@@ -1,0 +1,7 @@
+# Secrets. Real keys live only in .env on each machine; .env.example lists the names.
+.env
+.env.*
+!.env.example
+
+node_modules/
+.DS_Store
