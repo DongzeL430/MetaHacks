@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.3.3",
+    "ical2json": "^5.1.0",
     "react": "^19.3.1",
     "react-dom": "^19.3.1"
   },
