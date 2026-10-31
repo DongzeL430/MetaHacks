@@ -404,6 +404,74 @@ export type Database = {
           },
         ]
       }
+      study_session_members: {
+        Row: {
+          session_id: number
+          user_id: string
+        }
+        Insert: {
+          session_id: number
+          user_id: string
+        }
+        Update: {
+          session_id?: number
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "study_session_members_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "study_sessions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "study_session_members_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      study_sessions: {
+        Row: {
+          course_id: number | null
+          created_at: string
+          ends_at: string
+          id: number
+          location: string
+          starts_at: string
+          status: Database["public"]["Enums"]["session_status"]
+        }
+        Insert: {
+          course_id?: number | null
+          created_at?: string
+          ends_at: string
+          id?: never
+          location: string
+          starts_at: string
+          status?: Database["public"]["Enums"]["session_status"]
+        }
+        Update: {
+          course_id?: number | null
+          created_at?: string
+          ends_at?: string
+          id?: never
+          location?: string
+          starts_at?: string
+          status?: Database["public"]["Enums"]["session_status"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "study_sessions_course_id_fkey"
+            columns: ["course_id"]
+            isOneToOne: false
+            referencedRelation: "courses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       survey_answers: {
         Row: {
           answered_at: string
@@ -666,6 +734,7 @@ export type Database = {
         | "safety"
         | "other"
       report_status: "open" | "reviewed"
+      session_status: "planned" | "completed" | "cancelled"
       vibe_choice: "vibe" | "pass"
     }
     CompositeTypes: {
@@ -815,6 +884,7 @@ export const Constants = {
       onboarding_status: ["new", "onboarded"],
       report_reason: ["harassment", "inappropriate", "spam", "safety", "other"],
       report_status: ["open", "reviewed"],
+      session_status: ["planned", "completed", "cancelled"],
       vibe_choice: ["vibe", "pass"],
     },
   },
