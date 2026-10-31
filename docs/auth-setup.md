@@ -63,16 +63,19 @@ Without `--reveal` the secret key comes back masked, and every admin call fails 
 
 ## Notes on `config push`
 
-`config push` sends every setting declared in `config.toml`, including `site_url = "http://localhost:3000"`. Two changes are still to make:
+`config push` sends every setting declared in `config.toml`. Always load `.env` into the shell first:
 
-- Vite's dev server runs on `http://localhost:5173`, so `site_url` (or `additional_redirect_urls`) needs that address before confirmation links work in development.
-- Once the app has a real URL, add it to both, or confirmation links will point at localhost.
+```sh
+set -a; source .env; set +a
+```
 
-Settings `config push` doesn't manage, such as the hourly email limit, are changed in the dashboard.
+The Gmail and Turnstile settings read their secrets from `.env`. Pushing without it sends empty values, which breaks sign-up emails and the CAPTCHA.
 
-## Bot protection and email: in progress
+`site_url` is `http://localhost:5173`, Vite's dev server. Once the app has a real URL, change it, or confirmation links will point at localhost.
 
-**Cloudflare Turnstile (free bot check).** Once CAPTCHA is on in Supabase, every sign-up and sign-in without a valid token is rejected, so nothing but our own sign-up page can create accounts.
+## Bot protection and email
+
+**Cloudflare Turnstile (free bot check). On since 2026-10-31.** Every sign-up and sign-in without a valid token is rejected, so nothing but our own sign-up page can create accounts. A sign-up sent without a token gets `captcha_failed`. Setup, for reference:
 
 1. Create a free Cloudflare account at dash.cloudflare.com. No domain is needed.
 2. Turnstile > Add widget. Name it StudBuds, add the hostname `localhost`, choose Managed mode.
@@ -85,14 +88,14 @@ Settings `config push` doesn't manage, such as the hourly email limit, are chang
    ```
 5. When the app has a real URL, add it to the widget's hostnames and remove `localhost`.
 
-**Email sending: Gmail SMTP (free, about 500 emails a day).** Until this is on, Supabase's built-in sender only delivers to members of our Supabase team, at 2 emails per hour, so real students never get their confirmation link.
+**Email sending: Gmail SMTP (free, about 500 emails a day). On since 2026-10-31.** Emails come from the project Gmail account as "StudBuds", up to 100 an hour. Delivery to a real .edu inbox hasn't been tested yet: do step 7 as soon as the sign-up page works. Setup, for reference:
 
 1. Create a Gmail account for the project.
 2. Turn on 2-Step Verification for it (Google Account > Security).
 3. Create an app password (Google Account > Security > App passwords). Google shows 16 characters.
 4. Put the Gmail address in `SMTP_USER` and the app password, without spaces, in `SMTP_PASS` in `.env`.
 5. Uncomment `[auth.email.smtp]` in `config.toml`, then load `.env` and run `config diff` and `config push` as above.
-6. In the dashboard, Authentication > Rate Limits, raise the hourly email limit. It starts at 30 with custom SMTP; 100 leaves room for launch day and stays under Gmail's daily cap.
+6. The hourly email limit is `email_sent = 100` in `config.toml`. Once custom SMTP is on, `config push` manages it; 100 leaves room for launch day and stays under Gmail's daily cap.
 7. Sign up with a real .edu address and check that the email arrives and isn't in spam or quarantine. University mail filters are stricter than personal inboxes.
 
 **Rate limits.** Sign-up and sign-in stay at Supabase's default of 30 requests per 5 minutes per IP. Students on campus Wi-Fi often share one public IP, so tightening this could lock out real users on launch day. Tables students write to have their own per-student limits; see [database.md](database.md).
@@ -107,11 +110,13 @@ const { error } = await supabase.auth.signUp({
   password,
   options: {
     data: { adult_confirmed: true },
-    captchaToken, // once Turnstile is on
+    captchaToken, // required: the token from the Turnstile widget
     emailRedirectTo: `${window.location.origin}/auth/callback`,
   },
 });
 ```
+
+Sign-in and password reset need a token too, for example `supabase.auth.signInWithPassword({ email, password, options: { captchaToken } })`. A Turnstile token works once, so reset the widget after every attempt, successful or not. A missing or reused token fails with `error.code === 'captcha_failed'`.
 
 Messages the form should show when `error.message` matches:
 
