@@ -1,5 +1,6 @@
 import { Routes, Route, Navigate } from 'react-router';
 import AuthPage from './AuthPage.tsx';
+import PreSurveyPage from './PreSurveyPage.tsx'
 // import Home from './pages/Home';
 // import Profile from './pages/Profile';
 // import NotFound from './pages/NotFound';
@@ -8,8 +9,8 @@ import AuthPage from './AuthPage.tsx';
 export default function App() {
   return (
     <Routes>
-      <Route path="/" element={<AuthPage />} />
-
+      <Route path="/a" element={<AuthPage />} />
+     <Route path="/" element={<PreSurveyPage/>} />
       {/* Pages that share a layout (nav bar, etc.)
       <Route element={<Layout />}>
         <Route index element={<Home />} />
