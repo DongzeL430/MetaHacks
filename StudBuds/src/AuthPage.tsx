@@ -29,8 +29,11 @@ function describeError(error: AuthError): string {
     case 'weak_password':
       return 'Use a password with at least 8 characters.';
   }
+  // supabase-js uses this error both for no connection (status 0) and for server errors (5xx).
   if (error.name === 'AuthRetryableFetchError') {
-    return 'Can’t reach StudBuds right now. Check your connection and try again.';
+    return error.status === 0
+      ? 'Can’t reach StudBuds right now. Check your connection and try again.'
+      : `Something went wrong on our side (${error.message}). Try again in a few minutes.`;
   }
   return error.message;
 }
