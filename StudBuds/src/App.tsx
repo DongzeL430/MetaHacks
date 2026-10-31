@@ -1,4 +1,4 @@
-import { Routes, Route, Navigate } from 'react-router';
+import { Routes, Route } from 'react-router';
 import AuthPage from './AuthPage.tsx';
 import PreSurveyPage from './PreSurveyPage.tsx'
 // import Home from './pages/Home';
