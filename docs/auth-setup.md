@@ -2,7 +2,7 @@
 
 This covers step 1 of the user data layer: sign-up rules, the two profile tables, and how to apply them to the hosted Supabase project.
 
-Everything runs through the Supabase CLI via `npx`, pinned to one version so we both get the same behavior. No global install or Docker is needed.
+Everything runs through the Supabase CLI via `npx`, pinned to one version so we both get the same behavior. No global install is needed.
 
 ## What's in place
 
@@ -39,10 +39,12 @@ Then:
 npx supabase@2.122.0 db push --linked   # creates the tables, functions, and triggers (run first)
 npx supabase@2.122.0 config diff        # preview auth setting changes
 npx supabase@2.122.0 config push        # apply them; it asks before each change
-npx supabase@2.122.0 test db --linked   # 25 checks, rolled back afterwards (needs Docker)
+npx supabase@2.122.0 test db --linked   # 64 checks in supabase/tests, rolled back afterwards (needs Docker)
 ```
 
-`test db` runs its test tool inside Docker, even with `--linked`. Without Docker, the tests can still run through `db query --linked`, wrapped in a function that collects the results and forces a rollback. That is how they were run on 2026-10-30: all 25 passed, and no test rows were left behind.
+`test db` runs its test tool inside Docker, even with `--linked`. Without Docker, the tests can still run through `db query --linked`, wrapped in a function that collects the results and forces a rollback. That is how they were run on 2026-10-30 and 2026-10-31: all passed, and no test rows were left behind.
+
+The tables added in step 2 are described in [database.md](database.md).
 
 ## Keys
 
@@ -55,24 +57,45 @@ npx supabase@2.122.0 projects api-keys --project-ref <project-ref> --reveal
 
 Without `--reveal` the secret key comes back masked, and every admin call fails with "Invalid API key".
 
-- `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` is safe in the browser. Row level security limits what it can do.
+- `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY` are safe in the browser. Row level security limits what the publishable key can do.
 - `SUPABASE_SECRET_KEY` bypasses row level security. Use it only in server code, and send it in the `apikey` header. It is not a JWT, so `Authorization: Bearer <secret>` is rejected.
+- The frontend is Vite, which only exposes `VITE_` variables to the browser and normally reads `.env` from its own folder. `StudBuds/vite.config.ts` needs `envDir: '..'` so it reads this root `.env`. Anything without the `VITE_` prefix never reaches the browser, which is what keeps the secret keys safe.
 
 ## Notes on `config push`
 
-`config push` sends every setting declared in `config.toml`, including `site_url = "http://127.0.0.1:3000"`. That is fine until the app has a real URL, at which point `site_url` and `additional_redirect_urls` need updating, or confirmation links will point at localhost.
+`config push` sends every setting declared in `config.toml`, including `site_url = "http://localhost:3000"`. Two changes are still to make:
 
-## Not switched on yet
+- Vite's dev server runs on `http://localhost:5173`, so `site_url` (or `additional_redirect_urls`) needs that address before confirmation links work in development.
+- Once the app has a real URL, add it to both, or confirmation links will point at localhost.
 
-**Cloudflare Turnstile (bot check).** It waits until the sign-up page exists. Once CAPTCHA is on in Supabase, every sign-up and sign-in without a valid token is rejected, so turning it on early would block all sign-ups. When the page is ready:
+Settings `config push` doesn't manage, such as the hourly email limit, are changed in the dashboard.
 
-1. Create a Turnstile widget in the Cloudflare dashboard and note the site key and secret key.
-2. In `config.toml`, uncomment `[auth.captcha]`, set `provider = "turnstile"` and `secret = "env(TURNSTILE_SECRET)"`, then `config push` with that env var set. The dashboard path is Authentication > Attack Protection.
-3. The site key goes in the frontend env as `NEXT_PUBLIC_TURNSTILE_SITE_KEY`. The secret never goes in the repo.
+## Bot protection and email: in progress
 
-**Email sending.** Undecided. Until a custom SMTP provider is set up, Supabase's built-in sender only delivers to members of our Supabase team, at 2 emails per hour. That is enough for us to test, but not for real students.
+**Cloudflare Turnstile (free bot check).** Once CAPTCHA is on in Supabase, every sign-up and sign-in without a valid token is rejected, so nothing but our own sign-up page can create accounts.
 
-**Rate limits.** These stay at Supabase's defaults (30 sign-up and sign-in requests per 5 minutes per IP). Students on campus Wi-Fi often share one public IP, so tightening this could lock out real users on launch day.
+1. Create a free Cloudflare account at dash.cloudflare.com. No domain is needed.
+2. Turnstile > Add widget. Name it StudBuds, add the hostname `localhost`, choose Managed mode.
+3. Put the site key in `VITE_TURNSTILE_SITE_KEY` and the secret key in `TURNSTILE_SECRET` in `.env`.
+4. Uncomment `[auth.captcha]` in `config.toml`, then:
+   ```sh
+   set -a; source .env; set +a
+   npx supabase@2.122.0 config diff
+   npx supabase@2.122.0 config push
+   ```
+5. When the app has a real URL, add it to the widget's hostnames and remove `localhost`.
+
+**Email sending: Gmail SMTP (free, about 500 emails a day).** Until this is on, Supabase's built-in sender only delivers to members of our Supabase team, at 2 emails per hour, so real students never get their confirmation link.
+
+1. Create a Gmail account for the project.
+2. Turn on 2-Step Verification for it (Google Account > Security).
+3. Create an app password (Google Account > Security > App passwords). Google shows 16 characters.
+4. Put the Gmail address in `SMTP_USER` and the app password, without spaces, in `SMTP_PASS` in `.env`.
+5. Uncomment `[auth.email.smtp]` in `config.toml`, then load `.env` and run `config diff` and `config push` as above.
+6. In the dashboard, Authentication > Rate Limits, raise the hourly email limit. It starts at 30 with custom SMTP; 100 leaves room for launch day and stays under Gmail's daily cap.
+7. Sign up with a real .edu address and check that the email arrives and isn't in spam or quarantine. University mail filters are stricter than personal inboxes.
+
+**Rate limits.** Sign-up and sign-in stay at Supabase's default of 30 requests per 5 minutes per IP. Students on campus Wi-Fi often share one public IP, so tightening this could lock out real users on launch day. Tables students write to have their own per-student limits; see [database.md](database.md).
 
 ## Contract for the sign-up page
 
