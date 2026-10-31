@@ -1,1 +1,16 @@
-@import "tailwindcss";
+/* main.css */
+@import url('https://fonts.googleapis.com/css2?family=Short+Stack&display=swap');
+@import 'doodle.css/doodle.css';
+@import "tailwindcss";   
+@theme {
+  --font-sans: 'Short Stack', cursive;
+}
+ 
+/* Form controls don't inherit font by default */
+@layer base {
+  .doodle,
+  .doodle button,
+  .doodle input {
+    font-family: var(--font-sans);
+  }
+}
