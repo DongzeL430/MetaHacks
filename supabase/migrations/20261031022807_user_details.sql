@@ -137,8 +137,8 @@ create table public.survey_answers (
 
 
 -- Interests --------------------------------------------------------------------------
--- A fixed list managed by us. Tags about identity (religion, ethnicity, nationality,
--- politics, gender) don't belong in it.
+-- A fixed list managed by us. Tags about who a person is, such as religion, ethnicity,
+-- nationality, or politics, don't belong in it.
 
 create table public.interests (
   slug text primary key check (slug ~ '^[a-z0-9-]{2,40}$'),
