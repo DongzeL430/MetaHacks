@@ -27,25 +27,29 @@ export default function PreSurveyPage({
   };
 
   return (
-    <div className="doodle w-full h-dvh p-4">
-      <main className="doodle-border w-full h-full flex flex-col md:flex-row gap-6 p-6 min-h-0">
-        {/* LEFT: big icon + generated name */}
-        <aside className="shrink-0 flex flex-col items-center gap-3 md:w-64">
-          <svg
-            className="w-32 h-32 md:w-56 md:h-56"
-            viewBox="0 0 48 48"
-            role="img"
-            aria-label={`${userName}'s avatar`}
-          >
-            <circle cx="24" cy="24" r="21" fill="none" stroke="currentColor" strokeWidth="3" />
-            <ellipse cx="24" cy="20" rx="5" ry="4" fill="currentColor" />
-            <path d="M8 38 Q24 14 40 38 Z" fill="currentColor" />
-          </svg>
-          <p className="text-xl underline text-center break-words max-w-full">{userName}</p>
-        </aside>
+    <div className="doodle w-full h-dvh ">
+      {/* Outer padding leaves room for the icon to hang over the frame's corner */}
+      <main className="w-full h-full flex flex-col p-6 md:p-12 min-h-0">
+        {/* FIRST INNER FRAME. pt/pl clear space for the icon + name block on the left */}
+        <section className="relative doodle-border flex-1 min-w-0 min-h-0 flex flex-col gap-4 p-6 pt-36 md:pt-6 md:pl-48">
+          {/* Icon + generated name, pinned to the frame's top-left and hanging over the corner */}
+          <div className="absolute -top-6 -left-6 md:-top-10 md:-left-10 w-28 md:w-48 flex flex-col">
+            <svg
+              className="w-full h-auto"
+              viewBox="0 0 48 48"
+              role="img"
+              aria-label={`${userName}'s avatar`}
+            >
+              {/* Filled with the doodle background color so it cuts off the frame's corner */}
+              <circle cx="24" cy="24" r="21" fill="#FDF7F1" stroke="currentColor" strokeWidth="3" />
+              <ellipse cx="24" cy="20" rx="5" ry="4" fill="currentColor" />
+              <path d="M8 38 Q24 14 40 38 Z" fill="currentColor" />
+            </svg>
+            <p className="pl-6 md:pl-10 pr-2 pt-2 text-lg md:text-xl underline text-center break-words">
+              {userName}
+            </p>
+          </div>
 
-        {/* FIRST INNER FRAME */}
-        <section className="doodle-border flex-1 min-w-0 min-h-0 flex flex-col gap-4 p-6">
           <h1 className="text-3xl leading-snug">{sectionTitle}</h1>
           {sectionBio && <p className="opacity-80">{sectionBio}</p>}
 
