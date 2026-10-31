@@ -111,9 +111,14 @@ const { error } = await supabase.auth.signUp({
   options: {
     data: { adult_confirmed: true },
     captchaToken, // required: the token from the Turnstile widget
-    emailRedirectTo: `${window.location.origin}/auth/callback`,
   },
 });
+
+// The email holds an 8-digit code (no link). The student types it in:
+await supabase.auth.verifyOtp({ email, token: code, type: 'email' });
+
+// "Send a new code" needs a fresh Turnstile token:
+await supabase.auth.resend({ type: 'signup', email, options: { captchaToken } });
 ```
 
 Sign-in and password reset need a token too, for example `supabase.auth.signInWithPassword({ email, password, options: { captchaToken } })`. A Turnstile token works once, so reset the widget after every attempt, successful or not. A missing or reused token fails with `error.code === 'captcha_failed'`.
@@ -123,10 +128,12 @@ Messages the form should show when `error.message` matches:
 - "Please sign up with your school email address (ending in .edu)."
 - "You need to confirm that you are 18 or older."
 
-After sign-up, the user has to click the confirmation email before they can sign in.
+After sign-up, the student has to enter the emailed code before they can sign in. Logging in before that fails with `error.code === 'email_not_confirmed'`; `StudBuds/src/AuthPage.tsx` sends them to the code screen.
 
 ## Things that will trip you up
 
+- Confirmation emails carry a code, never a link (`supabase/templates/confirmation.html`). With a link, Vanderbilt's and Northeastern's mail scanners opened it within 20 seconds of delivery, which confirmed and signed in accounts nobody had checked, and the emails never reached the inbox. Don't put `{{ .ConfirmationURL }}` back in.
+- To see why an email failed, read the Auth logs, not the API Gateway log: the gateway only shows the status code. Through the Management API, query `GET /v1/projects/<ref>/analytics/endpoints/logs` with `SELECT timestamp, event_message FROM logs WHERE source = 'auth_logs' ORDER BY timestamp DESC`. That is how Gmail's `535 BadCredentials` reply was found.
 - The hook only runs on public sign-ups. Users created through the dashboard or the admin API skip it, and the trigger enforces the same two rules with a generic "Database error" message instead.
 - Creating a user with "Add user" in the dashboard fails, because the dashboard can't send the 18+ flag. Create test users through the sign-up call, or the admin API with `user_metadata: { adult_confirmed: true }`.
 - Checked live on 2026-10-30: the hook receives `options.data` from a real sign-up. A .edu sign-up with the flag was accepted, one without it got the 18+ message, and a gmail address got the .edu message.
