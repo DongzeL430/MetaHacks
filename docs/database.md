@@ -25,7 +25,7 @@ npx supabase@2.122.0 gen types typescript --linked --schema public > supabase/da
 
 ## Never send these
 
-`user_id`, `created_by`, and `university_domain` fill themselves from the signed-in student. Sending them is rejected, which is what stops anyone writing rows for someone else.
+`user_id`, `created_by`, `university_domain`, `blocker_id`, and `reporter_id` fill themselves from the signed-in student. Sending them is rejected, which is what stops anyone writing rows for someone else.
 
 ## Tables
 
@@ -45,6 +45,26 @@ Other students can't see any of these rows except where noted. Server code with 
 | `accessories` | Penguin accessory catalog | Read approved ones | Read only |
 | `user_accessories` | Accessories they own | Read | Read only (unlocked by server) |
 | `universities` | School domains and names | Read | Read only |
+| `pairings` | Each time two students are paired: who, when, Vibe Check counts, and `mutual_at` once both picked Vibe | Read pairings they're in | Read only (created by server) |
+| `vibe_decisions` | Their Vibe or Pass for a pairing | Choose once, never change; the partner never sees it | 1 per pairing |
+| `contact_shares` | Per mutual pairing: share `instagram`, `discord`, `phone` (yes/no each) | Answer, change their answer | 1 per pairing |
+| `blocks` | Who they blocked | Block someone they were paired with, unblock | 200 |
+| `reports` | Reports they filed: `reason`, optional `details` (500 characters) | File a report about someone they were paired with | 30 |
+| `study_sessions` | Study record: when (`starts_at`, `ends_at`), where (typed `location`), which course, `status` (`planned`, `completed`, `cancelled`) | Read sessions they were in | Read only (written by server) |
+| `study_session_members` | Who was in each session | See who was in their own sessions | Read only; up to 4 people per session |
+
+## Rules for the matchmaker and other server code
+
+These keep prejudice on our side out of pairing. They aren't enforced by the database, so whoever writes the matching code has to follow them:
+
+- A Pass, a block, or a report only affects that one pair. Never turn how often someone was passed, blocked, or reported into an overall score; that would carry other students' snap judgments into every future match. Reports go to a person for review instead.
+- Vibe Check results are counts only (`agreements`, `reactions`). Don't infer anything about a person from them.
+- Skip a pair when `pair_on_cooldown(a, b)` is true (a Pass in the last day) or a block exists in either direction.
+- Pair only students at the same school, using nothing that describes who they are. Grades are for matching complementary strengths, never shown to the partner.
+- Set `mutual_at` only when both students picked Vibe. Leave it empty otherwise, so a Pass looks the same as no answer.
+- Show contact handles only when both students said yes in that pairing, and only the platforms each one picked.
+- The study record is a history, never a score. Don't rank or filter students by how many sessions they've had or cancelled.
+- Session locations are typed text. The database only checks length (120 characters, one line), so the app has to steer students to public places such as libraries and student centers, never a home address.
 
 ## Formats
 
@@ -84,5 +104,30 @@ await supabase.from('survey_answers').update({ choice: 'b' }).eq('question_id', 
 // Contact handles (private)
 await supabase.from('profiles').update({ instagram: 'sleepy.reads' }).eq('id', userId)
 ```
+
+```ts
+// Vibe or Pass, once, at the end of the Vibe Check
+await supabase.from('vibe_decisions').insert({ pairing_id, choice: 'vibe' })
+
+// The student's connections: pairings where both picked Vibe
+const { data: connections } = await supabase.from('pairings').select('*').not('mutual_at', 'is', null)
+
+// "Share your contacts with this partner?", one choice per platform
+await supabase.from('contact_shares').insert({ pairing_id, instagram: true, discord: true, phone: false })
+
+// Block or report someone from a pairing
+await supabase.from('blocks').insert({ blocked_id: partnerId })
+await supabase.from('reports').insert({ reported_id: partnerId, pairing_id, reason: 'harassment', details })
+```
+
+```ts
+// Study record: past and upcoming sessions, with who was there
+const { data: sessions } = await supabase
+  .from('study_sessions')
+  .select('starts_at, ends_at, location, status, courses(code), study_session_members(user_id)')
+  .order('starts_at', { ascending: false })
+```
+
+`reason` is one of `harassment`, `inappropriate`, `spam`, `safety`, `other`. The partner's id is whichever of `user_low` and `user_high` on the pairing isn't the signed-in student.
 
 Use `insert` and `update` rather than `upsert`. An upsert also rewrites columns like `question_id` that students aren't allowed to change, so it gets rejected.
