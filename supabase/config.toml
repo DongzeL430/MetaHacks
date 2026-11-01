@@ -258,6 +258,12 @@ sender_name = "StudBuds"
 # subject = "You have been invited"
 # content_path = "./supabase/templates/invite.html"
 
+# Sign-up confirmation sends a code, not a link. School email scanners open links
+# automatically, which confirmed accounts nobody had checked and got emails quarantined.
+[auth.email.template.confirmation]
+subject = "Your StudBuds sign-up code"
+content_path = "./supabase/templates/confirmation.html"
+
 # Uncomment to customize notification email template
 # [auth.email.notification.password_changed]
 # enabled = true
