@@ -1,7 +1,15 @@
-import { useEffect, useRef, useState } from 'react';
-import type { KeyboardEvent, PointerEvent as ReactPointerEvent, ReactNode } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import type { CSSProperties, KeyboardEvent, MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent, ReactNode } from 'react';
 
 type ResizeEdge = 'n' | 's' | 'e' | 'w' | 'ne' | 'nw' | 'se' | 'sw';
+
+/** 'enabled' = clickable, 'disabled' = shown but greyed out, 'hidden' = not rendered */
+export type WindowControlState = 'enabled' | 'disabled' | 'hidden';
+
+export interface WindowControls {
+  close?: WindowControlState;
+  fullscreen?: WindowControlState;
+}
 
 /** Window position and size, relative to the parent's content box */
 interface WindowRect {
@@ -21,6 +29,11 @@ interface Box {
 interface AppWindowProps {
   /** Text shown in the title bar */
   title?: ReactNode;
+  /**
+   * Controlled visibility. Leave it out and the window hides itself when closed;
+   * pass it (with onClose setting it to false) to control it from the parent.
+   */
+  open?: boolean;
   /** Content rendered below the divider. Scrolls when it gets too tall. */
   children?: ReactNode;
   /** Pinned under the body with its own divider (action buttons, progress, etc.) */
@@ -31,10 +44,17 @@ interface AppWindowProps {
   movable?: boolean;
   minWidth?: number;
   minHeight?: number;
-  /** The X button is disabled unless this is set to false */
-  closeDisabled?: boolean;
-  /** The full screen button is disabled unless this is set to false */
-  fullscreenDisabled?: boolean;
+  /**
+   * State of the title bar buttons. Anything not given is 'disabled'.
+   * e.g. controls={{ close: 'enabled', fullscreen: 'hidden' }}
+   */
+  controls?: WindowControls;
+  /** Opens at this size, centered in its area, instead of filling it */
+  initialSize?: { width: number; height: number };
+  /** Makes the window unclickable and unfocusable, e.g. while a popup sits on top of it */
+  inactive?: boolean;
+  /** id for the title text, so a dialog can point aria-labelledby at it */
+  titleId?: string;
   onClose?: () => void;
   onFullscreenChange?: (isFullscreen: boolean) => void;
   /** Extra classes for the outer frame */
@@ -109,14 +129,17 @@ const trackPointer = (
 
 export default function AppWindow({
   title = 'Untitled',
+  open,
   children,
   footer,
   resizable = true,
   movable = true,
   minWidth = 280,
   minHeight = 200,
-  closeDisabled = true,
-  fullscreenDisabled = true,
+  controls,
+  initialSize,
+  inactive = false,
+  titleId,
   onClose,
   onFullscreenChange,
   className = '',
@@ -128,6 +151,15 @@ export default function AppWindow({
   const [rect, setRect] = useState<WindowRect | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
+  const [selfOpen, setSelfOpen] = useState(true);
+  const isOpen = open ?? selfOpen;
+  // Latest callback, for the Escape listener below
+  const onFullscreenChangeRef = useRef(onFullscreenChange);
+  onFullscreenChangeRef.current = onFullscreenChange;
+  const sizedRef = useRef(false);
+
+  const closeState = controls?.close ?? 'disabled';
+  const fullscreenState = controls?.fullscreen ?? 'disabled';
 
   const canResize = resizable && !isFullscreen;
   const canMove = movable && !isFullscreen;
@@ -206,6 +238,28 @@ export default function AppWindow({
     setRect(resizeFrom('se', measured.start, measured.box, delta[0], delta[1]));
   };
 
+  // initialSize: open centered at that size (before the first paint, so it doesn't jump)
+  useLayoutEffect(() => {
+    if (!initialSize || !isOpen || sizedRef.current) return;
+    const parent = frameRef.current?.parentElement;
+    if (!parent) return;
+    const box = getContentBox(parent);
+    const areaW = box.right - box.left;
+    const areaH = box.bottom - box.top;
+    const width = clamp(initialSize.width, Math.min(minWidth, areaW), areaW);
+    const height = clamp(initialSize.height, Math.min(minHeight, areaH), areaH);
+    setRect({ x: (areaW - width) / 2, y: (areaH - height) / 2, width, height });
+    sizedRef.current = true;
+    // Only the first time it opens: later size changes come from the user
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen]);
+
+  // inactive: block clicks and keyboard focus on everything inside the window
+  useEffect(() => {
+    const frame = frameRef.current as (HTMLDivElement & { inert: boolean }) | null;
+    if (frame) frame.inert = inactive;
+  }, [inactive, isOpen]);
+
   // If the page shrinks, pull the window back inside its area
   useEffect(() => {
     const parent = frameRef.current?.parentElement;
@@ -229,18 +283,51 @@ export default function AppWindow({
 
     observer.observe(parent);
     return () => observer.disconnect();
-  }, [minWidth, minHeight]);
+  }, [minWidth, minHeight, isOpen]);
 
-  const toggleFullscreen = () => {
-    const next = !isFullscreen;
+  const setFullscreen = (next: boolean) => {
     setIsFullscreen(next);
-    onFullscreenChange?.(next);
+    onFullscreenChangeRef.current?.(next);
   };
 
-  const rectStyle =
-    rect && !isFullscreen
-      ? { left: rect.x, top: rect.y, width: rect.width, height: rect.height }
-      : { left: 0, top: 0, width: '100%', height: '100%' };
+  const toggleFullscreen = () => setFullscreen(!isFullscreen);
+
+  // Escape leaves full screen (a popup that handles Escape itself stops it first)
+  useEffect(() => {
+    if (!isFullscreen) return;
+    const onKey = (e: globalThis.KeyboardEvent) => {
+      if (e.key === 'Escape' && !e.defaultPrevented) setFullscreen(false);
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isFullscreen]);
+
+  const handleClose = () => {
+    if (isFullscreen) setFullscreen(false);
+    if (open === undefined) setSelfOpen(false);
+    onClose?.();
+  };
+
+  // Double-clicking the title bar toggles full screen, like a desktop window
+  const handleTitleDoubleClick = (e: ReactMouseEvent<HTMLDivElement>) => {
+    if (fullscreenState !== 'enabled' || (e.target as HTMLElement).closest('button')) return;
+    toggleFullscreen();
+  };
+
+  // Full screen: pinned over the whole viewport. Otherwise: its own spot inside the desk area.
+  // The saved position and size are kept, so leaving full screen puts it back where it was.
+  const frameStyle: CSSProperties = isFullscreen
+    ? { position: 'fixed', inset: 0, zIndex: 60 }
+    : {
+        ...(rect
+          ? { left: rect.x, top: rect.y, width: rect.width, height: rect.height }
+          : { left: 0, top: 0, width: '100%', height: '100%' }),
+        minWidth,
+        minHeight,
+        maxWidth: '100%',
+        maxHeight: '100%',
+      };
 
   // Paper chips that sit on top of the title bar. Hover lifts and tilts them, press pushes them in.
   const titleButton = [
@@ -253,10 +340,12 @@ export default function AppWindow({
     'motion-safe:enabled:active:translate-y-0 motion-safe:enabled:active:rotate-0',
   ].join(' ');
 
+  if (!isOpen) return null;
+
   return (
     <div
       ref={frameRef}
-      style={{ ...rectStyle, minWidth, minHeight, maxWidth: '100%', maxHeight: '100%' }}
+      style={frameStyle}
       className={`relative ${className}`}
     >
       {/* SURFACE: the window's fill. Inset so its edges tuck under the hand-drawn line. */}
@@ -269,51 +358,60 @@ export default function AppWindow({
         {/* TITLE BAR: drag it to move the window */}
         <div
           onPointerDown={startMove}
+          onDoubleClick={handleTitleDoubleClick}
           className={`shrink-0 flex items-center gap-3 pl-4 pr-2.5 py-2 bg-[#EADBC8] touch-none select-none ${
             canMove ? (isDragging ? 'cursor-grabbing' : 'cursor-grab') : ''
           }`}
         >
-          <p className="flex-1 min-w-0 m-0 truncate text-lg">{title}</p>
+          <p id={titleId} className="flex-1 min-w-0 m-0 truncate text-lg">{title}</p>
 
           <div className="flex items-center gap-2">
-            <button
-              type="button"
-              className={`${titleButton} enabled:hover:bg-[#BFE3C4]`}
-              onClick={toggleFullscreen}
-              disabled={fullscreenDisabled}
-              aria-label={isFullscreen ? 'Exit full screen' : 'Full screen'}
-              title={isFullscreen ? 'Exit full screen' : 'Full screen'}
-            >
-              <svg viewBox="0 0 20 20" className="w-4 h-4" aria-hidden="true">
-                <path
-                  d="M3 8V3h5M12 3h5v5M17 12v5h-5M8 17H3v-5"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2.2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </svg>
-            </button>
+            {fullscreenState !== 'hidden' && (
+              <button
+                type="button"
+                className={`${titleButton} enabled:hover:bg-[#BFE3C4]`}
+                onClick={toggleFullscreen}
+                disabled={fullscreenState === 'disabled'}
+                aria-label={isFullscreen ? 'Exit full screen' : 'Full screen'}
+                title={isFullscreen ? 'Exit full screen' : 'Full screen'}
+              >
+                <svg viewBox="0 0 20 20" className="w-4 h-4" aria-hidden="true">
+                  <path
+                    d={
+                      isFullscreen
+                        ? 'M8 3v5H3M12 3v5h5M17 12h-5v5M3 12h5v5' // corners pointing in: exit
+                        : 'M3 8V3h5M12 3h5v5M17 12v5h-5M8 17H3v-5' // corners pointing out: enter
+                    }
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2.2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              </button>
+            )}
 
-            <button
-              type="button"
-              className={`${titleButton} enabled:hover:bg-[#F2A99E]`}
-              onClick={onClose}
-              disabled={closeDisabled}
-              aria-label="Close"
-              title="Close"
-            >
-              <svg viewBox="0 0 20 20" className="w-4 h-4" aria-hidden="true">
-                <path
-                  d="M4 4.5 16 15.5M15.5 4 4.5 16"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2.4"
-                  strokeLinecap="round"
-                />
-              </svg>
-            </button>
+            {closeState !== 'hidden' && (
+              <button
+                type="button"
+                className={`${titleButton} enabled:hover:bg-[#F2A99E]`}
+                onClick={handleClose}
+                disabled={closeState === 'disabled'}
+                aria-label="Close"
+                title="Close"
+              >
+                <svg viewBox="0 0 20 20" className="w-4 h-4" aria-hidden="true">
+                  <path
+                    d="M4 4.5 16 15.5M15.5 4 4.5 16"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2.4"
+                    strokeLinecap="round"
+                  />
+                </svg>
+              </button>
+            )}
           </div>
         </div>
 
