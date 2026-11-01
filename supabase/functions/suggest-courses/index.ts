@@ -11,6 +11,10 @@ const MAX_PROGRAMS_PER_KIND = 3;
 const MAX_COURSES_PER_PROGRAM = 40;
 // One search can take a while; several run at once, inside the function's time limit.
 const SEARCH_TIMEOUT_MS = 120_000;
+// Web pages Muse reads are billed as input tokens. On "medium" one program read up to ~360k
+// tokens (~$0.13); "low" plus a cap on searches keeps each program far cheaper.
+const SEARCH_CONTEXT = 'low';
+const MAX_SEARCHES = 4;
 // Same rule as courses.code in the database, so codes can be saved as they are.
 const COURSE_CODE = /^[A-Z0-9][A-Z0-9 ./-]{1,19}$/;
 const STATUSES = ['taken', 'taking', 'planned'] as const;
@@ -68,7 +72,7 @@ function instructions(school: string, domain: string, program: Program, gradYear
       : 'Minors rarely have a term-by-term plan. Unless a page places a course in a term, set term to null and status to "planned".';
   return `You find the courses a college student has taken, is taking, and will take for one program, using official sources.
 
-Use web search. Look for ${school}'s official course catalog and the requirements or sample plan of study for the program below, on the school's own website (${domain}). Use other reliable sources only when the school's pages don't cover it.
+Use web search, at most ${MAX_SEARCHES} searches. Look for ${school}'s official course catalog and the requirements or sample plan of study for the program below, on the school's own website (${domain}). Use other reliable sources only when the school's pages don't cover it.
 - Only include courses you found on a page you read, with that page's URL. Never invent a course code or title.
 - Include required courses and specific courses the program names. Skip generic placeholders like "Elective" or "General education".
 - status: "taken" for terms before the current one, "taking" for the current term, "planned" for later terms. Today is ${today}. The student expects to graduate in spring ${gradYear}${classYear ? ` and is a ${classYear}` : ''}.
@@ -111,10 +115,15 @@ function cleanCourses(raw: unknown): Course[] {
   return out;
 }
 
+const metaHeaders = () => ({
+  Authorization: `Bearer ${Deno.env.get('META_API_KEY')}`,
+  'Content-Type': 'application/json',
+});
+
 async function searchProgram(school: string, domain: string, program: Program, gradYear: number, classYear: string) {
   const res = await fetch('https://api.meta.ai/v1/responses', {
     method: 'POST',
-    headers: { Authorization: `Bearer ${Deno.env.get('META_API_KEY')}`, 'Content-Type': 'application/json' },
+    headers: metaHeaders(),
     signal: AbortSignal.timeout(SEARCH_TIMEOUT_MS),
     body: JSON.stringify({
       model: 'muse-spark-1.3',
@@ -126,7 +135,7 @@ async function searchProgram(school: string, domain: string, program: Program, g
           content: `Program: ${program.kind} in ${program.name}${program.track ? `, track or concentration: ${program.track}` : ''}`,
         },
       ],
-      tools: [{ type: 'web_search', search_context_size: 'medium' }],
+      tools: [{ type: 'web_search', search_context_size: SEARCH_CONTEXT }],
       text: { format: { type: 'json_schema', name: 'course_plan', strict: true, schema: SCHEMA } },
     }),
   });
@@ -134,14 +143,72 @@ async function searchProgram(school: string, domain: string, program: Program, g
 
   const body = await res.json();
   console.log('suggest-courses usage', program.kind, JSON.stringify(body.usage ?? {}));
-  const text = (body.output ?? [])
-    .filter((item: { type?: string }) => item.type === 'message')
-    .flatMap((item: { content?: { type?: string; text?: string }[] }) => item.content ?? [])
-    .filter((part: { type?: string }) => part.type === 'output_text')
-    .map((part: { text?: string }) => part.text ?? '')
+
+  // Muse often writes a short note ("I'll search the catalog...") before searching, so the
+  // output holds several messages. The JSON is in the last one.
+  const messages = (body.output ?? []).filter((item: { type?: string }) => item.type === 'message');
+  const last = messages[messages.length - 1] as { content?: { type?: string; text?: string }[] } | undefined;
+  const text = (last?.content ?? [])
+    .filter((part) => part.type === 'output_text')
+    .map((part) => part.text ?? '')
     .join('');
-  const parsed = JSON.parse(text);
+
+  let parsed: { courses?: unknown };
+  try {
+    parsed = readJson(text);
+  } catch (err) {
+    console.error('suggest-courses answer was not JSON, reformatting', program.kind, String(err).slice(0, 400));
+    parsed = await reformatAnswer(text);
+  }
   return cleanCourses(parsed.courses);
+}
+
+/**
+ * If Muse answered in prose instead of JSON, has it rewrite that answer in the course format.
+ * No new search, so this costs a small fraction of the search it rescues.
+ */
+async function reformatAnswer(text: string): Promise<{ courses?: unknown }> {
+  const res = await fetch('https://api.meta.ai/v1/chat/completions', {
+    method: 'POST',
+    headers: metaHeaders(),
+    signal: AbortSignal.timeout(60_000),
+    body: JSON.stringify({
+      model: 'muse-spark-1.3',
+      reasoning_effort: 'low',
+      max_completion_tokens: 6000,
+      messages: [
+        {
+          role: 'developer',
+          content:
+            'Rewrite the course list below in the given JSON format. Keep only courses that come with a source URL in the text. Never add a course that is not in the text.',
+        },
+        { role: 'user', content: text.slice(0, 40_000) },
+      ],
+      response_format: { type: 'json_schema', json_schema: { name: 'course_plan', strict: true, schema: SCHEMA } },
+    }),
+  });
+  if (!res.ok) throw new Error(`Meta API ${res.status} while reformatting: ${(await res.text()).slice(0, 200)}`);
+  const body = await res.json();
+  console.log('suggest-courses reformat usage', JSON.stringify(body.usage ?? {}));
+  return JSON.parse(body.choices?.[0]?.message?.content ?? '');
+}
+
+/** The answer's JSON, even if a sentence comes before or after it */
+function readJson(text: string): { courses?: unknown } {
+  try {
+    return JSON.parse(text);
+  } catch {
+    const start = text.indexOf('{');
+    const end = text.lastIndexOf('}');
+    if (start >= 0 && end > start) {
+      try {
+        return JSON.parse(text.slice(start, end + 1));
+      } catch {
+        // falls through to the error below
+      }
+    }
+    throw new Error(`Answer wasn't JSON: ${text.slice(0, 300)}`);
+  }
 }
 
 Deno.serve(async (req) => {
@@ -205,7 +272,13 @@ Deno.serve(async (req) => {
   if ((count ?? 0) >= DAILY_LIMIT) {
     return fail(429, `You've used today's ${DAILY_LIMIT} course searches. Add courses by hand, or try again tomorrow.`);
   }
-  await supabase.from('ai_requests').insert({ user_id: userId, kind: 'suggest_courses' });
+  // Counted before searching so parallel clicks can't slip past the limit; given back below if
+  // every program fails, since that's on us, not the student.
+  const { data: usage } = await supabase
+    .from('ai_requests')
+    .insert({ user_id: userId, kind: 'suggest_courses' })
+    .select('id')
+    .single();
 
   const programs = [...majors, ...minors];
   const freshAfter = new Date(Date.now() - CACHE_DAYS * 24 * 60 * 60 * 1000).toISOString();
@@ -256,7 +329,11 @@ Deno.serve(async (req) => {
   const failed = results.filter((r) => r.courses === null).map((r) => r.program.name);
 
   if (courses.length === 0 && failed.length === programs.length) {
-    return fail(502, 'Muse couldn’t search your school’s catalog right now. Try again in a minute.');
+    if (usage) await supabase.from('ai_requests').delete().eq('id', usage.id);
+    return fail(
+      502,
+      'Muse couldn’t search your school’s catalog right now. This try didn’t count toward your daily limit.',
+    );
   }
 
   if (courses.length > 0) {

@@ -9,6 +9,7 @@ export const STATUS_OPTIONS = [
   { value: 'taken', label: 'Already taken' },
   { value: 'taking', label: 'Taking now' },
   { value: 'planned', label: 'Planning to take' },
+  { value: 'transferred', label: 'Transferred' },
 ] as const;
 
 /** Most majors and minors one student can list (the course search runs one search per program) */
