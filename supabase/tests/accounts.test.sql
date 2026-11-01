@@ -103,18 +103,18 @@ select throws_ok(
 );
 
 select lives_ok(
-  $$update public.profiles set major = 'Computer Science' where id = 'a0000000-0000-4000-8000-000000000001'$$,
-  'Users can edit their own major'
+  $$update public.profiles set discord = 'sleepy_reads' where id = 'a0000000-0000-4000-8000-000000000001'$$,
+  'Users can edit their own profile details'
 );
 
 -- Row level security skips rows the user can't see, so this succeeds but changes nothing.
-update public.profiles set major = 'Changed by A'
+update public.profiles set discord = 'changed_by_a'
 where id = 'b0000000-0000-4000-8000-000000000002';
 
 reset role;
 
 select ok(
-  (select major from public.profiles where id = 'b0000000-0000-4000-8000-000000000002') is null,
+  (select discord from public.profiles where id = 'b0000000-0000-4000-8000-000000000002') is null,
   'Users cannot edit someone else''s profile'
 );
 

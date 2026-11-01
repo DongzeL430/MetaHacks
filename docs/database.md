@@ -33,10 +33,11 @@ Other students can't see any of these rows except where noted. Server code with 
 
 | Table | Holds | The student can | Limit |
 |---|---|---|---|
-| `profiles` | University, major, 18+ time, onboarding status, Instagram, Discord, phone | Read their own row; update `major`, `instagram`, `discord`, `phone` | 1 row |
+| `profiles` | University, 18+ time, onboarding status, Instagram, Discord, phone | Read their own row; update `instagram`, `discord`, `phone` | 1 row |
+| `user_programs` | Majors (each with an optional `track`) and minors, in order by `position` 1 to 3 | Add, edit, remove their own | 3 majors and 3 minors |
 | `public_profiles` | Nickname, animal, equipped accessories, points | Read their own, and other students' once onboarded | Read only |
 | `courses` | Shared course list per school | Read their school's list; add a code | 15 new codes |
-| `user_courses` | Courses taking or completed, with self-reported grade | Add, update `status` and `grade`, remove | 40 |
+| `user_courses` | Courses `taking`, `completed`, or `planned`, with self-reported grade | Add, update `status` and `grade`, remove | 40 |
 | `availability_slots` | Weekly free time | Add, edit, remove | 30 |
 | `survey_questions` | This or That questions | Read approved ones | Read only |
 | `survey_answers` | Their pick, `a` or `b`, per question | Answer, change, remove | 1 per question |
@@ -79,7 +80,8 @@ These keep prejudice on our side out of pairing. They aren't enforced by the dat
 ## Formats
 
 - **Course codes:** uppercase, single spaces, letters, digits, `.`, `-`, `/`, 2 to 20 characters, e.g. `CS 2500`. `CS2500` and `CS 2500` count as the same course. Search the list before adding, and add only if the code is missing.
-- **Grades:** `A` `A-` `B+` `B` `B-` `C+` `C` `C-` `D+` `D` `D-` `F` `P`. Optional while `status` is `taking`, required for `completed`.
+- **Grades:** `A` `A-` `B+` `B` `B-` `C+` `C` `C-` `D+` `D` `D-` `F` `P`. Required for `completed`, optional otherwise. `planned` courses have no grade or confidence yet.
+- **Course search cache:** `course_search_cache` holds Muse's course list per school, program, track, and graduation year for 7 days. Server code only; see [muse-schedule.md](muse-schedule.md).
 - **Availability:** `weekday` is 1 (Monday) to 7 (Sunday), times like `'09:00'`, in the school's local time. The end must be after the start.
 - **Instagram:** without the `@`, up to 30 letters, digits, `.` or `_`.
 - **Discord:** lowercase, 2 to 32 letters, digits, `.` or `_`.

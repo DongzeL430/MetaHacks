@@ -1,5 +1,4 @@
-import { FunctionsHttpError } from '@supabase/supabase-js';
-import { supabase } from '../lib/supabase.ts';
+import { callFunction } from '../lib/edgeFunctions.ts';
 import type { DayKey } from '../components/AvailabilityCalendar';
 
 /*
@@ -58,16 +57,10 @@ async function shrinkToJpeg(file: File): Promise<string> {
 
 export async function readScheduleScreenshot(file: File): Promise<ScheduleReadResult> {
   const image = await shrinkToJpeg(file);
-  const { data, error } = await supabase.functions.invoke('read-schedule', { body: { image } });
-
-  if (error) {
-    // The function explains limits and bad images in { error }; show that when it's there
-    const message =
-      error instanceof FunctionsHttpError
-        ? await error.context.json().then((body: { error?: string }) => body.error, () => undefined)
-        : undefined;
-    throw new Error(message ?? 'Couldn’t reach Muse right now. Check your connection and try again.');
-  }
+  const data = await callFunction<{ isSchedule: boolean; events: ScheduleBlock[]; courseCodes: string[] }>(
+    'read-schedule',
+    { image },
+  );
 
   if (!data?.isSchedule) {
     throw new Error('That doesn’t look like a schedule. Try a screenshot of your class schedule or calendar.');

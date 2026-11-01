@@ -32,6 +32,26 @@ npx supabase@2.122.0 functions deploy read-schedule --use-api --no-verify-jwt
 
 `--use-api` builds the function on Supabase's side, so Docker isn't needed. `--no-verify-jwt` is on purpose: the function checks the login itself with `supabase.auth.getUser`, which works with both legacy and new JWT signing keys.
 
+## Finding courses (web search)
+
+In the "About you" window, a student lists up to 3 majors (each with an optional track) and up to 3 minors, picks their expected graduation year, and clicks **Find courses**. Their school comes from their .edu email on the server, never from the request.
+
+1. `StudBuds/src/lib/courses.ts` calls `supabase/functions/suggest-courses`.
+2. For each program, the function uses a cached answer under 7 days old, or asks `muse-spark-1.3` to search the school's catalog and degree pages with the Responses API's `web_search` tool. Uncached programs search at the same time.
+3. Every course must come with the page it was found on, and codes must match the database's format. Results from all programs are combined, one row per course; if programs disagree, the earliest status wins (taken, then taking, then planned).
+4. New courses go into the school's shared `courses` list with their official titles (`add_found_courses`), so students don't hit their own 15-new-courses limit.
+5. Courses arrive on the Courses page as "Suggested" rows named like "CS 2500 · Fundamentals of Computer Science 1", with a Sources line linking the pages Muse used. Students change, rate, or remove each one. Planned courses need no rating.
+
+Limits: 3 clicks per student per day (counted before searching), up to 6 programs per click. Meta doesn't publish a price per search; check `suggest-courses usage` lines in the function logs for real token counts.
+
+Tested on 2026-11-01 without calling Muse, using pre-filled cache rows: input checks, combining a major and minor, the earliest-status rule, the shared course list, sources, and the daily limit all behave as described. The real search is untested until a student tries it.
+
+Deploy the same way as `read-schedule`:
+
+```sh
+npx supabase@2.122.0 functions deploy suggest-courses --use-api --no-verify-jwt
+```
+
 ## Changing it
 
 - Daily limit: `DAILY_LIMIT` in the function.
