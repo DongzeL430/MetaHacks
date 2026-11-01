@@ -33,10 +33,11 @@ Other students can't see any of these rows except where noted. Server code with 
 
 | Table | Holds | The student can | Limit |
 |---|---|---|---|
-| `profiles` | University, major, 18+ time, onboarding status, Instagram, Discord, phone | Read their own row; update `major`, `instagram`, `discord`, `phone` | 1 row |
+| `profiles` | University, 18+ time, onboarding status, Instagram, Discord, phone | Read their own row; update `instagram`, `discord`, `phone` | 1 row |
+| `user_programs` | Majors (each with an optional `track`) and minors, in order by `position` 1 to 3 | Add, edit, remove their own | 3 majors and 3 minors |
 | `public_profiles` | Nickname, animal, equipped accessories, points | Read their own, and other students' once onboarded | Read only |
 | `courses` | Shared course list per school | Read their school's list; add a code | 15 new codes |
-| `user_courses` | Courses taking or completed, with self-reported grade | Add, update `status` and `grade`, remove | 40 |
+| `user_courses` | Courses `taking`, `completed`, or `planned`, with self-reported grade | Add, update `status` and `grade`, remove | 40 |
 | `availability_slots` | Weekly free time | Add, edit, remove | 30 |
 | `survey_questions` | This or That questions | Read approved ones | Read only |
 | `survey_answers` | Their pick, `a` or `b`, per question | Answer, change, remove | 1 per question |
@@ -51,7 +52,17 @@ Other students can't see any of these rows except where noted. Server code with 
 | `blocks` | Who they blocked | Block someone they were paired with, unblock | 200 |
 | `reports` | Reports they filed: `reason`, optional `details` (500 characters) | File a report about someone they were paired with | 30 |
 | `study_sessions` | Study record: when (`starts_at`, `ends_at`), where (typed `location`), which course, `status` (`planned`, `completed`, `cancelled`) | Read sessions they were in | Read only (written by server) |
-| `study_session_members` | Who was in each session | See who was in their own sessions | Read only; up to 4 people per session |
+| `study_session_members` | Who was in each session: `nickname`, and `account_deleted` once that student deletes their account | See who was in their own sessions | Read only; up to 4 people per session |
+
+## Deleting an account
+
+`supabase.rpc('delete_my_account')` deletes the signed-in student's login. The database then removes their profiles, courses, free times, survey answers, interests, accessories, contact handles, pairings, Vibe choices, sharing choices, and blocks. What stays:
+
+- Study sessions they shared, in their partners' records. Their row keeps their nickname, with an empty `user_id` and `account_deleted` set to true, so partners still see who they studied with. The nickname can later be given to a new student.
+- Courses they added to the school's list.
+- Reports they filed, for review, with the reporter removed. Reports about them are deleted.
+
+The function takes no arguments, so a student can only delete themselves.
 
 ## Rules for the matchmaker and other server code
 
@@ -69,7 +80,8 @@ These keep prejudice on our side out of pairing. They aren't enforced by the dat
 ## Formats
 
 - **Course codes:** uppercase, single spaces, letters, digits, `.`, `-`, `/`, 2 to 20 characters, e.g. `CS 2500`. `CS2500` and `CS 2500` count as the same course. Search the list before adding, and add only if the code is missing.
-- **Grades:** `A` `A-` `B+` `B` `B-` `C+` `C` `C-` `D+` `D` `D-` `F` `P`. Optional while `status` is `taking`, required for `completed`.
+- **Grades:** `A` `A-` `B+` `B` `B-` `C+` `C` `C-` `D+` `D` `D-` `F` `P`. Required for `completed`, optional otherwise. `planned` courses have no grade or confidence yet.
+- **Course search cache:** `course_search_cache` holds Muse's course list per school, program, track, and graduation year for 7 days. Server code only; see [muse-schedule.md](muse-schedule.md).
 - **Availability:** `weekday` is 1 (Monday) to 7 (Sunday), times like `'09:00'`, in the school's local time. The end must be after the start.
 - **Instagram:** without the `@`, up to 30 letters, digits, `.` or `_`.
 - **Discord:** lowercase, 2 to 32 letters, digits, `.` or `_`.
@@ -124,8 +136,9 @@ await supabase.from('reports').insert({ reported_id: partnerId, pairing_id, reas
 // Study record: past and upcoming sessions, with who was there
 const { data: sessions } = await supabase
   .from('study_sessions')
-  .select('starts_at, ends_at, location, status, courses(code), study_session_members(user_id)')
+  .select('starts_at, ends_at, location, status, courses(code), study_session_members(nickname, account_deleted)')
   .order('starts_at', { ascending: false })
+// Show "Sunny Penguin 67 (account deleted)" when account_deleted is true.
 ```
 
 `reason` is one of `harassment`, `inappropriate`, `spam`, `safety`, `other`. The partner's id is whichever of `user_low` and `user_high` on the pairing isn't the signed-in student.

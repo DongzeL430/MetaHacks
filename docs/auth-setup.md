@@ -9,7 +9,7 @@ Everything runs through the Supabase CLI via `npx`, pinned to one version so we 
 | Piece | Where | What it does |
 |---|---|---|
 | `universities` | migration | One row per school domain. Northeastern is named; other .edu domains are added on first sign-up and named by hand later. |
-| `profiles` | migration | Private per-user data: university, major, when 18+ was confirmed, onboarding status. Only the owner can read it. |
+| `profiles` | migration | Private per-user data: university, when 18+ was confirmed, onboarding status, contact handles. Only the owner can read it. Majors and minors are in `user_programs`. |
 | `public_profiles` | migration | What other students see: nickname, animal, equipped accessories, points. Hidden until the account finishes onboarding. |
 | Before User Created hook | migration + `config.toml` | Rejects non-.edu emails and sign-ups without the 18+ flag, with a readable error message. |
 | New-user trigger | migration | Repeats the hook's checks, then creates both profile rows and a nickname like "Sleepy Penguin 42". |
@@ -18,7 +18,7 @@ Everything runs through the Supabase CLI via `npx`, pinned to one version so we 
 
 Passwords are hashed and stored by Supabase Auth in `auth.users`. Our tables never hold them.
 
-Users can change only their own `major`. Points, nickname, and onboarding status are changed by server code with the service key.
+Users can change only their own contact handles on `profiles`. Points, nickname, and onboarding status are changed by server code with the service key.
 
 Deleting a user in Supabase Auth deletes both of their profile rows.
 
@@ -119,7 +119,18 @@ await supabase.auth.verifyOtp({ email, token: code, type: 'email' });
 
 // "Send a new code" needs a fresh Turnstile token:
 await supabase.auth.resend({ type: 'signup', email, options: { captchaToken } });
+
+// Forgot password: also a code, never a link (supabase/templates/recovery.html).
+await supabase.auth.resetPasswordForEmail(email, { captchaToken });
+await supabase.auth.verifyOtp({ email, token: code, type: 'recovery' }); // signs the student in
+await supabase.auth.updateUser({ password: newPassword });
+
+// Delete my account (signed in): removes the login and everything tied to it.
+await supabase.rpc('delete_my_account');
+await supabase.auth.signOut({ scope: 'local' });
 ```
+
+`resetPasswordForEmail` answers the same way whether or not the account exists, so the page always says "If an account exists for that email, we sent a code."
 
 Sign-in and password reset need a token too, for example `supabase.auth.signInWithPassword({ email, password, options: { captchaToken } })`. A Turnstile token works once, so reset the widget after every attempt, successful or not. A missing or reused token fails with `error.code === 'captcha_failed'`.
 

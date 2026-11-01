@@ -1,4 +1,4 @@
-import { useRef } from 'react';
+import { Fragment, useRef } from 'react';
 import type { KeyboardEvent } from 'react';
 import { CONFIDENCE_LEVELS, GRADE_OPTIONS, STATUS_OPTIONS } from '../dataFiles/AcademicOptions';
 
@@ -16,33 +16,67 @@ export interface CourseEntry {
   suggested?: boolean;
 }
 
+/** A major and its optional track or concentration */
+export interface MajorEntry {
+  name: string;
+  track: string;
+}
+
 export interface AcademicProfile {
-  major: string;
-  minor: string;
+  /** Up to MAX_PROGRAMS. Blank entries are dropped on save. */
+  majors: MajorEntry[];
+  minors: string[];
   year: string;
+  /** Expected graduation year, like "2028", or '' */
+  gradYear: string;
   courses: CourseEntry[];
 }
 
 /** What the course suggestion search receives */
-export type CourseSuggestionQuery = Pick<AcademicProfile, 'major' | 'minor' | 'year'>;
+export type CourseSuggestionQuery = Pick<AcademicProfile, 'majors' | 'minors' | 'year' | 'gradYear'>;
+
+/** A course the search or a screenshot found, added as a "Suggested" row */
+export interface SuggestedCourse {
+  name: string;
+  status: CourseStatus;
+}
+
+/** What the course search returns */
+export interface CourseSearchResult {
+  courses: SuggestedCourse[];
+  /** Pages the courses came from */
+  sources: string[];
+  /** Programs the search couldn't finish */
+  failed: string[];
+}
 
 const newId = () => Math.random().toString(36).slice(2, 10);
 
-export const newCourse = (name = '', suggested = false): CourseEntry => ({
+export const newCourse = (name = '', suggested = false, status: CourseStatus = 'taken'): CourseEntry => ({
   id: newId(),
   name,
-  status: 'taken',
+  status,
   confidence: null,
   grade: '',
   suggested,
 });
 
 export const emptyAcademics = (): AcademicProfile => ({
-  major: '',
-  minor: '',
+  majors: [{ name: '', track: '' }],
+  minors: [''],
   year: '',
+  gradYear: '',
   courses: [newCourse()],
 });
+
+/**
+ * What makes two rows the same course: the code when the name starts with one
+ * ("CS 2500 · Fundamentals of CS 1" and "cs2500" match), otherwise the whole name.
+ */
+const courseKey = (name: string) => {
+  const code = name.trim().match(/^([A-Za-z&]{2,6})[\s-]*(\d{2,5}[A-Za-z]?)\b/);
+  return (code ? code[1] + code[2] : name).replace(/\s/g, '').toLowerCase();
+};
 
 /** A row the user never touched, ignored by validation and dropped on save */
 const isBlank = (c: CourseEntry) => !c.name.trim() && c.confidence === null && !c.grade;
@@ -58,14 +92,15 @@ export function validateAcademics(profile: AcademicProfile): { message: string; 
   if (!used.some((c) => c.name.trim())) missing.add('courses');
   for (const c of used) {
     if (!c.name.trim()) missing.add(`${c.id}:name`);
-    if (c.confidence === null) missing.add(`${c.id}:confidence`);
+    // You can't rate a course you haven't started
+    if (c.status !== 'planned' && c.confidence === null) missing.add(`${c.id}:confidence`);
   }
 
   if (missing.size === 0) return null;
   return {
     message: missing.has('courses')
       ? 'Add at least one course you’ve taken or are taking.'
-      : 'Finish the highlighted courses. Each one needs a name and a confidence rating.',
+      : 'Finish the highlighted courses. Each one needs a name, and a confidence rating unless it’s planned.',
     missing,
   };
 }
@@ -73,32 +108,48 @@ export function validateAcademics(profile: AcademicProfile): { message: string; 
 /** Trimmed copy without blank rows or UI-only flags, ready to save */
 export function cleanAcademics(profile: AcademicProfile): AcademicProfile {
   return {
-    major: profile.major.trim(),
-    minor: profile.minor.trim(),
+    majors: profile.majors
+      .map((m) => ({ name: m.name.trim(), track: m.track.trim() }))
+      .filter((m) => m.name),
+    minors: profile.minors.map((m) => m.trim()).filter(Boolean),
     year: profile.year,
+    gradYear: profile.gradYear,
     courses: profile.courses
       .filter((c) => c.name.trim())
-      .map(({ suggested: _suggested, ...c }) => ({ ...c, name: c.name.trim() })),
+      .map(({ suggested: _suggested, ...c }) => ({
+        ...c,
+        name: c.name.trim(),
+        // Planned courses have no rating or grade yet
+        ...(c.status === 'planned' ? { confidence: null, grade: '' } : {}),
+      })),
   };
 }
 
 /**
- * Adds suggested course names: fills empty rows first, then adds new rows.
- * Names already on the list (any capitalization) are skipped.
+ * Adds suggested courses: fills empty rows first, then adds new rows.
+ * Courses already on the list (same code, or same name) are skipped.
+ * Plain names are added as "Already taken".
  */
-export function mergeSuggestions(profile: AcademicProfile, names: string[]): { profile: AcademicProfile; added: number } {
-  const have = new Set(profile.courses.map((c) => c.name.trim().toLowerCase()).filter(Boolean));
-  const fresh = new Map<string, string>();
-  for (const raw of names) {
-    const name = raw.trim();
-    if (name && !have.has(name.toLowerCase())) fresh.set(name.toLowerCase(), name);
+export function mergeSuggestions(
+  profile: AcademicProfile,
+  suggestions: (string | SuggestedCourse)[],
+): { profile: AcademicProfile; added: number } {
+  const have = new Set(profile.courses.map((c) => c.name.trim() && courseKey(c.name)).filter(Boolean));
+  const fresh = new Map<string, SuggestedCourse>();
+  for (const raw of suggestions) {
+    const s: SuggestedCourse = typeof raw === 'string' ? { name: raw, status: 'taken' } : raw;
+    const name = s.name.trim();
+    const key = name && courseKey(name);
+    if (key && !have.has(key) && !fresh.has(key)) fresh.set(key, { name, status: s.status });
   }
 
   const queue = [...fresh.values()];
-  const courses = profile.courses.map((c) =>
-    isBlank(c) && queue.length > 0 ? { ...c, name: queue.shift()!, suggested: true } : c,
-  );
-  courses.push(...queue.map((name) => newCourse(name, true)));
+  const courses = profile.courses.map((c) => {
+    if (!isBlank(c) || queue.length === 0) return c;
+    const s = queue.shift()!;
+    return { ...c, name: s.name, status: s.status, suggested: true };
+  });
+  courses.push(...queue.map((s) => newCourse(s.name, true, s.status)));
   return { profile: { ...profile, courses }, added: fresh.size };
 }
 
@@ -111,6 +162,19 @@ interface CoursesSectionProps {
   onOpenAutofill?: () => void;
   /** Message shown above the course list, e.g. after an auto-fill */
   notice?: string;
+  /** Pages the course search used, linked under the notice so students can check them */
+  sources?: string[];
+}
+
+/** "catalog.school.edu/…/computer-science-bs" instead of the full address */
+function shortUrl(url: string): string {
+  try {
+    const { hostname, pathname } = new URL(url);
+    const last = pathname.split('/').filter(Boolean).pop();
+    return last ? `${hostname}/…/${last}` : hostname;
+  } catch {
+    return url;
+  }
 }
 
 export const CHIP = [
@@ -126,7 +190,7 @@ export const blockEnter = (e: KeyboardEvent<HTMLInputElement>) => {
   if (e.key === 'Enter') e.preventDefault();
 };
 
-export default function CoursesSection({ value, onChange, missing, onOpenAutofill, notice }: CoursesSectionProps) {
+export default function CoursesSection({ value, onChange, missing, onOpenAutofill, notice, sources }: CoursesSectionProps) {
   const listRef = useRef<HTMLDivElement>(null);
   // Latest value, so quick successive edits never build on an old copy
   const valueRef = useRef(value);
@@ -200,6 +264,20 @@ export default function CoursesSection({ value, onChange, missing, onOpenAutofil
         {notice && (
           <p role="status" className="m-0 mb-3 text-sm opacity-80">
             {notice}
+          </p>
+        )}
+
+        {sources && sources.length > 0 && (
+          <p className="m-0 mb-3 text-sm opacity-80">
+            Sources:{' '}
+            {sources.map((url, i) => (
+              <Fragment key={url}>
+                {i > 0 && ', '}
+                <a href={url} target="_blank" rel="noreferrer" className="underline">
+                  {shortUrl(url)}
+                </a>
+              </Fragment>
+            ))}
           </p>
         )}
 
@@ -281,7 +359,9 @@ export default function CoursesSection({ value, onChange, missing, onOpenAutofil
                     </div>
                   </div>
 
-                  {/* Confidence 1-5 */}
+                  {course.status !== 'planned' && (
+                  <>
+                  {/* Confidence 1-5. Planned courses skip it and the grade. */}
                   <div>
                     <p className={`m-0 mb-1 ${FIELD_LABEL}`} aria-hidden="true">
                       Confidence
@@ -332,6 +412,8 @@ export default function CoursesSection({ value, onChange, missing, onOpenAutofil
                       ))}
                     </select>
                   </label>
+                  </>
+                  )}
                 </div>
               </div>
             );
