@@ -1,0 +1,149 @@
+import PersonAvatar from './PersonAvatar';
+import PersonCard from './PersonCard';
+import { ME } from '../dataFiles/StudyData';
+import type { ConnectionStatus, Lobby, Person } from '../dataFiles/StudyData';
+import { roleIn } from '../utils/StudyState';
+import type { StudyDispatch } from '../utils/StudyState';
+
+/** A row of dots, one per spot: filled for taken spots, hollow for open ones */
+export function SpotPips({ filled, max }: { filled: number; max: number }) {
+  return (
+    <span className="flex items-center gap-1" role="img" aria-label={`${filled} of ${max} spots filled`}>
+      {Array.from({ length: max }, (_, i) => (
+        <span
+          key={i}
+          className={`w-2.5 h-2.5 rounded-full border-2 border-[#3c3c3c] ${i < filled ? 'bg-[#3c3c3c]' : 'bg-transparent'}`}
+        />
+      ))}
+    </span>
+  );
+}
+
+interface LobbyViewProps {
+  lobby: Lobby;
+  people: Map<string, Person>;
+  connections: Record<string, ConnectionStatus>;
+  dispatch: StudyDispatch;
+}
+
+const ACTION_BUTTON = 'px-4 py-1';
+
+/** One lobby's page: header, your actions, join requests (host only), and the member slots */
+export default function LobbyView({ lobby, people, connections, dispatch }: LobbyViewProps) {
+  const role = roleIn(lobby);
+  const host = people.get(lobby.hostId);
+  const members = lobby.memberIds.map((id) => people.get(id)).filter((p): p is Person => !!p);
+  const requests = lobby.requestIds.map((id) => people.get(id)).filter((p): p is Person => !!p);
+  const openSpots = lobby.maxSize - lobby.memberIds.length;
+  const isFull = openSpots <= 0;
+
+  return (
+    <>
+      {/* HEADER */}
+      <header className="flex flex-wrap items-end justify-between gap-3">
+        <div className="min-w-0">
+          <h2 className="m-0 text-2xl leading-tight">{lobby.subject}</h2>
+          <p className="m-0 text-sm opacity-70">
+            Hosted by {lobby.hostId === ME ? 'you' : host?.name ?? 'someone'}
+          </p>
+        </div>
+        <div className="flex flex-col items-end gap-1">
+          <SpotPips filled={lobby.memberIds.length} max={lobby.maxSize} />
+          <span className="text-sm">
+            {lobby.memberIds.length} / {lobby.maxSize} {isFull ? '· Full' : `· ${openSpots} open`}
+          </span>
+        </div>
+      </header>
+
+      {/* YOUR ACTIONS */}
+      <div className="flex flex-wrap items-center gap-3">
+        {role === 'open' && (
+          <button type="button" onClick={() => dispatch({ type: 'request-join', lobbyId: lobby.id })} className={ACTION_BUTTON}>
+            Request to join
+          </button>
+        )}
+        {role === 'requested' && (
+          <>
+            <span className="text-sm">Request sent. Waiting for the host to let you in.</span>
+            <button type="button" onClick={() => dispatch({ type: 'cancel-join', lobbyId: lobby.id })} className={ACTION_BUTTON}>
+              Cancel request
+            </button>
+          </>
+        )}
+        {role === 'full' && <span className="text-sm opacity-70">This lobby is full.</span>}
+        {role === 'member' && (
+          <button type="button" onClick={() => dispatch({ type: 'leave', lobbyId: lobby.id })} className={ACTION_BUTTON}>
+            Leave lobby
+          </button>
+        )}
+        {role === 'host' && (
+          <button type="button" onClick={() => dispatch({ type: 'close-lobby', lobbyId: lobby.id })} className={ACTION_BUTTON}>
+            Close lobby
+          </button>
+        )}
+      </div>
+
+      {/* JOIN REQUESTS (host only) */}
+      {role === 'host' && (
+        <section className="flex flex-col gap-2">
+          <h3 className="m-0 text-base opacity-80">Join requests {requests.length > 0 && `(${requests.length})`}</h3>
+          {requests.length === 0 ? (
+            <p className="m-0 text-sm opacity-70">No one is waiting right now.</p>
+          ) : (
+            <ul className="m-0 p-0 list-none flex flex-col gap-2">
+              {requests.map((p) => (
+                <li key={p.id} className="list-none flex items-center gap-3 p-2 rounded-md border-2 border-[#3c3c3c]/25">
+                  <PersonAvatar person={p} className="w-8 h-8" />
+                  <span className="flex-1 min-w-0 truncate">{p.name}</span>
+                  <button
+                    type="button"
+                    onClick={() => dispatch({ type: 'accept-join', lobbyId: lobby.id, personId: p.id })}
+                    disabled={isFull}
+                    title={isFull ? 'The lobby is full' : undefined}
+                    aria-label={`Let ${p.name} join`}
+                    className="px-2.5 py-0.5 text-sm"
+                  >
+                    Accept
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => dispatch({ type: 'decline-join', lobbyId: lobby.id, personId: p.id })}
+                    aria-label={`Decline ${p.name}’s request`}
+                    className="px-2.5 py-0.5 text-sm"
+                  >
+                    Decline
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+      )}
+
+      {/* SLOTS: members, then empty spots, like a game lobby */}
+      <section className="flex flex-col gap-2">
+        <h3 className="m-0 text-base opacity-80">In this lobby</h3>
+        <div className="grid gap-3 sm:grid-cols-2">
+          {members.map((p) => (
+            <PersonCard
+              key={p.id}
+              person={p}
+              isHost={p.id === lobby.hostId}
+              isMe={p.id === ME}
+              status={connections[p.id] ?? 'none'}
+              dispatch={dispatch}
+            />
+          ))}
+          {Array.from({ length: Math.max(0, openSpots) }, (_, i) => (
+            <div
+              key={`open-${i}`}
+              className="min-h-28 flex items-center justify-center rounded-md border-2 border-dashed border-[#3c3c3c]/30 text-sm opacity-60"
+            >
+              Open spot
+            </div>
+          ))}
+        </div>
+      </section>
+    </>
+  );
+}

@@ -22,7 +22,8 @@ const GRAD_YEARS = Array.from({ length: 8 }, (_, i) => String(thisYear - 1 + i))
 
 /**
  * A popup window that floats above the survey window. Render it inside the same
- * `relative` desk area as the main window: it covers that area and stays inside it.
+ * `relative` desk area as the main window: it stays inside that area, while the
+ * shade behind it dims the whole page.
  */
 export default function AboutYouWindow({
   value,
@@ -97,182 +98,191 @@ export default function AboutYouWindow({
   const removeButton = 'shrink-0 px-2 py-1 text-sm';
 
   return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby={titleId}
-      className={`${coverScreen ? 'fixed z-[70]' : 'absolute z-40'} inset-0 p-3 bg-[#3c3c3c]/15`}
-      onPointerDown={(e) => {
-        if (e.target === e.currentTarget) onClose(); // click on the dimmed backdrop
-      }}
-      onKeyDown={(e) => {
-        if (e.key === 'Escape') {
-          e.preventDefault(); // so the full screen window behind doesn't also exit
-          e.stopPropagation();
-          onClose();
-        }
-      }}
-    >
-      <AppWindow
-        title="About you"
-        titleId={titleId}
-        controls={{ close: 'enabled', fullscreen: 'disabled' }}
-        onClose={onClose}
-        initialSize={{ width: 600, height: 560 }}
-        minWidth={300}
-        minHeight={280}
-        footerClassName="p-0"
-        footer={
-          <>
-            <div className="px-3 py-1.5 flex items-center gap-3">
-              <p role="status" className="m-0 flex-1 min-w-0 text-sm opacity-80">
-                {footerNote}
-              </p>
+    <>
+      {/* Dims the WHOLE page, taskbar included. Fixed to the viewport, so it isn't limited to the desk area.
+          Sits above the survey window (also when that one is full screen) and below this popup.
+          Clicking it closes the popup. */}
+      <div
+        aria-hidden="true"
+        onPointerDown={onClose}
+        className={`fixed inset-0 bg-[#3c3c3c]/25 ${coverScreen ? 'z-[65]' : 'z-[45]'} motion-safe:transition-opacity motion-safe:duration-200 starting:opacity-0`}
+      />
+
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        // No background of its own: this layer only keeps the popup inside the desk area
+        className={`${coverScreen ? 'fixed z-[70]' : 'absolute z-50'} inset-0 p-3`}
+        onPointerDown={(e) => {
+          if (e.target === e.currentTarget) onClose(); // click on the dimmed area around the popup
+        }}
+        onKeyDown={(e) => {
+          if (e.key === 'Escape') {
+            e.preventDefault(); // so the full screen window behind doesn't also exit
+            e.stopPropagation();
+            onClose();
+          }
+        }}
+      >
+        <AppWindow
+          title="About you"
+          titleId={titleId}
+          controls={{ close: 'enabled', fullscreen: 'enabled' }}
+          onClose={onClose}
+          initialSize={{ width: 600, height: 560 }}
+          minWidth={300}
+          minHeight={280}
+          footerClassName="p-0"
+          footer={
+            <>
+              <div className="px-3 py-1.5 flex items-center gap-3">
+                <p role="status" className="m-0 flex-1 min-w-0 text-sm opacity-80">
+                  {footerNote}
+                </p>
+                <button
+                  type="button"
+                  onClick={findCourses}
+                  disabled={!suggestCourses || !hasEnough || searching}
+                  className="px-3 py-0.5 text-sm"
+                >
+                  {searching ? 'Searching…' : 'Find courses'}
+                </button>
+              </div>
+            </>
+          }
+        >
+          <p className="m-0 text-sm opacity-80">
+            Tell us your majors, minors, and when you expect to graduate. We'll try our best to fill each one!.
+          </p>
+
+          {/* MAJORS, each with an optional track */}
+          <div className="flex flex-col gap-2">
+            <p className={`m-0 ${FIELD_LABEL}`}>Majors</p>
+            {value.majors.map((major, i) => (
+              <div key={i} className="flex items-end gap-2">
+                <label className="flex-1 min-w-0 flex flex-col gap-1">
+                  <span className="sr-only">Major {i + 1}</span>
+                  <input
+                    ref={i === 0 ? firstFieldRef : undefined}
+                    type="text"
+                    value={major.name}
+                    onChange={(e) => setMajor(i, { name: e.target.value })}
+                    onKeyDown={blockEnter}
+                    placeholder="e.g. Computer Science"
+                    autoComplete="off"
+                    maxLength={80}
+                    className="w-full px-2 py-1"
+                  />
+                </label>
+                <label className="flex-1 min-w-0 flex flex-col gap-1">
+                  <span className="sr-only">Track for major {i + 1} (optional)</span>
+                  <input
+                    type="text"
+                    value={major.track}
+                    onChange={(e) => setMajor(i, { track: e.target.value })}
+                    onKeyDown={blockEnter}
+                    placeholder="Track or concentration (optional)"
+                    autoComplete="off"
+                    maxLength={80}
+                    className="w-full px-2 py-1"
+                  />
+                </label>
+                {value.majors.length > 1 && (
+                  <button type="button" onClick={() => removeMajor(i)} className={removeButton} aria-label={`Remove major ${i + 1}`}>
+                    Remove
+                  </button>
+                )}
+              </div>
+            ))}
+            {value.majors.length < MAX_PROGRAMS && (
               <button
                 type="button"
-                onClick={findCourses}
-                disabled={!suggestCourses || !hasEnough || searching}
-                className="px-3 py-0.5 text-sm"
+                onClick={() => update({ majors: [...valueRef.current.majors, { name: '', track: '' }] })}
+                className="self-start px-3 py-0.5 text-sm"
               >
-                {searching ? 'Searching…' : 'Find courses'}
+                + Add another major
               </button>
-            </div>
-            {/* Edge where the footer strip meets the lighter area below it */}
-            <hr className="m-0" />
-          </>
-        }
-      >
-        <p className="m-0 text-sm opacity-80">
-          Tell us your majors, minors, and when you expect to graduate. Muse looks up your school’s catalog
-          (from your email) and fills in courses. You’ll still check each one.
-        </p>
-
-        {/* MAJORS, each with an optional track */}
-        <div className="flex flex-col gap-2">
-          <p className={`m-0 ${FIELD_LABEL}`}>Majors</p>
-          {value.majors.map((major, i) => (
-            <div key={i} className="flex items-end gap-2">
-              <label className="flex-1 min-w-0 flex flex-col gap-1">
-                <span className="sr-only">Major {i + 1}</span>
-                <input
-                  ref={i === 0 ? firstFieldRef : undefined}
-                  type="text"
-                  value={major.name}
-                  onChange={(e) => setMajor(i, { name: e.target.value })}
-                  onKeyDown={blockEnter}
-                  placeholder="e.g. Computer Science"
-                  autoComplete="off"
-                  maxLength={80}
-                  className="w-full px-2 py-1"
-                />
-              </label>
-              <label className="flex-1 min-w-0 flex flex-col gap-1">
-                <span className="sr-only">Track for major {i + 1} (optional)</span>
-                <input
-                  type="text"
-                  value={major.track}
-                  onChange={(e) => setMajor(i, { track: e.target.value })}
-                  onKeyDown={blockEnter}
-                  placeholder="Track or concentration (optional)"
-                  autoComplete="off"
-                  maxLength={80}
-                  className="w-full px-2 py-1"
-                />
-              </label>
-              {value.majors.length > 1 && (
-                <button type="button" onClick={() => removeMajor(i)} className={removeButton} aria-label={`Remove major ${i + 1}`}>
-                  Remove
-                </button>
-              )}
-            </div>
-          ))}
-          {value.majors.length < MAX_PROGRAMS && (
-            <button
-              type="button"
-              onClick={() => update({ majors: [...valueRef.current.majors, { name: '', track: '' }] })}
-              className="self-start px-3 py-0.5 text-sm"
-            >
-              + Add another major
-            </button>
-          )}
-        </div>
-
-        {/* MINORS */}
-        <div className="flex flex-col gap-2">
-          <p className={`m-0 ${FIELD_LABEL}`}>
-            Minors <span className="opacity-60">(optional)</span>
-          </p>
-          {value.minors.map((minor, i) => (
-            <div key={i} className="flex items-end gap-2">
-              <label className="flex-1 min-w-0 flex flex-col gap-1">
-                <span className="sr-only">Minor {i + 1}</span>
-                <input
-                  type="text"
-                  value={minor}
-                  onChange={(e) => setMinor(i, e.target.value)}
-                  onKeyDown={blockEnter}
-                  placeholder="e.g. Mathematics"
-                  autoComplete="off"
-                  maxLength={80}
-                  className="w-full px-2 py-1"
-                />
-              </label>
-              {value.minors.length > 1 && (
-                <button type="button" onClick={() => removeMinor(i)} className={removeButton} aria-label={`Remove minor ${i + 1}`}>
-                  Remove
-                </button>
-              )}
-            </div>
-          ))}
-          {value.minors.length < MAX_PROGRAMS && (
-            <button
-              type="button"
-              onClick={() => update({ minors: [...valueRef.current.minors, ''] })}
-              className="self-start px-3 py-0.5 text-sm"
-            >
-              + Add another minor
-            </button>
-          )}
-        </div>
-
-        <div>
-          <p id={`${titleId}-year`} className={`m-0 mb-1 ${FIELD_LABEL}`}>
-            Year
-          </p>
-          <div role="radiogroup" aria-labelledby={`${titleId}-year`} className="flex flex-wrap gap-2">
-            {YEAR_OPTIONS.map((year) => (
-              <label key={year} className={`${CHIP} has-checked:bg-[#EADBC8]`}>
-                <input
-                  type="radio"
-                  name="year"
-                  value={year}
-                  checked={value.year === year}
-                  onChange={() => update({ year })}
-                  className="sr-only"
-                />
-                {year}
-              </label>
-            ))}
+            )}
           </div>
-        </div>
 
-        <label className="flex flex-col gap-1 self-start">
-          <span className={FIELD_LABEL}>Expected graduation</span>
-          <select
-            value={value.gradYear}
-            onChange={(e) => update({ gradYear: e.target.value })}
-            // Room on the right for doodle.css's arrow, which px-2 would cover
-            className="pl-2 pr-8 py-1"
-          >
-            <option value="">Pick a year</option>
-            {GRAD_YEARS.map((year) => (
-              <option key={year} value={year}>
-                {year}
-              </option>
+          {/* MINORS */}
+          <div className="flex flex-col gap-2">
+            <p className={`m-0 ${FIELD_LABEL}`}>
+              Minors <span className="opacity-60">(optional)</span>
+            </p>
+            {value.minors.map((minor, i) => (
+              <div key={i} className="flex items-end gap-2">
+                <label className="flex-1 min-w-0 flex flex-col gap-1">
+                  <span className="sr-only">Minor {i + 1}</span>
+                  <input
+                    type="text"
+                    value={minor}
+                    onChange={(e) => setMinor(i, e.target.value)}
+                    onKeyDown={blockEnter}
+                    placeholder="e.g. Mathematics"
+                    autoComplete="off"
+                    maxLength={80}
+                    className="w-full px-2 py-1"
+                  />
+                </label>
+                {value.minors.length > 1 && (
+                  <button type="button" onClick={() => removeMinor(i)} className={removeButton} aria-label={`Remove minor ${i + 1}`}>
+                    Remove
+                  </button>
+                )}
+              </div>
             ))}
-          </select>
-        </label>
-      </AppWindow>
-    </div>
+            {value.minors.length < MAX_PROGRAMS && (
+              <button
+                type="button"
+                onClick={() => update({ minors: [...valueRef.current.minors, ''] })}
+                className="self-start px-3 py-0.5 text-sm"
+              >
+                + Add another minor
+              </button>
+            )}
+          </div>
+
+          <div>
+            <p id={`${titleId}-year`} className={`m-0 mb-1 ${FIELD_LABEL}`}>
+              Year
+            </p>
+            <div role="radiogroup" aria-labelledby={`${titleId}-year`} className="flex flex-wrap gap-2">
+              {YEAR_OPTIONS.map((year) => (
+                <label key={year} className={`${CHIP} has-checked:bg-[#EADBC8]`}>
+                  <input
+                    type="radio"
+                    name="year"
+                    value={year}
+                    checked={value.year === year}
+                    onChange={() => update({ year })}
+                    className="sr-only"
+                  />
+                  {year}
+                </label>
+              ))}
+            </div>
+          </div>
+
+          <label className="flex flex-col gap-1 self-start">
+            <span className={FIELD_LABEL}>Expected graduation</span>
+            <select
+              value={value.gradYear}
+              onChange={(e) => update({ gradYear: e.target.value })}
+              // Room on the right for doodle.css's arrow, which px-2 would cover
+              className="pl-2 pr-8 py-1"
+            >
+              <option value="">Pick a year</option>
+              {GRAD_YEARS.map((year) => (
+                <option key={year} value={year}>
+                  {year}
+                </option>
+              ))}
+            </select>
+          </label>
+        </AppWindow>
+      </div>
+    </>
   );
 }
