@@ -32,8 +32,8 @@ export interface AcademicProfile {
   courses: CourseEntry[];
 }
 
-/** What the course suggestion search receives */
-export type CourseSuggestionQuery = Pick<AcademicProfile, 'majors' | 'minors' | 'year' | 'gradYear'>;
+/** What the course suggestion search receives. Minors aren't searched. */
+export type CourseSuggestionQuery = Pick<AcademicProfile, 'majors' | 'year' | 'gradYear'>;
 
 /** A course the search or a screenshot found, added as a "Suggested" row */
 export interface SuggestedCourse {
@@ -73,9 +73,6 @@ export const emptyAcademics = (): AcademicProfile => ({
  * What makes two rows the same course: the code when the name starts with one
  * ("CS 2500 · Fundamentals of CS 1" and "cs2500" match), otherwise the whole name.
  */
-/** Every course gets a confidence rating except a planned one, which hasn't started yet */
-const needsConfidence = (status: CourseStatus) => status !== 'planned';
-
 const courseKey = (name: string) => {
   const code = name.trim().match(/^([A-Za-z&]{2,6})[\s-]*(\d{2,5}[A-Za-z]?)\b/);
   return (code ? code[1] + code[2] : name).replace(/\s/g, '').toLowerCase();
@@ -95,14 +92,14 @@ export function validateAcademics(profile: AcademicProfile): { message: string; 
   if (!used.some((c) => c.name.trim())) missing.add('courses');
   for (const c of used) {
     if (!c.name.trim()) missing.add(`${c.id}:name`);
-    if (needsConfidence(c.status) && c.confidence === null) missing.add(`${c.id}:confidence`);
+    if (c.confidence === null) missing.add(`${c.id}:confidence`);
   }
 
   if (missing.size === 0) return null;
   return {
     message: missing.has('courses')
       ? 'Add at least one course you’ve taken or are taking.'
-      : 'Finish the highlighted courses. Each one needs a name, and a confidence rating unless it’s planned.',
+      : 'Finish the highlighted courses. Each one needs a name and a confidence rating.',
     missing,
   };
 }
@@ -118,13 +115,7 @@ export function cleanAcademics(profile: AcademicProfile): AcademicProfile {
     gradYear: profile.gradYear,
     courses: profile.courses
       .filter((c) => c.name.trim())
-      .map(({ suggested: _suggested, ...c }) => ({
-        ...c,
-        name: c.name.trim(),
-        ...(needsConfidence(c.status) ? {} : { confidence: null }),
-        // A planned course has no grade yet
-        ...(c.status === 'planned' ? { grade: '' } : {}),
-      })),
+      .map(({ suggested: _suggested, ...c }) => ({ ...c, name: c.name.trim() })),
   };
 }
 
@@ -248,7 +239,7 @@ export default function CoursesSection({ value, onChange, missing, onOpenAutofil
           <button
             type="button"
             onClick={onOpenAutofill}
-            title="Enter your major and year to fill in courses students usually take"
+            title="Enter your major and graduation year to fill in courses you've most likely taken"
             className="mb-3 px-3 py-0.5 text-sm flex items-center gap-2"
           >
             <svg viewBox="0 0 20 20" className="w-4 h-4" aria-hidden="true">
@@ -362,8 +353,7 @@ export default function CoursesSection({ value, onChange, missing, onOpenAutofil
                     </div>
                   </div>
 
-                  {/* Confidence 1-5. Planned courses skip it. */}
-                  {needsConfidence(course.status) && (
+                  {/* Confidence 1-5 */}
                   <div>
                     <p className={`m-0 mb-1 ${FIELD_LABEL}`} aria-hidden="true">
                       Confidence
@@ -394,10 +384,8 @@ export default function CoursesSection({ value, onChange, missing, onOpenAutofil
                     </div>
                     {confidenceMissing && <p className={`m-0 mt-1 ${ERROR_TEXT}`}>Pick 1 to 5.</p>}
                   </div>
-                  )}
 
-                  {/* Optional grade. A planned course has none yet. */}
-                  {course.status !== 'planned' && (
+                  {/* Optional grade */}
                   <label className="flex flex-col gap-1">
                     <span className={FIELD_LABEL}>
                       {course.status === 'taking' ? 'Current grade' : 'Grade'}{' '}
@@ -417,7 +405,6 @@ export default function CoursesSection({ value, onChange, missing, onOpenAutofil
                       ))}
                     </select>
                   </label>
-                  )}
                 </div>
               </div>
             );

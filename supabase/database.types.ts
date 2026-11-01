@@ -824,7 +824,7 @@ export type Database = {
     Enums: {
       accessory_slot: "head" | "face" | "neck" | "held"
       content_source: "team" | "ai"
-      course_status: "taking" | "completed" | "planned" | "transferred"
+      course_status: "taking" | "completed"
       letter_grade:
         | "A"
         | "A-"
@@ -979,7 +979,7 @@ export const Constants = {
     Enums: {
       accessory_slot: ["head", "face", "neck", "held"],
       content_source: ["team", "ai"],
-      course_status: ["taking", "completed", "planned", "transferred"],
+      course_status: ["taking", "completed"],
       letter_grade: [
         "A",
         "A-",

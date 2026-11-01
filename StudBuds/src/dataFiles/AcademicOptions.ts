@@ -8,11 +8,9 @@ export const YEAR_OPTIONS = ['Freshman', 'Sophomore', 'Junior', 'Senior', 'Gradu
 export const STATUS_OPTIONS = [
   { value: 'taken', label: 'Already taken' },
   { value: 'taking', label: 'Taking now' },
-  { value: 'planned', label: 'Planning to take' },
-  { value: 'transferred', label: 'Transferred' },
 ] as const;
 
-/** Most majors and minors one student can list (the course search runs one search per program) */
+/** Most majors and minors one student can list (the course search runs one search per major) */
 export const MAX_PROGRAMS = 3;
 
 export const CONFIDENCE_LEVELS = [

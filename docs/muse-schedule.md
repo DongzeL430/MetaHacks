@@ -34,17 +34,18 @@ npx supabase@2.122.0 functions deploy read-schedule --use-api --no-verify-jwt
 
 ## Finding courses (web search)
 
-In the "About you" window, a student lists up to 3 majors (each with an optional track) and up to 3 minors, picks their expected graduation year, and clicks **Find courses**. Their school comes from their .edu email on the server, never from the request.
+In the "About you" window, a student lists up to 3 majors (each with an optional track) and up to 3 minors, picks their expected graduation year, and clicks **Find courses**. Muse suggests only courses the student has most likely already finished at their own school. Their school comes from their .edu email on the server, never from the request.
 
-1. `StudBuds/src/lib/courses.ts` calls `supabase/functions/suggest-courses`.
-2. For each program, the function uses a cached answer under 7 days old, or asks `muse-spark-1.3` to search the school's catalog and degree pages with the Responses API's `web_search` tool. Uncached programs search at the same time.
-3. Every course must come with the page it was found on, and codes must match the database's format. Results from all programs are combined, one row per course; if programs disagree, the earliest status wins (taken, then taking, then planned).
-4. New courses go into the school's shared `courses` list with their official titles (`add_found_courses`), so students don't hit their own 15-new-courses limit.
-5. Courses arrive on the Courses page as "Suggested" rows named like "CS 2500 · Fundamentals of Computer Science 1", with a Sources line linking the pages Muse used. Students change, rate, or remove each one. Planned courses need no rating.
+1. `StudBuds/src/lib/courses.ts` calls `supabase/functions/suggest-courses` with the majors only. Minors are saved but not searched, since they rarely place courses in terms.
+2. For each major, the function uses a cached answer under 7 days old, or asks `muse-spark-1.3` to search the school's catalog and sample plan of study with the Responses API's `web_search` tool. Uncached majors search at the same time.
+3. Muse maps the plan of study onto real terms, counting back from the graduation year, and keeps only courses from terms that ended before today. A student in their first term gets no courses.
+4. Every course must come with the page it was found on, and codes must match the database's format. Results from all majors are combined, one row per course.
+5. New courses go into the school's shared `courses` list with their official titles (`add_found_courses`), so students don't hit their own 15-new-courses limit.
+6. Courses arrive on the Courses page as "Already taken" rows marked "Suggested", named like "CS 2500 · Fundamentals of Computer Science 1", with a Sources line linking the pages Muse used. Students rate, change, or remove each one.
 
-Limits: 3 clicks per student per day (counted before searching), up to 6 programs per click. Meta doesn't publish a price per search; check `suggest-courses usage` lines in the function logs for real token counts.
+Limits: 3 clicks per student per day (counted before searching), up to 3 majors per click. Meta doesn't publish a price per search; check `suggest-courses usage` lines in the function logs for real token counts.
 
-Tested on 2026-11-01 without calling Muse, using pre-filled cache rows: input checks, combining a major and minor, the earliest-status rule, the shared course list, sources, and the daily limit all behave as described. The real search is untested until a student tries it.
+Tested on 2026-11-01 without calling Muse, using pre-filled cache rows: input checks, the shared course list, sources, and the daily limit behave as described. The first real searches worked for a student's own school. The finished-courses-only version (2026-11-01) is untested until a student tries it; the cache was cleared when it shipped.
 
 Deploy the same way as `read-schedule`:
 

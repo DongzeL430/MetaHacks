@@ -70,13 +70,15 @@ select lives_ok(
   $$insert into public.user_courses (course_id, status, grade) select id, 'completed', 'A-' from public.courses where code = 'LIMIT 1'$$,
   'A completed course with a grade is accepted'
 );
-select lives_ok(
+select throws_ok(
   $$insert into public.user_courses (course_id, status) select id, 'planned' from public.courses where code = 'LIMIT 3'$$,
-  'A planned course needs no grade'
+  '22P02', null,
+  'Planned courses are not a status'
 );
-select lives_ok(
+select throws_ok(
   $$insert into public.user_courses (course_id, status) select id, 'transferred' from public.courses where code = 'LIMIT 4'$$,
-  'A transferred course needs no grade'
+  '22P02', null,
+  'Transferred courses are not a status'
 );
 select throws_ok(
   $$insert into public.user_courses (course_id) select id from public.courses where code = 'CS 2500'$$,

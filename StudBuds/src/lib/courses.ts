@@ -1,22 +1,21 @@
 import { callFunction } from './edgeFunctions.ts';
 import { supabase } from './supabase.ts';
-import type { AcademicProfile, CourseSearchResult, CourseStatus, CourseSuggestionQuery } from '../components/CoursesSection';
+import type { AcademicProfile, CourseSearchResult, CourseSuggestionQuery } from '../components/CoursesSection';
 
 interface FoundCourse {
   code: string;
   title: string;
-  status: CourseStatus;
   term: string | null;
 }
 
 /**
- * "Find courses": Muse Spark searches the student's school catalog for each major and minor
- * (supabase/functions/suggest-courses). Courses come back named like "CS 2500 · Fundamentals of CS 1".
+ * "Find courses": Muse Spark searches the student's school catalog for each major and returns
+ * the courses they have most likely already finished (supabase/functions/suggest-courses).
+ * Courses come back named like "CS 2500 · Fundamentals of CS 1".
  */
 export async function findCourses(query: CourseSuggestionQuery): Promise<CourseSearchResult> {
   const data = await callFunction<{ courses: FoundCourse[]; sources: string[]; failed: string[] }>('suggest-courses', {
     majors: query.majors,
-    minors: query.minors,
     gradYear: Number(query.gradYear),
     classYear: query.year,
   });
@@ -24,7 +23,7 @@ export async function findCourses(query: CourseSuggestionQuery): Promise<CourseS
   return {
     courses: data.courses.map((c) => ({
       name: c.title && c.title !== c.code ? `${c.code} · ${c.title}` : c.code,
-      status: c.status,
+      status: 'taken' as const,
     })),
     sources: data.sources ?? [],
     failed: data.failed ?? [],
