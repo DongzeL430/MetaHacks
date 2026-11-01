@@ -10,7 +10,7 @@ import CoursesSection, {
   mergeSuggestions,
   validateAcademics,
 } from './components/CoursesSection';
-import type { AcademicProfile, CourseSuggestionQuery } from './components/CoursesSection';
+import type { AcademicProfile, CourseSearchResult, CourseSuggestionQuery } from './components/CoursesSection';
 import MultipleChoiceSection from './components/MultipleChoiceSection';
 import SurveyFooter, { StepDots } from './components/SurveyFooter';
 import { SURVEY_SECTIONS } from './dataFiles/SurveySections';
@@ -39,7 +39,7 @@ interface PreSurveyFlowProps {
   /** Show the Courses page after the calendar (default true) */
   includeCourses?: boolean;
   /** Search that returns expected course names for the About you window's "Find courses" button */
-  suggestCourses?: (query: CourseSuggestionQuery) => Promise<string[]>;
+  suggestCourses?: (query: CourseSuggestionQuery) => Promise<CourseSearchResult>;
   /** Runs when the calendar page is submitted. Return a promise to show "Saving…"; throw to show an error. */
   onAvailabilitySubmit?: (slots: string[], timezone: string) => void | Promise<void>;
   /** Runs when the Courses page is submitted. Same rules as onAvailabilitySubmit. */
@@ -106,6 +106,8 @@ export default function PreSurveyFlow({
   const [autofillNotice, setAutofillNotice] = useState('');
   // Shown on the Courses page after Muse finds course codes in a schedule screenshot
   const [courseImportNote, setCourseImportNote] = useState('');
+  // Pages the last course search used, linked on the Courses page
+  const [courseSources, setCourseSources] = useState<string[]>([]);
   const openerRef = useRef<HTMLElement | null>(null);
 
   const current = steps[step];
@@ -120,8 +122,12 @@ export default function PreSurveyFlow({
     setAboutOpen(false);
   };
 
+  // Courses on a schedule screenshot are ones the student is taking now
   const handleCoursesFound = (codes: string[]) => {
-    const { profile, added } = mergeSuggestions(academics, codes);
+    const { profile, added } = mergeSuggestions(
+      academics,
+      codes.map((name) => ({ name, status: 'taking' as const })),
+    );
     if (added === 0) return;
     setAcademics(profile);
     setCourseImportNote(`Muse added ${added} course${added === 1 ? '' : 's'} from your schedule. Rate each one or remove it.`);
@@ -138,8 +144,12 @@ export default function PreSurveyFlow({
     requestAnimationFrame(() => openerRef.current?.focus());
   };
 
-  const handleAutofilled = (added: number) => {
-    setAutofillNotice(`Added ${added} suggested course${added === 1 ? '' : 's'}. Rate each one or remove it.`);
+  const handleAutofilled = (added: number, result: CourseSearchResult) => {
+    const missed = result.failed.length > 0 ? ` Couldn’t search ${result.failed.join(', ')} this time.` : '';
+    setAutofillNotice(
+      `Added ${added} course${added === 1 ? '' : 's'} from your school’s catalog. Check each one: fix its status, rate it, or remove it.${missed}`,
+    );
+    setCourseSources(result.sources);
     closeAutofill();
   };
 
@@ -269,6 +279,7 @@ export default function PreSurveyFlow({
         missing={missing}
         onOpenAutofill={openAutofill}
         notice={autofillNotice || courseImportNote}
+        sources={courseSources}
       />
     );
   } else {

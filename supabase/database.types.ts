@@ -55,6 +55,35 @@ export type Database = {
           },
         ]
       }
+      ai_requests: {
+        Row: {
+          created_at: string
+          id: number
+          kind: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: never
+          kind: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: never
+          kind?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_requests_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       availability_slots: {
         Row: {
           ends_at: string
@@ -159,6 +188,47 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
+          },
+        ]
+      }
+      course_search_cache: {
+        Row: {
+          courses: Json
+          grad_year: number
+          kind: Database["public"]["Enums"]["program_kind"]
+          program_key: string
+          searched_at: string
+          sources: Json
+          track_key: string
+          university_domain: string
+        }
+        Insert: {
+          courses: Json
+          grad_year: number
+          kind: Database["public"]["Enums"]["program_kind"]
+          program_key: string
+          searched_at?: string
+          sources?: Json
+          track_key?: string
+          university_domain: string
+        }
+        Update: {
+          courses?: Json
+          grad_year?: number
+          kind?: Database["public"]["Enums"]["program_kind"]
+          program_key?: string
+          searched_at?: string
+          sources?: Json
+          track_key?: string
+          university_domain?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "course_search_cache_university_domain_fkey"
+            columns: ["university_domain"]
+            isOneToOne: false
+            referencedRelation: "universities"
+            referencedColumns: ["domain"]
           },
         ]
       }
@@ -277,7 +347,6 @@ export type Database = {
           discord: string | null
           id: string
           instagram: string | null
-          major: string | null
           onboarding_status: Database["public"]["Enums"]["onboarding_status"]
           phone: string | null
           university_domain: string
@@ -288,7 +357,6 @@ export type Database = {
           discord?: string | null
           id: string
           instagram?: string | null
-          major?: string | null
           onboarding_status?: Database["public"]["Enums"]["onboarding_status"]
           phone?: string | null
           university_domain: string
@@ -299,7 +367,6 @@ export type Database = {
           discord?: string | null
           id?: string
           instagram?: string | null
-          major?: string | null
           onboarding_status?: Database["public"]["Enums"]["onboarding_status"]
           phone?: string | null
           university_domain?: string
@@ -670,6 +737,38 @@ export type Database = {
           },
         ]
       }
+      user_programs: {
+        Row: {
+          kind: Database["public"]["Enums"]["program_kind"]
+          name: string
+          position: number
+          track: string | null
+          user_id: string
+        }
+        Insert: {
+          kind: Database["public"]["Enums"]["program_kind"]
+          name: string
+          position: number
+          track?: string | null
+          user_id?: string
+        }
+        Update: {
+          kind?: Database["public"]["Enums"]["program_kind"]
+          name?: string
+          position?: number
+          track?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_programs_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       vibe_decisions: {
         Row: {
           choice: Database["public"]["Enums"]["vibe_choice"]
@@ -711,6 +810,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      add_found_courses: {
+        Args: { found: Json; school: string }
+        Returns: undefined
+      }
       delete_my_account: { Args: never; Returns: undefined }
       hook_before_user_created: { Args: { event: Json }; Returns: Json }
       pair_on_cooldown: {
@@ -721,7 +824,7 @@ export type Database = {
     Enums: {
       accessory_slot: "head" | "face" | "neck" | "held"
       content_source: "team" | "ai"
-      course_status: "taking" | "completed"
+      course_status: "taking" | "completed" | "planned"
       letter_grade:
         | "A"
         | "A-"
@@ -737,6 +840,7 @@ export type Database = {
         | "F"
         | "P"
       onboarding_status: "new" | "onboarded"
+      program_kind: "major" | "minor"
       report_reason:
         | "harassment"
         | "inappropriate"
@@ -875,7 +979,7 @@ export const Constants = {
     Enums: {
       accessory_slot: ["head", "face", "neck", "held"],
       content_source: ["team", "ai"],
-      course_status: ["taking", "completed"],
+      course_status: ["taking", "completed", "planned"],
       letter_grade: [
         "A",
         "A-",
@@ -892,6 +996,7 @@ export const Constants = {
         "P",
       ],
       onboarding_status: ["new", "onboarded"],
+      program_kind: ["major", "minor"],
       report_reason: ["harassment", "inappropriate", "spam", "safety", "other"],
       report_status: ["open", "reviewed"],
       session_status: ["planned", "completed", "cancelled"],

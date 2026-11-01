@@ -4,6 +4,7 @@ import PreSurveyPage from './PreSurveyPage.tsx'
 import PreSurveyFlow from './PresurveyFlow.tsx';
 import RequireAuth from './RequireAuth.tsx';
 import { saveAvailability } from './lib/onboarding.ts';
+import { findCourses, savePrograms } from './lib/courses.ts';
 // import Home from './pages/Home';
 // import Profile from './pages/Profile';
 // import NotFound from './pages/NotFound';
@@ -18,7 +19,11 @@ export default function App() {
        path="/"
        element={
          <RequireAuth>
-           <PreSurveyFlow onAvailabilitySubmit={(slots) => saveAvailability(slots)} />
+           <PreSurveyFlow
+             onAvailabilitySubmit={(slots) => saveAvailability(slots)}
+             suggestCourses={findCourses}
+             onAcademicsSubmit={savePrograms}
+           />
          </RequireAuth>
        }
      />
