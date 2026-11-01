@@ -328,11 +328,7 @@ export default function AuthPage() {
 
                 {confirmingDelete ? (
                   <div className="flex flex-col gap-3 mt-4">
-                    <p>
-                      Deleting your account removes your profile, courses, free times, answers, interests,
-                      accessories, contact handles, pairings, and blocks. Study sessions you shared stay in your
-                      partners&rsquo; records without you. This can&rsquo;t be undone.
-                    </p>
+                    <p>This deletes your account and everything tied to you. It can&rsquo;t be undone.</p>
                     <label className="flex flex-col gap-1">
                       Type DELETE to confirm:
                       <input
