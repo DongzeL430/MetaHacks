@@ -702,6 +702,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      delete_my_account: { Args: never; Returns: undefined }
       hook_before_user_created: { Args: { event: Json }; Returns: Json }
       pair_on_cooldown: {
         Args: { student_a: string; student_b: string }

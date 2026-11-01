@@ -53,6 +53,16 @@ Other students can't see any of these rows except where noted. Server code with 
 | `study_sessions` | Study record: when (`starts_at`, `ends_at`), where (typed `location`), which course, `status` (`planned`, `completed`, `cancelled`) | Read sessions they were in | Read only (written by server) |
 | `study_session_members` | Who was in each session | See who was in their own sessions | Read only; up to 4 people per session |
 
+## Deleting an account
+
+`supabase.rpc('delete_my_account')` deletes the signed-in student's login. The database then removes their profiles, courses, free times, survey answers, interests, accessories, contact handles, pairings, Vibe choices, sharing choices, and blocks. What stays:
+
+- Study sessions they shared, in their partners' records, without them.
+- Courses they added to the school's list.
+- Reports they filed, for review, with the reporter removed. Reports about them are deleted.
+
+The function takes no arguments, so a student can only delete themselves.
+
 ## Rules for the matchmaker and other server code
 
 These keep prejudice on our side out of pairing. They aren't enforced by the database, so whoever writes the matching code has to follow them:
