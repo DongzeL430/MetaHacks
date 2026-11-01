@@ -3,6 +3,8 @@ import type { ChangeEvent, FormEvent } from 'react';
 import type { AuthError, Session } from '@supabase/supabase-js';
 import { supabase } from './lib/supabase.ts';
 import Turnstile from './Turnstile.tsx';
+import { Canvas } from '@react-three/fiber';
+import { Scene } from 'three';
 // import AvatarStage from './AvatarStage';
 
 type Mode = 'signup' | 'login';
@@ -182,9 +184,13 @@ export default function AuthPage() {
     <main className="w-full h-full grid grid-cols-1 md:grid-cols-2">
       {/* LEFT: 3D avatar stage */}
       <section className="flex flex-col items-center p-6 min-h-0 md:border-r-2 md:border-black">
-        <h2 className="text-3xl leading-snug text-center">
+        {/* <h2 className="text-3xl leading-snug text-center">
           Clickable demo of base 3D avatar
-        </h2>
+        </h2> */}
+        <Canvas>
+          <directionalLight intensity={0.5}/>
+          
+        </Canvas>
       </section>
 
         {/* RIGHT: auth form */}

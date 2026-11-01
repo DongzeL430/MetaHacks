@@ -10,9 +10,9 @@ import PreSurveyFlow from './PresurveyFlow.tsx';
 export default function App() {
   return (
     <Routes>
-      <Route path="/a" element={<AuthPage />} />
+      <Route path="/" element={<AuthPage />} />
      <Route path="/s" element={<PreSurveyPage/>} />
-     <Route path="/" element={<PreSurveyFlow></PreSurveyFlow>}/>
+     <Route path="/a" element={<PreSurveyFlow></PreSurveyFlow>}/>
       {/* Pages that share a layout (nav bar, etc.)
       <Route element={<Layout />}>
         <Route index element={<Home />} />
