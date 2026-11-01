@@ -2,8 +2,8 @@ import type { ReactNode } from 'react';
 import AppWindow from './AppWindow';
 import PersonAvatar from './PersonAvatar';
 import { ConnectControl } from './PersonCard';
-import type { ConnectionStatus, Person } from '../dataFiles/studyData';
-import type { StudyDispatch } from '../utils/studyState';
+import type { ConnectionStatus, Person } from '../dataFiles/StudyData';
+import type { StudyDispatch } from '../utils/StudyState';
 
 interface ConnectionsWindowProps {
   id: string;
@@ -54,7 +54,6 @@ export default function ConnectionsWindow({ id, open, onClose, people, connectio
       onClose={onClose}
       controls={{ close: 'enabled', fullscreen: 'enabled' }}
       initialSize={{ width: 380, height: 500 }}
-      initialAlign="center"
       minWidth={300}
       minHeight={260}
       bodyClassName="p-3 flex flex-col gap-5"

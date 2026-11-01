@@ -1,11 +1,11 @@
 import { useMemo, useState } from 'react';
 import { WindowLayer, useWindowManager } from './AppWindow';
-import BrowserWindow from './BrowserWindow.tsx';
-import ConnectionsWindow from './ConnectionsWindow.tsx';
-import HostSessionWindow from './HostSessionWindow.tsx';
-import LobbyBrowserWindow from './LobbyBrowserWindow.tsx';
-import LobbyView from './LobbyView.tsx';
-import PersonAvatar from './PersonAvatar.tsx';
+import BrowserWindow from './BrowserWindow';
+import ConnectionsWindow from './ConnectionsWindow';
+import HostSessionWindow from './HostSessionWindow';
+import LobbyBrowserWindow from './LobbyBrowserWindow';
+import LobbyView from './LobbyView';
+import PersonAvatar from './PersonAvatar';
 import { ME } from '../dataFiles/StudyData';
 import type { Lobby, Person } from '../dataFiles/StudyData';
 import type { StudyDispatch, StudyState } from '../utils/StudyState';
@@ -142,7 +142,6 @@ export default function StudyLayout({
             setActiveId(null);
           }}
           address={active ? `studbuds / lobbies / ${slugOf(active.subject)}` : undefined}
-          initialAlign="end"
         >
           {active && (
             <LobbyView lobby={active} people={peopleById} connections={state.connections} dispatch={dispatch} />

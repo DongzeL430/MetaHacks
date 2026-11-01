@@ -8,7 +8,7 @@ import {
   useRef,
   useState,
 } from 'react';
-import { flushSync } from 'react-dom';
+import { createPortal, flushSync } from 'react-dom';
 import type {
   CSSProperties,
   KeyboardEvent,
@@ -25,6 +25,8 @@ export type WindowControlState = 'enabled' | 'disabled' | 'hidden';
 export interface WindowControls {
   close?: WindowControlState;
   fullscreen?: WindowControlState;
+  /** Pin: stops moving, resizing and tiling. Enabled unless set otherwise. */
+  pin?: WindowControlState;
 }
 
 /** Window position and size, relative to the parent's content box */
@@ -43,30 +45,105 @@ interface Box {
 }
 
 /* ------------------------------------------------------------------ *
- * WINDOW STACK
- * Wrap a group of windows in <WindowManagerProvider>. It remembers the order they
- * opened (or were last clicked) in. The newest sits on top at full size; each window
- * behind it shrinks a little more, with an animation. Windows outside a provider
- * work exactly as before, just without the shrinking.
+ * WINDOW MANAGER
+ * Wrap a group of windows in <WindowManagerProvider>. It handles:
+ *  - Stacking: the last window opened or clicked sits on top. Sizes never change on click.
+ *  - Tiling: when a window opens, the unpinned windows are moved and resized into a pattern:
+ *      2 windows  -> left and right halves
+ *      3-4        -> quadrants (oldest top-left, then top-right, bottom-left, bottom-right)
+ *      5 or more  -> no rearranging; the new window just opens on top
+ *    Pinned windows and windows with `excludeFromLayout` are left alone and don't take a tile.
+ *    Drag a tiled window by its title bar onto another tile to swap places (or into an empty
+ *    quadrant to move there). Hold Shift while dragging to place it freely instead.
+ *    On small screens (below `tilingMinWidth`, 768px by default) none of this applies:
+ *    new windows simply open on top of the others.
+ *  - Pinning: a pinned window can't be moved, resized or tiled.
+ * Windows outside a provider work on their own, without tiling.
  * ------------------------------------------------------------------ */
 
-/** How much smaller each window gets per window stacked in front of it */
-const STACK_SHRINK = 0.06;
-/** Never shrink below this */
-const MIN_STACK_SCALE = 0.82;
+/** Space between tiled windows, in px */
+const TILE_GAP = 8;
+/** How long windows take to glide into their tiles */
+const TILE_MS = 380;
 
-interface WindowStackActions {
-  open: (id: string) => void;
-  close: (id: string) => void;
-  focus: (id: string) => void;
+/** A tile, as fractions of the desk area (0 to 1) */
+export interface Tile {
+  left: number;
+  top: number;
+  width: number;
+  height: number;
 }
 
-// Two contexts: the actions never change, so registering a window never re-runs because the order moved
-const WindowStackActionsContext = createContext<WindowStackActions | null>(null);
-const WindowStackOrderContext = createContext<string[]>([]);
+const HALF_LEFT: Tile = { left: 0, top: 0, width: 0.5, height: 1 };
+const HALF_RIGHT: Tile = { left: 0.5, top: 0, width: 0.5, height: 1 };
+const TOP_LEFT: Tile = { left: 0, top: 0, width: 0.5, height: 0.5 };
+const TOP_RIGHT: Tile = { left: 0.5, top: 0, width: 0.5, height: 0.5 };
+const BOTTOM_LEFT: Tile = { left: 0, top: 0.5, width: 0.5, height: 0.5 };
+const BOTTOM_RIGHT: Tile = { left: 0.5, top: 0.5, width: 0.5, height: 0.5 };
 
-/** The stack's actions (open / close / focus a window by id), for components inside a WindowManagerProvider */
-export const useWindowManager = () => useContext(WindowStackActionsContext);
+/** Tile patterns by number of tiled windows. Counts not listed here don't rearrange anything. */
+const LAYOUTS: Record<number, Tile[]> = {
+  2: [HALF_LEFT, HALF_RIGHT],
+  3: [TOP_LEFT, TOP_RIGHT, BOTTOM_LEFT],
+  4: [TOP_LEFT, TOP_RIGHT, BOTTOM_LEFT, BOTTOM_RIGHT],
+};
+
+/** Spots a dragged window can be dropped into, by number of tiled windows (3 windows can use the empty quadrant) */
+const DROP_SLOTS: Record<number, Tile[]> = {
+  2: [HALF_LEFT, HALF_RIGHT],
+  3: [TOP_LEFT, TOP_RIGHT, BOTTOM_LEFT, BOTTOM_RIGHT],
+  4: [TOP_LEFT, TOP_RIGHT, BOTTOM_LEFT, BOTTOM_RIGHT],
+};
+
+const sameTile = (a: Tile | undefined, b: Tile | undefined) =>
+  !!a && !!b && a.left === b.left && a.top === b.top && a.width === b.width && a.height === b.height;
+
+interface WindowManagerActions {
+  /** A window appeared. `tiled` = false keeps it out of the layout. */
+  open: (id: string, tiled: boolean) => void;
+  close: (id: string) => void;
+  /** Bring to the front (z-order only, size untouched) */
+  focus: (id: string) => void;
+  setPinned: (id: string, pinned: boolean) => void;
+  /** Move a tiled window into another tile, swapping with whoever is there */
+  moveToTile: (id: string, tile: Tile) => void;
+}
+
+interface WindowManagerState {
+  /** Back to front */
+  zOrder: string[];
+  /** In the order they opened, for handing out tiles */
+  opened: string[];
+  excluded: ReadonlySet<string>;
+  pinned: ReadonlySet<string>;
+  /**
+   * Bumped each time windows are rearranged. Windows listed in `apply` move into their tile;
+   * the rest stay where the user put them.
+   */
+  layout: { version: number; tiles: Record<string, Tile>; apply: string[] };
+  /** False on small screens: no auto-arranging, no drop targets */
+  tilingEnabled: boolean;
+}
+
+/** Open windows currently taking part in the layout */
+const tiledWindows = (s: WindowManagerState) =>
+  s.opened.filter((w) => s.layout.tiles[w] && !s.excluded.has(w) && !s.pinned.has(w));
+
+const EMPTY_MANAGER: WindowManagerState = {
+  zOrder: [],
+  opened: [],
+  excluded: new Set(),
+  pinned: new Set(),
+  layout: { version: 0, tiles: {}, apply: [] },
+  tilingEnabled: false,
+};
+
+// Two contexts: the actions never change, so registering a window never re-runs because the state moved
+const WindowManagerActionsContext = createContext<WindowManagerActions | null>(null);
+const WindowManagerStateContext = createContext<WindowManagerState>(EMPTY_MANAGER);
+
+/** The manager's actions (open / close / focus / pin a window by id), for components inside a WindowManagerProvider */
+export const useWindowManager = () => useContext(WindowManagerActionsContext);
 
 /**
  * Lets several windows share one desk area. Each window goes in its own full-size layer, so they
@@ -77,25 +154,100 @@ export function WindowLayer({ children }: { children: ReactNode }) {
   return <div className="absolute inset-0 pointer-events-none [&>*]:pointer-events-auto">{children}</div>;
 }
 
-export function WindowManagerProvider({ children }: { children: ReactNode }) {
-  const [order, setOrder] = useState<string[]>([]);
+export function WindowManagerProvider({
+  children,
+  tilingMinWidth = 768,
+}: {
+  children: ReactNode;
+  /** Screen width (px) below which windows stop tiling and just stack on top of each other */
+  tilingMinWidth?: number;
+}) {
+  const [state, setState] = useState<WindowManagerState>(EMPTY_MANAGER);
 
-  const actions = useMemo<WindowStackActions>(
+  // Tiling only on screens at least tilingMinWidth wide. Follows the window as it's resized.
+  const query = `(min-width: ${tilingMinWidth}px)`;
+  const [tilingEnabled, setTilingEnabled] = useState(
+    () => typeof window === 'undefined' || window.matchMedia(query).matches,
+  );
+  useEffect(() => {
+    const media = window.matchMedia(query);
+    const onChange = () => setTilingEnabled(media.matches);
+    onChange();
+    media.addEventListener('change', onChange);
+    return () => media.removeEventListener('change', onChange);
+  }, [query]);
+  // The actions below never change, so they read the current value through a ref
+  const tilingRef = useRef(tilingEnabled);
+  tilingRef.current = tilingEnabled;
+
+  const actions = useMemo<WindowManagerActions>(
     () => ({
-      open: (id) => setOrder((prev) => [...prev.filter((w) => w !== id), id]),
-      close: (id) => setOrder((prev) => (prev.includes(id) ? prev.filter((w) => w !== id) : prev)),
-      focus: (id) =>
-        setOrder((prev) =>
-          !prev.includes(id) || prev[prev.length - 1] === id ? prev : [...prev.filter((w) => w !== id), id],
+      open: (id, tiled) =>
+        setState((prev) => {
+          if (prev.opened.includes(id)) return prev;
+          const opened = [...prev.opened, id];
+          const excluded = new Set(prev.excluded);
+          if (tiled) excluded.delete(id);
+          else excluded.add(id);
+          const zOrder = [...prev.zOrder.filter((w) => w !== id), id];
+
+          // Rearrange only on a big enough screen, and only when the new window itself takes part
+          const takesPart = tilingRef.current && tiled && !prev.pinned.has(id);
+          const tiledIds = opened.filter((w) => !excluded.has(w) && !prev.pinned.has(w));
+          const pattern = LAYOUTS[tiledIds.length];
+          const layout =
+            takesPart && pattern
+              ? {
+                  version: prev.layout.version + 1,
+                  tiles: Object.fromEntries(tiledIds.map((w, i) => [w, pattern[i]])),
+                  apply: tiledIds,
+                }
+              : prev.layout;
+
+          return { ...prev, opened, excluded, zOrder, layout };
+        }),
+      close: (id) =>
+        setState((prev) =>
+          prev.opened.includes(id)
+            ? { ...prev, opened: prev.opened.filter((w) => w !== id), zOrder: prev.zOrder.filter((w) => w !== id) }
+            : prev,
         ),
+      focus: (id) =>
+        setState((prev) =>
+          !prev.zOrder.includes(id) || prev.zOrder[prev.zOrder.length - 1] === id
+            ? prev
+            : { ...prev, zOrder: [...prev.zOrder.filter((w) => w !== id), id] },
+        ),
+      moveToTile: (id, tile) =>
+        setState((prev) => {
+          const current = prev.layout.tiles[id];
+          if (!current || sameTile(current, tile)) return prev;
+          const occupant = tiledWindows(prev).find((w) => w !== id && sameTile(prev.layout.tiles[w], tile));
+          const tiles = { ...prev.layout.tiles, [id]: tile };
+          if (occupant) tiles[occupant] = current; // swap
+          return {
+            ...prev,
+            layout: { version: prev.layout.version + 1, tiles, apply: occupant ? [id, occupant] : [id] },
+          };
+        }),
+      setPinned: (id, pinned) =>
+        setState((prev) => {
+          if (prev.pinned.has(id) === pinned) return prev;
+          const next = new Set(prev.pinned);
+          if (pinned) next.add(id);
+          else next.delete(id);
+          return { ...prev, pinned: next };
+        }),
     }),
     [],
   );
 
+  const value = useMemo(() => ({ ...state, tilingEnabled }), [state, tilingEnabled]);
+
   return (
-    <WindowStackActionsContext.Provider value={actions}>
-      <WindowStackOrderContext.Provider value={order}>{children}</WindowStackOrderContext.Provider>
-    </WindowStackActionsContext.Provider>
+    <WindowManagerActionsContext.Provider value={actions}>
+      <WindowManagerStateContext.Provider value={value}>{children}</WindowManagerStateContext.Provider>
+    </WindowManagerActionsContext.Provider>
   );
 }
 
@@ -104,7 +256,7 @@ export function WindowManagerProvider({ children }: { children: ReactNode }) {
 interface AppWindowProps {
   /** Text shown in the title bar */
   title?: ReactNode;
-  /** Stable id for the window stack. Optional; one is generated if left out. */
+  /** Stable id for the window manager. Optional; one is generated if left out. */
   id?: string;
   /**
    * Controlled visibility. Leave it out and the window hides itself when closed;
@@ -126,12 +278,12 @@ interface AppWindowProps {
    * e.g. controls={{ close: 'enabled', fullscreen: 'hidden' }}
    */
   controls?: WindowControls;
-  /** Opens at this size instead of filling its area */
+  /** Opens at this size, centered. Without it, the window opens filling its area. */
   initialSize?: { width: number; height: number };
-  /** Where an initialSize window opens horizontally: left edge, centered (default) or right edge */
-  initialAlign?: 'start' | 'center' | 'end';
   /** Makes the window unclickable and unfocusable, e.g. while a popup sits on top of it */
   inactive?: boolean;
+  /** Keep this window out of the tiling layout (e.g. a modal popup) */
+  excludeFromLayout?: boolean;
   /** id for the title text, so a dialog can point aria-labelledby at it */
   titleId?: string;
   onClose?: () => void;
@@ -194,14 +346,14 @@ const getContentBox = (parent: HTMLElement): Box => {
 const trackPointer = (
   target: HTMLElement,
   e: ReactPointerEvent,
-  onMove: (dx: number, dy: number) => void,
+  onMove: (dx: number, dy: number, ev: PointerEvent) => void,
   onEnd?: () => void,
 ) => {
   target.setPointerCapture(e.pointerId);
   const startX = e.clientX;
   const startY = e.clientY;
 
-  const move = (ev: PointerEvent) => onMove(ev.clientX - startX, ev.clientY - startY);
+  const move = (ev: PointerEvent) => onMove(ev.clientX - startX, ev.clientY - startY, ev);
   const end = () => {
     target.removeEventListener('pointermove', move);
     target.removeEventListener('pointerup', end);
@@ -238,8 +390,8 @@ export default function AppWindow({
   minHeight = 200,
   controls,
   initialSize,
-  initialAlign = 'center',
   inactive = false,
+  excludeFromLayout = false,
   titleId,
   onClose,
   onFullscreenChange,
@@ -252,6 +404,8 @@ export default function AppWindow({
   const [rect, setRect] = useState<WindowRect | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
+  /** Where a dragged tiled window would land, in viewport pixels (shown as a dashed outline) */
+  const [dropPreview, setDropPreview] = useState<{ left: number; top: number; width: number; height: number } | null>(null);
   const [isRebounding, setIsRebounding] = useState(false);
   const reboundTimer = useRef<number | undefined>(undefined);
   const [selfOpen, setSelfOpen] = useState(true);
@@ -259,37 +413,44 @@ export default function AppWindow({
   // Latest callback, for the Escape listener below
   const onFullscreenChangeRef = useRef(onFullscreenChange);
   onFullscreenChangeRef.current = onFullscreenChange;
-  const sizedRef = useRef(false);
   const reducedMotion = usePrefersReducedMotion();
 
   const closeState = controls?.close ?? 'disabled';
   const fullscreenState = controls?.fullscreen ?? 'disabled';
+  const pinState = controls?.pin ?? 'enabled';
 
-  const canResize = resizable && !isFullscreen;
-  const canMove = movable && !isFullscreen;
-
-  /* ---------- Window stack ---------- */
+  /* ---------- Window manager ---------- */
   const autoId = useId();
   const windowId = id ?? autoId;
-  const stack = useContext(WindowStackActionsContext);
-  const order = useContext(WindowStackOrderContext);
+  const manager = useContext(WindowManagerActionsContext);
+  const managerState = useContext(WindowManagerStateContext);
 
-  useEffect(() => {
-    if (!stack || !isOpen) return;
-    stack.open(windowId);
-    return () => stack.close(windowId);
-  }, [stack, isOpen, windowId]);
+  // Registered before the first paint, so a tile handed out on opening is in place right away
+  useLayoutEffect(() => {
+    if (!manager || !isOpen) return;
+    manager.open(windowId, !excludeFromLayout);
+    return () => manager.close(windowId);
+  }, [manager, isOpen, windowId, excludeFromLayout]);
 
-  const stackIndex = order.indexOf(windowId);
-  const depth = stackIndex === -1 ? 0 : order.length - 1 - stackIndex;
-  const stackScale = Math.max(MIN_STACK_SCALE, 1 - depth * STACK_SHRINK);
+  // Pinned state lives in the manager (it affects tiling); a window on its own keeps it locally
+  const [selfPinned, setSelfPinned] = useState(false);
+  const pinned = manager ? managerState.pinned.has(windowId) : selfPinned;
+  const togglePin = () => (manager ? manager.setPinned(windowId, !pinned) : setSelfPinned(!pinned));
+
+  const stackIndex = managerState.zOrder.indexOf(windowId);
+  const tile = managerState.layout.tiles[windowId];
+  const layoutVersion = managerState.layout.version;
+
+  const canResize = resizable && !isFullscreen && !pinned;
+  const canMove = movable && !isFullscreen && !pinned;
+  const canFullscreen = fullscreenState === 'enabled' && !pinned;
 
   /* ---------- Measuring ---------- */
 
   /**
    * Current window edges and the area it's allowed to occupy, in viewport pixels.
    * Uses the layout size and the saved position rather than getBoundingClientRect,
-   * because a window behind others is scaled down and its on-screen box is smaller.
+   * because the on-screen box can be mid-animation (popping in, springing back or gliding into a tile).
    */
   const measure = () => {
     const frame = frameRef.current;
@@ -386,17 +547,55 @@ export default function AppWindow({
     setIsDragging(true);
     frame.style.willChange = 'translate';
 
+    // Drop slots: only on big screens, for a window that's part of a 2 to 4 window layout
+    const tiled = manager && managerState.tilingEnabled ? tiledWindows(managerState) : [];
+    const slots = tile && tiled.includes(windowId) ? DROP_SLOTS[tiled.length] ?? [] : [];
+    const areaW = box.right - box.left;
+    const areaH = box.bottom - box.top;
+    const slotRect = (t: Tile) => ({
+      left: box.left + t.left * areaW,
+      top: box.top + t.top * areaH,
+      width: t.width * areaW,
+      height: t.height * areaH,
+    });
+    let dropTarget: Tile | null = null;
+
     trackPointer(
       e.currentTarget,
       e,
-      (dx, dy) => {
+      (dx, dy, ev) => {
         last.x = clamp(baseX + dx, dragMinX, dragMaxX);
         last.y = clamp(baseY + dy, dragMinY, dragMaxY);
         frame.style.translate = `${last.x - baseX}px ${last.y - baseY}px`;
+
+        if (slots.length === 0) return;
+        // The slot under the pointer, unless it's this window's own (or Shift is held for free placement)
+        const hit = ev.shiftKey
+          ? null
+          : slots.find((t) => {
+              const r = slotRect(t);
+              return ev.clientX >= r.left && ev.clientX < r.left + r.width && ev.clientY >= r.top && ev.clientY < r.top + r.height;
+            }) ?? null;
+        const next = hit && !sameTile(hit, tile) ? hit : null;
+        const changed = next === null ? dropTarget !== null : !sameTile(next, dropTarget ?? undefined);
+        if (changed) {
+          dropTarget = next;
+          setDropPreview(next ? slotRect(next) : null); // re-renders only when the target changes
+        }
       },
       () => {
         setIsDragging(false);
         frame.style.willChange = '';
+        setDropPreview(null);
+
+        if (dropTarget && manager) {
+          // Dropped on another tile: settle where it was let go, then glide into the new tile
+          // (whoever was there glides into this window's old one)
+          frame.style.translate = '';
+          flushSync(() => setRect({ x: last.x, y: last.y, width, height }));
+          manager.moveToTile(windowId, dropTarget);
+          return;
+        }
 
         const x = clamp(last.x, 0, restMaxX);
         const y = clamp(last.y, 0, restMaxY);
@@ -442,9 +641,16 @@ export default function AppWindow({
     setRect(resizeFrom('se', measured.start, measured.box, delta[0], delta[1]));
   };
 
-  // initialSize: open centered at that size (before the first paint, so it doesn't jump)
+  // Spawn position, every time the window opens: centered at initialSize, or filling its area
+  // (which is centered too) when there's no initialSize. Runs before the first paint, so nothing jumps.
+  // If the window manager hands out a tile on opening, the tile replaces this, also before the first paint.
   useLayoutEffect(() => {
-    if (!initialSize || !isOpen || sizedRef.current) return;
+    if (!isOpen) return;
+    stopRebound();
+    if (!initialSize) {
+      setRect(null);
+      return;
+    }
     const parent = frameRef.current?.parentElement;
     if (!parent) return;
     const box = getContentBox(parent);
@@ -452,10 +658,8 @@ export default function AppWindow({
     const areaH = box.bottom - box.top;
     const width = clamp(initialSize.width, Math.min(minWidth, areaW), areaW);
     const height = clamp(initialSize.height, Math.min(minHeight, areaH), areaH);
-    const x = initialAlign === 'start' ? 0 : initialAlign === 'end' ? areaW - width : (areaW - width) / 2;
-    setRect({ x, y: (areaH - height) / 2, width, height });
-    sizedRef.current = true;
-    // Only the first time it opens: later size changes come from the user
+    setRect({ x: (areaW - width) / 2, y: (areaH - height) / 2, width, height });
+    // Only when it opens: after that, size and position are up to the user (and tiling)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen]);
 
@@ -490,6 +694,51 @@ export default function AppWindow({
     return () => observer.disconnect();
   }, [minWidth, minHeight, isOpen]);
 
+  /* ---------- Tiling ---------- */
+  const [isTiling, setIsTiling] = useState(false);
+  const tilingTimer = useRef<number | undefined>(undefined);
+  // False until the window has been on screen for a frame: a brand-new window jumps straight to its tile
+  const shownRef = useRef(false);
+  useEffect(() => {
+    shownRef.current = isOpen;
+  }, [isOpen]);
+
+  // When the manager rearranges, move + resize into this window's tile (gliding there if already on screen)
+  useLayoutEffect(() => {
+    if (!tile || pinned || isFullscreen || !isOpen) return;
+    if (!managerState.layout.apply.includes(windowId)) return;
+    const parent = frameRef.current?.parentElement;
+    if (!parent) return;
+
+    const box = getContentBox(parent);
+    const areaW = box.right - box.left;
+    const areaH = box.bottom - box.top;
+    const gap = TILE_GAP / 2; // half on each shared edge, none against the desk's outer edges
+    const x = tile.left * areaW + (tile.left > 0 ? gap : 0);
+    const y = tile.top * areaH + (tile.top > 0 ? gap : 0);
+    const right = (tile.left + tile.width) * areaW - (tile.left + tile.width < 1 ? gap : 0);
+    const bottom = (tile.top + tile.height) * areaH - (tile.top + tile.height < 1 ? gap : 0);
+    const target = { x, y, width: right - x, height: bottom - y };
+
+    stopRebound();
+
+    if (!shownRef.current || reducedMotion) {
+      setRect(target);
+      return;
+    }
+
+    // Turn on the position/size transition first, then move, so the move animates
+    setIsTiling(true);
+    const frame = requestAnimationFrame(() => setRect(target));
+    window.clearTimeout(tilingTimer.current);
+    tilingTimer.current = window.setTimeout(() => setIsTiling(false), TILE_MS + 80);
+    return () => cancelAnimationFrame(frame);
+    // Only when a new layout is handed out
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [layoutVersion]);
+
+  useEffect(() => () => window.clearTimeout(tilingTimer.current), []);
+
   const setFullscreen = (next: boolean) => {
     setIsFullscreen(next);
     onFullscreenChangeRef.current?.(next);
@@ -516,19 +765,22 @@ export default function AppWindow({
 
   // Double-clicking the title bar toggles full screen, like a desktop window
   const handleTitleDoubleClick = (e: ReactMouseEvent<HTMLDivElement>) => {
-    if (fullscreenState !== 'enabled' || (e.target as HTMLElement).closest('button')) return;
+    if (!canFullscreen || (e.target as HTMLElement).closest('button')) return;
     toggleFullscreen();
   };
 
-  // Shrinking behind newer windows, the pop-in, and the rebound all animate; nothing does with reduced motion
+  // The pop-in, the rebound and tiling animate; nothing does with reduced motion
   const transition = reducedMotion
     ? 'none'
     : [
-        `transform 320ms ${EASE_OUT}`,
         `scale 260ms ${EASE_OUT}`,
         'opacity 200ms ease-out',
         // The spring-back animates translate only, so it also stays off the layout and paint path
         ...(isRebounding ? [`translate ${REBOUND_MS}ms ${SPRING}`] : []),
+        // Gliding into a tile: only while a rearrange is running, so dragging and resizing stay instant
+        ...(isTiling
+          ? ['left', 'top', 'width', 'height'].map((p) => `${p} ${TILE_MS}ms ${EASE_OUT}`)
+          : []),
       ].join(', ');
 
   // Full screen: pinned over the whole viewport. Otherwise: its own spot inside the desk area.
@@ -545,14 +797,13 @@ export default function AppWindow({
         maxHeight: '100%',
         // Later windows sit on top. Kept under 20 so the taskbar stays above windows dragged under it.
         zIndex: stackIndex === -1 ? undefined : 10 + stackIndex,
-        transform: stackScale < 1 ? `scale(${stackScale})` : 'none',
         transition,
       };
 
   // Paper chips that sit on top of the title bar. Hover lifts and tilts them, press pushes them in.
   const titleButton = [
     'shrink-0 w-8 h-8 p-0 flex items-center justify-center rounded-md',
-    'border-2 border-[#3c3c3c] [border-image:none] bg-[#FDF7F1]',
+    'border-2 border-[#3c3c3c] [border-image:none]',
     'shadow-[2px_2px_0_rgba(60,60,60,0.35)] transition duration-150 ease-out',
     'disabled:opacity-45 disabled:cursor-not-allowed disabled:shadow-none',
     'enabled:hover:shadow-[3px_4px_0_#3c3c3c] enabled:active:shadow-[1px_1px_0_#3c3c3c]',
@@ -563,11 +814,26 @@ export default function AppWindow({
   if (!isOpen) return null;
 
   return (
+    <>
+      {dropPreview &&
+        createPortal(
+          <div
+            aria-hidden="true"
+            className="pointer-events-none fixed z-[25] rounded-md border-2 border-dashed border-[#3c3c3c] bg-[#F2A65A]/20 motion-safe:transition-opacity motion-safe:duration-150 starting:opacity-0"
+            style={{
+              left: dropPreview.left + TILE_GAP / 2,
+              top: dropPreview.top + TILE_GAP / 2,
+              width: dropPreview.width - TILE_GAP,
+              height: dropPreview.height - TILE_GAP,
+            }}
+          />,
+          document.body,
+        )}
     <div
       ref={frameRef}
       style={frameStyle}
-      // Clicking anywhere on a window brings it to the front of the stack
-      onPointerDownCapture={() => stack?.focus(windowId)}
+      // Clicking anywhere on a window brings it to the front (its size stays the same)
+      onPointerDownCapture={() => manager?.focus(windowId)}
       // Pops in when it first appears (or reopens)
       className={`relative starting:opacity-0 starting:scale-90 ${className}`}
     >
@@ -590,12 +856,35 @@ export default function AppWindow({
           <p id={titleId} className="flex-1 min-w-0 m-0 truncate text-lg">{title}</p>
 
           <div className="flex items-center gap-2">
+            {pinState !== 'hidden' && (
+              <button
+                type="button"
+                className={`${titleButton} ${pinned ? 'bg-[#F2A65A]' : 'bg-[#FDF7F1] enabled:hover:bg-[#EADBC8]'}`}
+                onClick={togglePin}
+                disabled={pinState === 'disabled' || isFullscreen}
+                aria-pressed={pinned}
+                aria-label={pinned ? 'Unpin window' : 'Pin window'}
+                title={pinned ? 'Unpin (allow moving and resizing)' : 'Pin (stop moving, resizing and auto-arranging)'}
+              >
+                <svg viewBox="0 0 20 20" className="w-4 h-4" aria-hidden="true">
+                  <path
+                    d="M7.5 2.5h5l-.8 5 2.8 2.8v1.7h-9v-1.7L8.3 7.5zM10 12v5.5"
+                    fill={pinned ? 'currentColor' : 'none'}
+                    stroke="currentColor"
+                    strokeWidth="1.8"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              </button>
+            )}
+
             {fullscreenState !== 'hidden' && (
               <button
                 type="button"
-                className={`${titleButton} enabled:hover:bg-[#BFE3C4]`}
+                className={`${titleButton} bg-[#FDF7F1] enabled:hover:bg-[#BFE3C4]`}
                 onClick={toggleFullscreen}
-                disabled={fullscreenState === 'disabled'}
+                disabled={!canFullscreen}
                 aria-label={isFullscreen ? 'Exit full screen' : 'Full screen'}
                 title={isFullscreen ? 'Exit full screen' : 'Full screen'}
               >
@@ -619,7 +908,7 @@ export default function AppWindow({
             {closeState !== 'hidden' && (
               <button
                 type="button"
-                className={`${titleButton} enabled:hover:bg-[#F2A99E]`}
+                className={`${titleButton} bg-[#FDF7F1] enabled:hover:bg-[#F2A99E]`}
                 onClick={handleClose}
                 disabled={closeState === 'disabled'}
                 aria-label="Close"
@@ -684,5 +973,6 @@ export default function AppWindow({
         </>
       )}
     </div>
+    </>
   );
 }

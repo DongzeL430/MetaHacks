@@ -52,7 +52,6 @@ export default function LobbyBrowserWindow({
       onClose={onClose}
       controls={{ close: 'enabled', fullscreen: 'enabled' }}
       initialSize={{ width: 440, height: 560 }}
-      initialAlign="start"
       minWidth={320}
       minHeight={280}
       bodyClassName="p-3 flex flex-col gap-3"

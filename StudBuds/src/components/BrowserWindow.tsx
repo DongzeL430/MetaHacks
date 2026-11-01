@@ -23,7 +23,6 @@ interface BrowserWindowProps {
   /** Text in the fake address bar for the active tab */
   address?: string;
   initialSize?: { width: number; height: number };
-  initialAlign?: 'start' | 'center' | 'end';
   /** The active tab's page */
   children?: ReactNode;
 }
@@ -44,7 +43,6 @@ export default function BrowserWindow({
   onClose,
   address,
   initialSize = { width: 640, height: 580 },
-  initialAlign = 'end',
   children,
 }: BrowserWindowProps) {
   const baseId = useId();
@@ -85,7 +83,6 @@ export default function BrowserWindow({
       onClose={onClose}
       controls={{ close: 'enabled', fullscreen: 'enabled' }}
       initialSize={initialSize}
-      initialAlign={initialAlign}
       minWidth={320}
       minHeight={300}
       bodyClassName="p-0 flex flex-col"

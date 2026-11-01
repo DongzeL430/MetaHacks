@@ -123,13 +123,6 @@ export default function HomePage({
             <div className="relative flex-1 min-h-0 min-w-0">
               {/* All windows on the desk share one stack: the newest is in front, the ones behind shrink a little */}
               <WindowManagerProvider>
-                <AppWindow id="home" title={windowTitle} footer={footer} controls={{ close: 'enabled', fullscreen: 'enabled' }}>
-                  {children ?? (
-                    <p className="m-auto text-center opacity-60">
-                      Reserved for input forms and custom components
-                    </p>
-                  )}
-                </AppWindow>
 
                 <StudyLayout
                   me={{ name: userName, avatar: avatarUrl }}

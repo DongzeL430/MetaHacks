@@ -128,7 +128,9 @@ export default function AboutYouWindow({
         <AppWindow
           title="About you"
           titleId={titleId}
-          controls={{ close: 'enabled', fullscreen: 'enabled' }}
+          // A modal popup: keep it out of the auto-arranging, and don't let the survey window move for it
+          excludeFromLayout
+          controls={{ close: 'enabled', fullscreen: 'disabled', pin: 'hidden' }}
           onClose={onClose}
           initialSize={{ width: 600, height: 560 }}
           minWidth={300}
@@ -149,6 +151,8 @@ export default function AboutYouWindow({
                   {searching ? 'Searching…' : 'Find courses'}
                 </button>
               </div>
+              {/* Edge where the footer strip meets the lighter area below it */}
+              <hr className="m-0" />
             </>
           }
         >
