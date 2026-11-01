@@ -121,20 +121,25 @@ export default function AboutYouWindow({
         initialSize={{ width: 600, height: 560 }}
         minWidth={300}
         minHeight={280}
+        footerClassName="p-0"
         footer={
-          <div className="flex items-center gap-3">
-            <p role="status" className="m-0 flex-1 min-w-0 text-sm opacity-80">
-              {footerNote}
-            </p>
-            <button
-              type="button"
-              onClick={findCourses}
-              disabled={!suggestCourses || !hasEnough || searching}
-              className="px-3 py-0.5 text-sm"
-            >
-              {searching ? 'Searching…' : 'Find courses'}
-            </button>
-          </div>
+          <>
+            <div className="px-3 py-1.5 flex items-center gap-3">
+              <p role="status" className="m-0 flex-1 min-w-0 text-sm opacity-80">
+                {footerNote}
+              </p>
+              <button
+                type="button"
+                onClick={findCourses}
+                disabled={!suggestCourses || !hasEnough || searching}
+                className="px-3 py-0.5 text-sm"
+              >
+                {searching ? 'Searching…' : 'Find courses'}
+              </button>
+            </div>
+            {/* Edge where the footer strip meets the lighter area below it */}
+            <hr className="m-0" />
+          </>
         }
       >
         <p className="m-0 text-sm opacity-80">
@@ -256,7 +261,8 @@ export default function AboutYouWindow({
           <select
             value={value.gradYear}
             onChange={(e) => update({ gradYear: e.target.value })}
-            className="px-2 py-1"
+            // Room on the right for doodle.css's arrow, which px-2 would cover
+            className="pl-2 pr-8 py-1"
           >
             <option value="">Pick a year</option>
             {GRAD_YEARS.map((year) => (
