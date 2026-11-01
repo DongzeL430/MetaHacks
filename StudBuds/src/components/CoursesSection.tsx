@@ -73,11 +73,8 @@ export const emptyAcademics = (): AcademicProfile => ({
  * What makes two rows the same course: the code when the name starts with one
  * ("CS 2500 · Fundamentals of CS 1" and "cs2500" match), otherwise the whole name.
  */
-/**
- * Only courses taken here or being taken now get a confidence rating: a planned course hasn't
- * started, and transferred courses skip it.
- */
-const needsConfidence = (status: CourseStatus) => status === 'taken' || status === 'taking';
+/** Every course gets a confidence rating except a planned one, which hasn't started yet */
+const needsConfidence = (status: CourseStatus) => status !== 'planned';
 
 const courseKey = (name: string) => {
   const code = name.trim().match(/^([A-Za-z&]{2,6})[\s-]*(\d{2,5}[A-Za-z]?)\b/);
@@ -105,7 +102,7 @@ export function validateAcademics(profile: AcademicProfile): { message: string; 
   return {
     message: missing.has('courses')
       ? 'Add at least one course you’ve taken or are taking.'
-      : 'Finish the highlighted courses. Each one needs a name, and a confidence rating unless it’s planned or transferred.',
+      : 'Finish the highlighted courses. Each one needs a name, and a confidence rating unless it’s planned.',
     missing,
   };
 }
@@ -365,7 +362,7 @@ export default function CoursesSection({ value, onChange, missing, onOpenAutofil
                     </div>
                   </div>
 
-                  {/* Confidence 1-5, for courses taken here or being taken now */}
+                  {/* Confidence 1-5. Planned courses skip it. */}
                   {needsConfidence(course.status) && (
                   <div>
                     <p className={`m-0 mb-1 ${FIELD_LABEL}`} aria-hidden="true">

@@ -72,7 +72,7 @@ These keep prejudice on our side out of pairing. They aren't enforced by the dat
 - Vibe Check results are counts only (`agreements`, `reactions`). Don't infer anything about a person from them.
 - Skip a pair when `pair_on_cooldown(a, b)` is true (a Pass in the last day) or a block exists in either direction.
 - Pair only students at the same school, using nothing that describes who they are. Grades are for matching complementary strengths, never shown to the partner.
-- Treat `transferred` courses like `completed` ones: the student knows the material even without a confidence rating. Ignore where the credit came from; it isn't recorded.
+- Treat `transferred` courses like `completed` ones: the student knows the material, and rates their confidence the same way. Ignore where the credit came from; it isn't recorded.
 - Set `mutual_at` only when both students picked Vibe. Leave it empty otherwise, so a Pass looks the same as no answer.
 - Show contact handles only when both students said yes in that pairing, and only the platforms each one picked.
 - The study record is a history, never a score. Don't rank or filter students by how many sessions they've had or cancelled.
@@ -81,7 +81,7 @@ These keep prejudice on our side out of pairing. They aren't enforced by the dat
 ## Formats
 
 - **Course codes:** uppercase, single spaces, letters, digits, `.`, `-`, `/`, 2 to 20 characters, e.g. `CS 2500`. `CS2500` and `CS 2500` count as the same course. Search the list before adding, and add only if the code is missing.
-- **Grades:** `A` `A-` `B+` `B` `B-` `C+` `C` `C-` `D+` `D` `D-` `F` `P`. Required for `completed`, optional otherwise. `planned` courses have no grade or confidence yet; `transferred` courses skip confidence and may have a grade.
+- **Grades:** `A` `A-` `B+` `B` `B-` `C+` `C` `C-` `D+` `D` `D-` `F` `P`. Required for `completed`, optional otherwise. `planned` courses have no grade or confidence yet; `transferred` courses have a confidence rating and may have a grade.
 - **Course search cache:** `course_search_cache` holds Muse's course list per school, program, track, and graduation year for 7 days. Server code only; see [muse-schedule.md](muse-schedule.md).
 - **Availability:** `weekday` is 1 (Monday) to 7 (Sunday), times like `'09:00'`, in the school's local time. The end must be after the start.
 - **Instagram:** without the `@`, up to 30 letters, digits, `.` or `_`.
