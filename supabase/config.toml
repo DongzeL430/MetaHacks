@@ -264,6 +264,11 @@ sender_name = "StudBuds"
 subject = "Your StudBuds sign-up code"
 content_path = "./supabase/templates/confirmation.html"
 
+# Same reason: a scanner opening a reset link would sign into the student's account.
+[auth.email.template.recovery]
+subject = "Your StudBuds password reset code"
+content_path = "./supabase/templates/recovery.html"
+
 # Uncomment to customize notification email template
 # [auth.email.notification.password_changed]
 # enabled = true

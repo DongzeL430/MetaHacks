@@ -5,7 +5,7 @@
 begin;
 create extension if not exists pgtap with schema extensions;
 
-select plan(17);
+select plan(18);
 
 insert into auth.users (id, email, raw_user_meta_data) values
   ('a4000000-0000-4000-8000-00000000000a', 'a@northeastern.edu', '{"adult_confirmed": true}'),
@@ -132,6 +132,15 @@ select throws_ok(
   '23505', null,
   'The same person cannot be in a session twice'
 );
+select ok(
+  not exists (select 1 from public.study_session_members where nickname is null)
+  and not exists (
+    select 1 from public.study_session_members m
+    join public.public_profiles p on p.id = m.user_id
+    where m.nickname <> p.nickname
+  ),
+  'Each member''s nickname is filled in automatically'
+);
 
 set local role service_role;
 select lives_ok(
@@ -144,16 +153,30 @@ reset role;
 
 -- Deletions --------------------------------------------------------------------------------
 
+do $$
+begin
+  perform set_config('test.b_nickname',
+    (select nickname from public.public_profiles where id = 'b4000000-0000-4000-8000-00000000000b'), true);
+end;
+$$;
+
 delete from auth.users where id = 'b4000000-0000-4000-8000-00000000000b';
 
+set local role authenticated;
+set local request.jwt.claims to '{"sub": "a4000000-0000-4000-8000-00000000000a", "role": "authenticated"}';
+
 select ok(
-  exists (select 1 from public.study_sessions where id = current_setting('test.s1')::bigint)
-  and not exists (
+  exists (
     select 1 from public.study_session_members
-    where session_id = current_setting('test.s1')::bigint and user_id = 'b4000000-0000-4000-8000-00000000000b'
+    where session_id = current_setting('test.s1')::bigint
+      and user_id is null
+      and account_deleted
+      and nickname = current_setting('test.b_nickname')
   ),
-  'When a partner deletes their account, the session stays in the others'' record without them'
+  'After a partner deletes their account, others still see their nickname, marked as deleted'
 );
+
+reset role;
 
 delete from public.courses where code = 'TEST 2500';
 

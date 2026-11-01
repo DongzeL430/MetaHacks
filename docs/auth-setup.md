@@ -119,7 +119,18 @@ await supabase.auth.verifyOtp({ email, token: code, type: 'email' });
 
 // "Send a new code" needs a fresh Turnstile token:
 await supabase.auth.resend({ type: 'signup', email, options: { captchaToken } });
+
+// Forgot password: also a code, never a link (supabase/templates/recovery.html).
+await supabase.auth.resetPasswordForEmail(email, { captchaToken });
+await supabase.auth.verifyOtp({ email, token: code, type: 'recovery' }); // signs the student in
+await supabase.auth.updateUser({ password: newPassword });
+
+// Delete my account (signed in): removes the login and everything tied to it.
+await supabase.rpc('delete_my_account');
+await supabase.auth.signOut({ scope: 'local' });
 ```
+
+`resetPasswordForEmail` answers the same way whether or not the account exists, so the page always says "If an account exists for that email, we sent a code."
 
 Sign-in and password reset need a token too, for example `supabase.auth.signInWithPassword({ email, password, options: { captchaToken } })`. A Turnstile token works once, so reset the widget after every attempt, successful or not. A missing or reused token fails with `error.code === 'captcha_failed'`.
 
