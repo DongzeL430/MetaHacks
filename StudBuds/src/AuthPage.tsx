@@ -13,14 +13,18 @@ interface FormValues {
   confirm: string;
 }
 
+// The sign-up email holds a code, not a link: school email scanners open links on their own,
+// which confirmed accounts nobody had checked. Matches otp_length in supabase/config.toml.
+const CODE_LENGTH = 8;
+
 // Turns Supabase errors into something a student can act on. The sign-up rules (.edu email,
 // 18+) already come back from the server with student-facing messages.
 function describeError(error: AuthError): string {
   switch (error.code) {
-    case 'email_not_confirmed':
-      return 'Confirm your email first. Check your inbox for a link from StudBuds.';
     case 'invalid_credentials':
       return 'Wrong email or password.';
+    case 'otp_expired':
+      return 'That code is wrong or has expired. Check it, or send a new code.';
     case 'captcha_failed':
       return 'The bot check didn’t go through. Try again.';
     case 'over_request_rate_limit':
@@ -38,29 +42,24 @@ function describeError(error: AuthError): string {
   return error.message;
 }
 
-// An email link that expired or was already used comes back with an error in the URL.
-const linkFailed = (): boolean => new URLSearchParams(window.location.hash.slice(1)).has('error');
-const LINK_ERROR =
-  'That email link has expired or was already used. Sign up again with the same email to get a new one.';
-
 export default function AuthPage() {
   const [mode, setMode] = useState<Mode>('login');
   const [values, setValues] = useState<FormValues>({ email: '', password: '', confirm: '' });
   const [adult, setAdult] = useState(false);
-  const [error, setError] = useState<string>(() => (linkFailed() ? LINK_ERROR : ''));
+  const [error, setError] = useState<string>('');
+  const [notice, setNotice] = useState<string>('');
   const [captchaToken, setCaptchaToken] = useState<string | null>(null);
   const [captchaReset, setCaptchaReset] = useState(0);
   const [sending, setSending] = useState(false);
-  const [sentTo, setSentTo] = useState('');
-  // undefined until the saved session, or the one in an email link, has been read.
+  // Set while waiting for the student to type the code emailed to this address.
+  const [confirmEmail, setConfirmEmail] = useState('');
+  const [code, setCode] = useState('');
+  // undefined until the saved session has been read.
   const [session, setSession] = useState<Session | null | undefined>(undefined);
 
   const signup = mode === 'signup';
 
   useEffect(() => {
-    // Clear the failed link from the address bar so a refresh doesn't show the error again.
-    if (linkFailed()) window.history.replaceState(null, '', window.location.pathname);
-
     supabase.auth.getSession().then(({ data }) => setSession(data.session));
     const { data } = supabase.auth.onAuthStateChange((_event, next) => setSession(next));
     return () => data.subscription.unsubscribe();
@@ -72,7 +71,21 @@ export default function AuthPage() {
   const toggleMode = (): void => {
     setMode(signup ? 'login' : 'signup');
     setError('');
-    setSentTo('');
+    setNotice('');
+  };
+
+  const showCodeScreen = (email: string, message: string): void => {
+    setConfirmEmail(email);
+    setCode('');
+    setError('');
+    setNotice(message);
+  };
+
+  const backToLogin = (): void => {
+    setConfirmEmail('');
+    setMode('login');
+    setError('');
+    setNotice('');
   };
 
   // Catches problems before anything is sent, so students don't use up rate-limited attempts.
@@ -107,7 +120,6 @@ export default function AuthPage() {
           options: {
             data: { adult_confirmed: true },
             captchaToken: captchaToken ?? undefined,
-            emailRedirectTo: window.location.origin,
           },
         })
       : await supabase.auth.signInWithPassword({
@@ -119,8 +131,50 @@ export default function AuthPage() {
     // A bot-check token works once, so get a fresh one for the next attempt.
     setCaptchaReset((n) => n + 1);
 
+    if (authError?.code === 'email_not_confirmed') {
+      showCodeScreen(email, 'Confirm your email first. Enter the code we sent you, or send a new one.');
+    } else if (authError) {
+      setError(describeError(authError));
+    } else if (signup) {
+      showCodeScreen(email, `We sent a ${CODE_LENGTH}-digit code to ${email}. It can take a minute, and it might land in junk.`);
+    }
+  };
+
+  const onVerify = async (e: FormEvent<HTMLFormElement>): Promise<void> => {
+    e.preventDefault();
+    const token = code.replace(/\s/g, '');
+    if (!new RegExp(`^\\d{${CODE_LENGTH}}$`).test(token)) {
+      setError(`Enter the ${CODE_LENGTH}-digit code from the email.`);
+      return;
+    }
+
+    setError('');
+    setSending(true);
+    const { error: authError } = await supabase.auth.verifyOtp({ email: confirmEmail, token, type: 'email' });
+    setSending(false);
+
     if (authError) setError(describeError(authError));
-    else if (signup) setSentTo(email);
+    else setConfirmEmail('');
+  };
+
+  const onResend = async (): Promise<void> => {
+    if (!captchaToken) {
+      setError('The bot check is still loading. Try again in a moment.');
+      return;
+    }
+
+    setError('');
+    setSending(true);
+    const { error: authError } = await supabase.auth.resend({
+      type: 'signup',
+      email: confirmEmail,
+      options: { captchaToken },
+    });
+    setSending(false);
+    setCaptchaReset((n) => n + 1);
+
+    if (authError) setError(describeError(authError));
+    else setNotice(`We sent a new code to ${confirmEmail}.`);
   };
 
   return (
@@ -163,16 +217,44 @@ export default function AuthPage() {
                   Log out
                 </button>
               </div>
-            ) : sentTo ? (
-              <div className="flex flex-col gap-4">
-                <p>
-                  Check your inbox at {sentTo} for a link from StudBuds. It can take a minute, and it
-                  might land in spam.
-                </p>
-                <button type="button" onClick={toggleMode} className="self-center px-10 py-2">
-                  Back to log in
+            ) : confirmEmail ? (
+            <form onSubmit={onVerify} className="flex flex-col gap-4" noValidate>
+              <p>{notice}</p>
+
+              <label className="flex flex-col gap-1">
+                Code:
+                <input
+                  type="text"
+                  name="code"
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
+                  maxLength={CODE_LENGTH + 2}
+                  value={code}
+                  onChange={(e) => setCode(e.target.value)}
+                  className="w-full"
+                />
+              </label>
+
+              <Turnstile onToken={setCaptchaToken} resetKey={captchaReset} />
+
+              <p className="text-red-600 min-h-[1.5rem]" role="alert">
+                {error}
+              </p>
+
+              <div className="mt-2 flex flex-col items-center gap-3">
+                <button type="submit" disabled={sending} className="w-full max-w-[14rem] px-10 py-2">
+                  Confirm
                 </button>
+                <div className="flex gap-3">
+                  <button type="button" onClick={onResend} disabled={sending} className="px-3 py-1">
+                    Send a new code
+                  </button>
+                  <button type="button" onClick={backToLogin} className="px-3 py-1">
+                    Back to log in
+                  </button>
+                </div>
               </div>
+            </form>
             ) : (
             <form onSubmit={onSubmit} className="flex flex-col gap-4" noValidate>
               <label className="flex flex-col gap-1">
