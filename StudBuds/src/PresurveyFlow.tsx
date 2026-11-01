@@ -302,7 +302,8 @@ export default function PreSurveyFlow({
   const showAboutWindow = !isDone && current.kind === 'courses';
 
   return (
-    <div className="doodle w-full h-dvh flex flex-col">
+    // overflow-clip: a window dragged past the edge (or springing back) never adds page scrollbars
+    <div className="doodle w-full h-dvh flex flex-col overflow-clip">
       <Taskbar userName={userName} avatar={avatar} right={taskbarRight} />
 
       {/* No `isolate` / z-index on main: a full screen window has to be able to rise above the taskbar */}
@@ -326,7 +327,7 @@ export default function PreSurveyFlow({
                 footer={windowFooter}
                 open={windowOpen}
                 onClose={() => setWindowOpen(false)}
-                controls={{ close: 'disabled', fullscreen: 'enabled' }}
+                controls={{ close: 'enabled', fullscreen: 'enabled' }}
                 onFullscreenChange={setIsWindowFullscreen}
                 inactive={aboutOpen}
               >

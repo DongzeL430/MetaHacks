@@ -253,6 +253,11 @@ export function WindowManagerProvider({
 
 /* ------------------------------------------------------------------ */
 
+/** A fixed size in px, or a function that works it out from the desk area's size when the window opens */
+export type InitialSize =
+  | { width: number; height: number }
+  | ((area: { width: number; height: number }) => { width: number; height: number });
+
 interface AppWindowProps {
   /** Text shown in the title bar */
   title?: ReactNode;
@@ -278,8 +283,11 @@ interface AppWindowProps {
    * e.g. controls={{ close: 'enabled', fullscreen: 'hidden' }}
    */
   controls?: WindowControls;
-  /** Opens at this size, centered. Without it, the window opens filling its area. */
-  initialSize?: { width: number; height: number };
+  /**
+   * Opens at this size, centered. Without it, the window opens filling its area.
+   * Pass a function to size it relative to the desk, e.g. ({ width, height }) => ({ width: width * 0.6, height: height * 0.8 }).
+   */
+  initialSize?: InitialSize;
   /** Makes the window unclickable and unfocusable, e.g. while a popup sits on top of it */
   inactive?: boolean;
   /** Keep this window out of the tiling layout (e.g. a modal popup) */
@@ -656,8 +664,9 @@ export default function AppWindow({
     const box = getContentBox(parent);
     const areaW = box.right - box.left;
     const areaH = box.bottom - box.top;
-    const width = clamp(initialSize.width, Math.min(minWidth, areaW), areaW);
-    const height = clamp(initialSize.height, Math.min(minHeight, areaH), areaH);
+    const size = typeof initialSize === 'function' ? initialSize({ width: areaW, height: areaH }) : initialSize;
+    const width = Math.round(clamp(size.width, Math.min(minWidth, areaW), areaW));
+    const height = Math.round(clamp(size.height, Math.min(minHeight, areaH), areaH));
     setRect({ x: (areaW - width) / 2, y: (areaH - height) / 2, width, height });
     // Only when it opens: after that, size and position are up to the user (and tiling)
     // eslint-disable-next-line react-hooks/exhaustive-deps

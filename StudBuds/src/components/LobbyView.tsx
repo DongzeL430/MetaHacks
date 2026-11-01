@@ -4,6 +4,7 @@ import { ME } from '../dataFiles/StudyData';
 import type { ConnectionStatus, Lobby, Person } from '../dataFiles/StudyData';
 import { roleIn } from '../utils/StudyState';
 import type { StudyDispatch } from '../utils/StudyState';
+import { describeSlots } from '../utils/ScheduleBlocks';
 
 /** A row of dots, one per spot: filled for taken spots, hollow for open ones */
 export function SpotPips({ filled, max }: { filled: number; max: number }) {
@@ -46,6 +47,7 @@ export default function LobbyView({ lobby, people, connections, dispatch }: Lobb
           <p className="m-0 text-sm opacity-70">
             Hosted by {lobby.hostId === ME ? 'you' : host?.name ?? 'someone'}
           </p>
+          {lobby.timeSlots.length > 0 && <p className="m-0 text-sm">Meets {describeSlots(lobby.timeSlots)}</p>}
         </div>
         <div className="flex flex-col items-end gap-1">
           <SpotPips filled={lobby.memberIds.length} max={lobby.maxSize} />

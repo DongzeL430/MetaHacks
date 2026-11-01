@@ -34,6 +34,8 @@ export interface Lobby {
   memberIds: string[];
   /** People waiting for the host to accept them */
   requestIds: string[];
+  /** When the session meets: one block of weekly slots ("wed|14:00", "wed|14:30", …) on one day */
+  timeSlots: string[];
 }
 
 /** Friend-request style: 'sent' = you asked them, 'received' = they asked you */
@@ -99,12 +101,56 @@ export const SAMPLE_PEOPLE: Person[] = [
 ];
 
 export const SAMPLE_LOBBIES: Lobby[] = [
-  { id: 'lobby-orgo', hostId: 'maya-ortiz', subject: 'Organic Chemistry', maxSize: 4, memberIds: ['maya-ortiz', 'priya-shah'], requestIds: [] },
-  { id: 'lobby-linalg', hostId: 'devin-park', subject: 'Linear Algebra', maxSize: 3, memberIds: ['devin-park', 'priya-shah', 'sam-oconnor'], requestIds: [] },
-  { id: 'lobby-stats', hostId: 'priya-shah', subject: 'Statistics', maxSize: 5, memberIds: ['priya-shah'], requestIds: [] },
+  {
+    id: 'lobby-orgo',
+    hostId: 'maya-ortiz',
+    subject: 'Organic Chemistry',
+    maxSize: 4,
+    memberIds: ['maya-ortiz', 'priya-shah'],
+    requestIds: [],
+    timeSlots: slotsBetween('wed', '14:00', '16:00'),
+  },
+  {
+    id: 'lobby-linalg',
+    hostId: 'devin-park',
+    subject: 'Linear Algebra',
+    maxSize: 3,
+    memberIds: ['devin-park', 'priya-shah', 'sam-oconnor'],
+    requestIds: [],
+    timeSlots: slotsBetween('thu', '11:00', '12:30'),
+  },
+  {
+    id: 'lobby-stats',
+    hostId: 'priya-shah',
+    subject: 'Statistics',
+    maxSize: 5,
+    memberIds: ['priya-shah'],
+    requestIds: [],
+    timeSlots: slotsBetween('fri', '13:00', '14:00'),
+  },
   // One you host, with someone waiting, so the host view has something to show
-  { id: 'lobby-mine', hostId: ME, subject: 'Calculus II', maxSize: 3, memberIds: [ME], requestIds: ['sam-oconnor'] },
+  {
+    id: 'lobby-mine',
+    hostId: ME,
+    subject: 'Calculus II',
+    maxSize: 3,
+    memberIds: [ME],
+    requestIds: ['sam-oconnor'],
+    timeSlots: slotsBetween('mon', '09:00', '10:30'),
+  },
 ];
+
+/** Sample of the signed-in user's free times (what the pre-survey calendar saves) */
+export const SAMPLE_MY_AVAILABILITY: string[] = [
+  ...slotsBetween('mon', '09:00', '12:00'),
+  ...slotsBetween('tue', '13:00', '17:00'),
+  ...slotsBetween('wed', '10:00', '15:00'),
+  ...slotsBetween('thu', '09:00', '11:00'),
+  ...slotsBetween('fri', '12:00', '16:00'),
+];
+
+/** Sample of the signed-in user's subjects, for the lobby browser's "My subjects" filter */
+export const SAMPLE_MY_SUBJECTS: string[] = ['Statistics', 'Organic Chemistry', 'Calculus II'];
 
 export const SAMPLE_CONNECTIONS: Record<string, ConnectionStatus> = {
   'maya-ortiz': 'connected',

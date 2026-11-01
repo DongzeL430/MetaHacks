@@ -1,9 +1,10 @@
 import { useState } from 'react';
 import type { FormEvent, ReactNode } from 'react';
 import AppWindow, { WindowManagerProvider } from './components/AppWindow';
-import Taskbar, { TASKBAR_CLEARANCE } from './components/TaskBar.tsx';
+import Taskbar, { TASKBAR_CLEARANCE } from './components/TaskBar';
 import type { TaskbarApp } from './components/TaskBar';
 import StudyLayout from './components/StudyLayout';
+import { ME } from './dataFiles/StudyData';
 import type { Person } from './dataFiles/StudyData';
 import { useStudyState } from './utils/StudyState';
 import type { StudyAction, StudyState } from './utils/StudyState';
@@ -15,6 +16,13 @@ import defaultbg from './assets/defaultbg.png';
 const BG_FOCUS = 'center bottom';
 
 /* Taskbar icons (drawn at 24x24, sized by the taskbar) */
+const SessionsIcon = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="3.5" y="5" width="17" height="15" rx="2" />
+    <path d="M3.5 10h17M8 3v4M16 3v4M8 14h3" />
+  </svg>
+);
+
 const LobbiesIcon = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <circle cx="9" cy="8" r="3.5" />
@@ -55,6 +63,10 @@ interface HomePageProps {
   onSubmit?: (data: FormData) => void;
   /** Other users who can appear in lobbies and connections */
   people?: Person[];
+  /** The user's free slots from the pre-survey calendar ("mon|09:30"), shown when hosting and used by lobby filters */
+  myAvailability?: string[];
+  /** The user's subjects (e.g. courses from the pre-survey), used by the lobby browser's "My subjects" filter */
+  mySubjects?: string[];
   /** Lobbies and connection statuses to start with */
   initialStudyState?: StudyState;
   /** Every lobby / connection action the user takes, e.g. to send to your backend */
@@ -73,14 +85,19 @@ export default function HomePage({
   taskbarRight,
   onSubmit,
   people = [],
+  myAvailability,
+  mySubjects,
   initialStudyState = EMPTY_STUDY_STATE,
   onStudyAction,
 }: HomePageProps) {
   const [lobbiesOpen, setLobbiesOpen] = useState(false);
   const [connectionsOpen, setConnectionsOpen] = useState(false);
+  const [sessionsOpen, setSessionsOpen] = useState(false);
   const [study, dispatch] = useStudyState(initialStudyState, onStudyAction);
 
   const pendingRequests = Object.values(study.connections).filter((s) => s === 'received').length;
+  // People waiting to join the lobby you host
+  const waitingToJoin = study.lobbies.find((l) => l.hostId === ME)?.requestIds.length ?? 0;
 
   const handleSubmit = (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -90,13 +107,25 @@ export default function HomePage({
   const taskbarApps: TaskbarApp[] = [
     {
       id: 'lobbies',
+      name: 'Lobbies',
       label: lobbiesOpen ? 'Close study lobbies' : 'Open study lobbies',
       icon: <LobbiesIcon />,
       open: lobbiesOpen,
       onClick: () => setLobbiesOpen((o) => !o),
     },
     {
+      id: 'sessions',
+      name: 'Sessions',
+      label:
+        (sessionsOpen ? 'Close sessions' : 'Open sessions') +
+        (waitingToJoin > 0 ? ` (${waitingToJoin} waiting to join)` : ''),
+      icon: <SessionsIcon />,
+      open: sessionsOpen,
+      onClick: () => setSessionsOpen((o) => !o),
+    },
+    {
       id: 'connections',
+      name: 'Connections',
       label:
         (connectionsOpen ? 'Close connections' : 'Open connections') +
         (pendingRequests > 0 ? ` (${pendingRequests} new request${pendingRequests === 1 ? '' : 's'})` : ''),
@@ -123,16 +152,27 @@ export default function HomePage({
             <div className="relative flex-1 min-h-0 min-w-0">
               {/* All windows on the desk share one stack: the newest is in front, the ones behind shrink a little */}
               <WindowManagerProvider>
+                <AppWindow id="home" title={windowTitle} footer={footer} controls={{ close: 'enabled', fullscreen: 'enabled' }}>
+                  {children ?? (
+                    <p className="m-auto text-center opacity-60">
+                      Reserved for input forms and custom components
+                    </p>
+                  )}
+                </AppWindow>
 
                 <StudyLayout
                   me={{ name: userName, avatar: avatarUrl }}
                   people={people}
+                  myAvailability={myAvailability}
+                  mySubjects={mySubjects}
                   state={study}
                   dispatch={dispatch}
                   lobbiesOpen={lobbiesOpen}
                   onLobbiesClose={() => setLobbiesOpen(false)}
                   connectionsOpen={connectionsOpen}
                   onConnectionsClose={() => setConnectionsOpen(false)}
+                  sessionsOpen={sessionsOpen}
+                  onSessionsClose={() => setSessionsOpen(false)}
                 />
               </WindowManagerProvider>
             </div>

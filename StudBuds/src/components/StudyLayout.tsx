@@ -5,6 +5,7 @@ import ConnectionsWindow from './ConnectionsWindow';
 import HostSessionWindow from './HostSessionWindow';
 import LobbyBrowserWindow from './LobbyBrowserWindow';
 import LobbyView from './LobbyView';
+import SessionsWindow from './SessionsWindow';
 import PersonAvatar from './PersonAvatar';
 import { ME } from '../dataFiles/StudyData';
 import type { Lobby, Person } from '../dataFiles/StudyData';
@@ -15,6 +16,7 @@ const WINDOWS = {
   lobbies: 'lobby-tabs',
   host: 'host-session',
   connections: 'connections',
+  sessions: 'sessions',
 };
 
 const slugOf = (text: string) =>
@@ -28,6 +30,10 @@ interface StudyLayoutProps {
   me: { name: string; avatar?: string };
   /** Everyone else the user can see in lobbies and connections */
   people: Person[];
+  /** The user's free slots ("mon|09:30"), shown on the host form's schedule and used by lobby filters */
+  myAvailability?: string[];
+  /** The user's subjects (e.g. their courses), used by the lobby browser's "My subjects" filter */
+  mySubjects?: string[];
   state: StudyState;
   dispatch: StudyDispatch;
   /** Lobby list window, driven by its taskbar button */
@@ -36,11 +42,15 @@ interface StudyLayoutProps {
   /** Connections window, driven by its taskbar button */
   connectionsOpen: boolean;
   onConnectionsClose: () => void;
+  /** Sessions window (lobbies you host, joined or requested), driven by its taskbar button */
+  sessionsOpen: boolean;
+  onSessionsClose: () => void;
 }
 
 /**
  * Every study-session window on the desk:
- *  - Study Lobbies: the lobby list (search, host a session)
+ *  - Study Lobbies: lobbies you could join (search, filters, host a session)
+ *  - Sessions: lobbies you host, joined or asked to join
  *  - Lobbies: a browser-style window with a tab per lobby you've opened
  *  - Host a session: subject + group size form
  *  - Connections: friend-request style list
@@ -49,12 +59,16 @@ interface StudyLayoutProps {
 export default function StudyLayout({
   me,
   people,
+  myAvailability,
+  mySubjects,
   state,
   dispatch,
   lobbiesOpen,
   onLobbiesClose,
   connectionsOpen,
   onConnectionsClose,
+  sessionsOpen,
+  onSessionsClose,
 }: StudyLayoutProps) {
   const stack = useWindowManager();
   const [tabIds, setTabIds] = useState<string[]>([]);
@@ -92,7 +106,7 @@ export default function StudyLayout({
     stack?.focus(WINDOWS.host);
   };
 
-  const create = (subject: string, maxSize: number) => {
+  const create = (subject: string, maxSize: number, timeSlots: string[]) => {
     const lobby: Lobby = {
       id: `lobby-${Date.now().toString(36)}`,
       hostId: ME,
@@ -100,6 +114,7 @@ export default function StudyLayout({
       maxSize,
       memberIds: [ME],
       requestIds: [],
+      timeSlots,
     };
     dispatch({ type: 'host', lobby });
     setHostOpen(false);
@@ -119,6 +134,8 @@ export default function StudyLayout({
           onOpenLobby={openLobby}
           onHost={host}
           isHosting={!!myLobby}
+          freeSlots={myAvailability}
+          subjects={mySubjects}
         />
       </WindowLayer>
 
@@ -150,7 +167,26 @@ export default function StudyLayout({
       </WindowLayer>
 
       <WindowLayer>
-        <HostSessionWindow id={WINDOWS.host} open={hostOpen} onClose={() => setHostOpen(false)} onCreate={create} />
+        <HostSessionWindow
+          id={WINDOWS.host}
+          open={hostOpen}
+          onClose={() => setHostOpen(false)}
+          availability={myAvailability}
+          onCreate={create}
+        />
+      </WindowLayer>
+
+      <WindowLayer>
+        <SessionsWindow
+          id={WINDOWS.sessions}
+          open={sessionsOpen}
+          onClose={onSessionsClose}
+          lobbies={state.lobbies}
+          people={peopleById}
+          openTabIds={tabIds}
+          onOpenLobby={openLobby}
+          onHost={host}
+        />
       </WindowLayer>
 
       <WindowLayer>

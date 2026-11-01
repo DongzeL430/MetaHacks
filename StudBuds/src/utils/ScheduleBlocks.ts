@@ -68,3 +68,18 @@ export function toDayBlocks(slots: string[], slotMinutes = 30): DayBlocks[] {
     return { day: DAY_NAMES[day], ranges };
   });
 }
+
+/** One line describing slots, e.g. "Wednesday 2 PM to 4 PM" (or "Wed 2 PM to 4 PM" when short) */
+export function describeSlots(slots: string[], options: { short?: boolean; slotMinutes?: number } = {}): string {
+  const { short = false, slotMinutes = 30 } = options;
+  return toDayBlocks(slots, slotMinutes)
+    .map((b) => `${short ? b.day.slice(0, 3) : b.day} ${b.ranges.join(', ')}`)
+    .join('; ');
+}
+
+/** "30 minutes", "1 hour", "2.5 hours" */
+export function durationLabel(minutes: number): string {
+  if (minutes < 60) return `${minutes} minutes`;
+  const hours = minutes / 60;
+  return `${hours} hour${hours === 1 ? '' : 's'}`;
+}

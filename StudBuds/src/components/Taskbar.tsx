@@ -1,77 +1,71 @@
 import type { ReactNode } from 'react';
 
 /*
- * SIZING: the avatar is centered on the bar's bottom line, so half of it sits inside the bar.
- * Its diameter is fluid: it grows smoothly with the viewport width instead of jumping at a breakpoint.
+ * A floating, pill-shaped nav bar: a light pill with the avatar and the user's name on the left,
+ * then the app links, on a warm gray capsule.
  *
- *   --avatar = clamp(6rem, 4rem + 6vw, 9rem)
- *   -> 96px up to about 530px wide, growing to 144px by about 1300px wide.
- *
- * Everything else is derived from --avatar, so it all scales together:
- *   bar height     = half the avatar + 8px  (8px of clearance above the avatar)
- *   page clearance = the same value         (TASKBAR_CLEARANCE below)
- *   name box overlap and padding are fractions of --avatar
- *
- * To change the sizes, edit the clamp(...) in the TWO places marked below and keep them identical.
- * (Tailwind only generates classes it can read as literal text, so the value can't be shared
- * through a JS variable. Spaces are written as underscores inside the brackets.)
+ * The bar floats OVER the top of the page (position: absolute), so the page's background
+ * image runs all the way to the top edge behind it. Content below needs TASKBAR_CLEARANCE
+ * so it starts under the bar instead of behind it.
  */
 
 /**
- * Top padding a page needs so its content clears the half of the avatar
- * that hangs below the taskbar. Add it to the element right under <Taskbar />.
- * Must use the same clamp(...) as the header below.
+ * Top padding for the page content under <Taskbar />: the bar's top gap + its height + a small gap.
+ *   phones: 12px + 56px bar + 12px = 80px
+ *   md+:    20px + 64px bar + 16px = 100px
+ * If you change the bar's padding or badge size below, update these numbers.
  */
-export const TASKBAR_CLEARANCE = 'pt-[calc(clamp(6rem,4rem_+_6vw,9rem)/2_+_8px)]';
+export const TASKBAR_CLEARANCE = 'pt-20 md:pt-[6.25rem]';
 
-/** One app button in the taskbar, usually opening and closing an app window */
+/** One app link in the bar, usually opening and closing an app window */
 export interface TaskbarApp {
   /** Unique id, used by `visibleApps` */
   id: string;
-  /** Tooltip and screen reader name, e.g. "Survey" */
+  /** Tooltip and screen reader name, e.g. "Open study lobbies" */
   label: string;
-  /** A small icon. An <svg> is sized to fit automatically. */
-  icon: ReactNode;
-  /** The app's window is open: the button looks pressed and gets a dot under it */
+  /** Short text shown in the bar, e.g. "Lobbies". Falls back to `label`. */
+  name?: string;
+  /** Small icon, shown instead of the text on narrow screens. An <svg> is sized to fit automatically. */
+  icon?: ReactNode;
+  /** The app's window is open: the link is highlighted */
   open?: boolean;
   /** Usually toggles the app's window */
   onClick?: () => void;
   disabled?: boolean;
-  /** Hide this one button */
+  /** Hide this one link */
   hidden?: boolean;
 }
 
 interface TaskbarProps {
-  /** The user's generated name, shown next to the avatar */
+  /** The user's name, shown next to the avatar*/
   userName?: string;
-  /** Replaces the default avatar drawing. Size it with w-full h-full to fill the circle slot. */
+  /** Replaces the default drawing in the round badge. Size it with w-full h-full. */
   avatar?: ReactNode;
-  /** App buttons, in the order they appear */
+  /** App links, in the order they appear */
   apps?: TaskbarApp[];
   /**
    * Which app ids to show on this page. Leave it out to show every app that isn't `hidden`.
-   * e.g. visibleApps={['survey']} on one page, visibleApps={['survey', 'about']} on another.
+   * e.g. visibleApps={['lobbies']} on one page, visibleApps={['lobbies', 'connections']} on another.
    */
   visibleApps?: string[];
-  /** Optional content for the right side (step counter, clock, etc.) */
+  /** Optional extra content at the right end of the bar (step counter, clock, etc.) */
   right?: ReactNode;
-  /** Extra classes for the bar itself */
+  /** Extra classes for the outer header */
   className?: string;
 }
 
 function DefaultAvatar({ label }: { label: string }) {
   return (
     <svg className="w-full h-full" viewBox="0 0 48 48" role="img" aria-label={label}>
-      {/* Filled with the page background color so it masks the line behind it */}
-      <circle cx="24" cy="24" r="21" fill="#FDF7F1" stroke="currentColor" strokeWidth="3" />
-      <ellipse cx="24" cy="20" rx="5" ry="4" fill="currentColor" />
-      <path d="M8 38 Q24 14 40 38 Z" fill="currentColor" />
+      <ellipse cx="24" cy="19" rx="6" ry="5" fill="currentColor" />
+      <path d="M11 38 Q24 16 37 38 Z" fill="currentColor" />
     </svg>
   );
 }
 
-/** Paper chip like the window buttons. Open apps look pressed in and get a dot underneath. */
-function TaskbarAppButton({ app }: { app: TaskbarApp }) {
+/** Text link on the dark bar. Open apps get a soft highlight; on narrow screens only the icon shows. */
+function TaskbarAppLink({ app }: { app: TaskbarApp }) {
+  const name = app.name ?? app.label;
   return (
     <button
       type="button"
@@ -81,24 +75,18 @@ function TaskbarAppButton({ app }: { app: TaskbarApp }) {
       aria-label={app.label}
       title={app.label}
       className={[
-        'relative shrink-0 w-10 h-10 md:w-11 md:h-11 p-0 flex items-center justify-center rounded-md',
-        'border-2 border-[#3c3c3c] [border-image:none] transition duration-150 ease-out',
+        'shrink-0 flex items-center gap-2 rounded-full px-3 sm:px-4 py-2 text-base md:text-lg',
+        'border-0 [border-image:none] text-[#FDF7F1] transition-colors duration-150',
         'disabled:opacity-45 disabled:cursor-not-allowed',
-        app.open
-          ? 'bg-[#DFCDB4] shadow-[inset_0_2px_3px_rgba(60,60,60,0.35)]'
-          : [
-              'bg-[#FDF7F1] shadow-[2px_2px_0_rgba(60,60,60,0.35)]',
-              'enabled:hover:shadow-[3px_4px_0_#3c3c3c] enabled:active:shadow-[1px_1px_0_#3c3c3c]',
-              'motion-safe:enabled:hover:-translate-y-0.5 motion-safe:enabled:active:translate-y-0',
-            ].join(' '),
+        app.open ? 'bg-[#FDF7F1]/25' : 'bg-transparent enabled:hover:bg-[#FDF7F1]/15',
       ].join(' ')}
     >
-      <span aria-hidden="true" className="flex w-5 h-5 md:w-6 md:h-6 [&>svg]:w-full [&>svg]:h-full">
-        {app.icon}
-      </span>
-      {app.open && (
-        <span aria-hidden="true" className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-1.5 h-1.5 rounded-full bg-[#3c3c3c]" />
+      {app.icon && (
+        <span aria-hidden="true" className="flex sm:hidden w-5 h-5 [&>svg]:w-full [&>svg]:h-full">
+          {app.icon}
+        </span>
       )}
+      <span className={app.icon ? 'hidden sm:inline' : ''}>{name}</span>
     </button>
   );
 }
@@ -114,57 +102,29 @@ export default function Taskbar({
   const shownApps = apps.filter((app) => !app.hidden && (!visibleApps || visibleApps.includes(app.id)));
 
   return (
-    /* A slim full-width bar in a different shade than the page.
-       The inset highlight on top and soft shadow underneath give it a raised, bevelled look.
-       The hand-drawn line (doodle's <hr>) is its bottom edge; the avatar + name box sit on it.
-       The first two classes define --avatar and size the bar from it (clamp #1 of 2). */
+    // Floats over the page. The full-width strip ignores clicks so windows under it stay reachable;
+    // only the pill itself is clickable. z-20 keeps it above windows dragged up under it.
     <header
-      className={`relative z-20 shrink-0 [--avatar:clamp(6rem,4rem_+_6vw,9rem)] h-[calc(var(--avatar)/2_+_8px)] ${className}`}
+      className={`pointer-events-none absolute inset-x-0 top-0 z-20 flex justify-center px-3 pt-3 md:px-6 md:pt-5 ${className}`}
     >
-      {/* Bar fill. Stops 3px short of the bottom so its straight edge hides under the wobbly
-          hand-drawn line instead of showing below it. */}
-      <div
-        aria-hidden="true"
-        className="absolute inset-x-0 top-0 bottom-[3px] bg-[#EADBC8] shadow-[inset_0_2px_0_rgba(255,255,255,0.7),0_3px_6px_rgba(60,60,60,0.18)]"
-      />
-      <hr className="absolute bottom-0 left-0 right-0 m-0" />
-
-      {/* Left: avatar + name, attached, straddling the bar's bottom edge */}
-      <div className="absolute bottom-0 left-4 md:left-10 translate-y-1/2 flex items-center">
-        <div className="relative z-10 w-[var(--avatar)] h-[var(--avatar)] shrink-0">
-          {avatar ?? <DefaultAvatar label={`${userName}'s avatar`} />}
+      <div className="pointer-events-auto w-full max-w-4xl flex items-center gap-1 sm:gap-2 p-1.5 md:p-2 rounded-full bg-[#6B5E54] text-[#FDF7F1] shadow-[0_14px_30px_-12px_rgba(40,30,20,0.55)]">
+        {/* Left: avatar badge with the user's name right next to it, in one light pill */}
+        <div className="shrink-0 min-w-0 max-w-[55%] sm:max-w-[16rem] flex items-center gap-2 rounded-full bg-[#FDF7F1] text-[#2b2b2b] p-1 pr-4">
+          <div className="shrink-0 w-9 h-9 md:w-10 md:h-10 p-1 rounded-full bg-[#EADBC8] overflow-hidden">
+            {avatar ?? <DefaultAvatar label={`${userName}'s avatar`} />}
+          </div>
+          <p className="m-0 min-w-0 truncate text-base md:text-lg">{userName}</p>
         </div>
 
-        {/* Tucks under the avatar by 15% of its size. Three layers: the fill (inset 5px so its
-            corners hide under the hand-drawn line), the text, then the frame drawn on top.
-            The 10px in the padding is the frame's thickness; the rest clears the avatar overlap. */}
-        <div className="relative min-w-0 max-w-[12rem] md:max-w-xs ml-[calc(var(--avatar)*-0.15)]">
-          <div aria-hidden="true" className="absolute inset-[5px] bg-[#FDF7F1]" />
-          <p className="relative m-0 truncate text-lg md:text-xl py-[calc(10px_+_0.25rem)] pr-[calc(10px_+_1rem)] pl-[calc(10px_+_var(--avatar)*0.15_+_12px)]">
-            {userName}
-          </p>
-          <div aria-hidden="true" className="doodle-border pointer-events-none absolute inset-0" />
-        </div>
+        {/* Middle: app links. Scrolls sideways if there are more than fit. */}
+        <nav aria-label="Apps" className="flex-1 min-w-0 flex items-center gap-1 overflow-x-auto px-1 sm:px-2">
+          {shownApps.map((app) => (
+            <TaskbarAppLink key={app.id} app={app} />
+          ))}
+        </nav>
+
+        {right && <div className="shrink-0 hidden sm:flex items-center gap-3 px-3 text-sm">{right}</div>}
       </div>
-
-      {/* Right: app buttons, then the system-tray slot. Vertically centered in the bar fill. */}
-      {(shownApps.length > 0 || right) && (
-        <div className="absolute right-3 md:right-6 top-0 bottom-[3px] flex items-center gap-3 md:gap-4">
-          {shownApps.length > 0 && (
-            <nav aria-label="Apps" className="flex items-center gap-2">
-              {shownApps.map((app) => (
-                <TaskbarAppButton key={app.id} app={app} />
-              ))}
-            </nav>
-          )}
-
-          {right && (
-            <div className="flex items-center gap-3 px-3 py-1 text-sm md:text-base bg-[#DFCDB4] shadow-[inset_0_2px_3px_rgba(60,60,60,0.3)] rounded">
-              {right}
-            </div>
-          )}
-        </div>
-      )}
     </header>
   );
 }

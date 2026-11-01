@@ -1,6 +1,6 @@
 import { useCallback, useReducer, useRef } from 'react';
-import { ME } from '../dataFiles/studyData';
-import type { ConnectionStatus, Lobby } from '../dataFiles/studyData';
+import { ME } from '../dataFiles/StudyData';
+import type { ConnectionStatus, Lobby } from '../dataFiles/StudyData';
 
 export interface StudyState {
   lobbies: Lobby[];

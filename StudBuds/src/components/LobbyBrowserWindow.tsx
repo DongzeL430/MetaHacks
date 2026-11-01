@@ -1,10 +1,18 @@
-import { useState } from 'react';
+import { useId, useMemo, useState } from 'react';
 import AppWindow from './AppWindow';
-import PersonAvatar from './PersonAvatar';
-import { SpotPips } from './LobbyView';
+import type { InitialSize } from './AppWindow';
+import LobbyRow from './LobbyRow';
 import type { Lobby, Person } from '../dataFiles/StudyData';
 import { roleIn } from '../utils/StudyState';
-import type { LobbyRole } from '../utils/StudyState';
+import {
+  ALL_SIZES,
+  DEFAULT_FILTERS,
+  activeFilterCount,
+  fitsSchedule,
+  matchesSubjects,
+  passesFilters,
+} from '../utils/LobbyFilters';
+import type { LobbyFilters } from '../utils/LobbyFilters';
 
 interface LobbyBrowserWindowProps {
   id: string;
@@ -15,20 +23,42 @@ interface LobbyBrowserWindowProps {
   /** Lobbies already open as tabs */
   openTabIds: string[];
   onOpenLobby: (lobbyId: string) => void;
-  /** Opens the host form, or your lobby if you already host one */
+  /** Opens the host form */
   onHost: () => void;
+  /** Already hosting a lobby (only one at a time): the host button is disabled */
   isHosting: boolean;
+  /** The user's free slots, for the "fits my free time" criterion */
+  freeSlots?: string[];
+  /** The user's subjects (e.g. their courses), for the "my subjects" criterion */
+  subjects?: string[];
 }
 
-const STATUS: Record<LobbyRole, { label: string; className: string }> = {
-  host: { label: 'Hosting', className: 'bg-[#F2A65A]/45' },
-  member: { label: 'Joined', className: 'bg-[#9FD6A6]/60' },
-  requested: { label: 'Requested', className: 'bg-[#A9C7E8]/60' },
-  full: { label: 'Full', className: 'bg-[#3c3c3c]/15' },
-  open: { label: 'Open', className: 'bg-[#FDF7F1] border-2 border-[#3c3c3c]/30' },
+/**
+ * Opening size, as a share of the desk area (the space under the nav bar):
+ *   wide monitors (1280px+):  60% wide, 80% tall
+ *   smaller monitors (768px+): 70% wide, 70% tall
+ *   phones:                    almost the whole desk, so the list is readable
+ * When 2 to 4 windows are open on a big screen, the tiling layout decides the size instead.
+ */
+const LOBBY_SIZE: InitialSize = ({ width, height }) => {
+  const screen = window.innerWidth;
+  if (screen >= 1280) return { width: width * 0.6, height: height * 0.8 };
+  if (screen >= 768) return { width: width * 0.7, height: height * 0.7 };
+  return { width: width * 0.96, height: height * 0.92 };
 };
 
-/** The lobby list, like a game's server browser: host, subject, spots, and your status */
+const SIZE_CHIP = [
+  'inline-flex items-center justify-center w-9 py-0.5 rounded-md border-2 border-[#3c3c3c]/45 text-sm',
+  'cursor-pointer select-none transition-colors hover:bg-[#EADBC8]/60',
+  'has-checked:bg-[#F2A65A] has-checked:border-[#3c3c3c]',
+  'has-disabled:opacity-40 has-disabled:cursor-not-allowed',
+  'has-focus-visible:outline-2 has-focus-visible:outline-dashed has-focus-visible:outline-offset-2',
+].join(' ');
+
+/**
+ * Finds lobbies to join, like a game's server browser. Lobbies you host, joined or asked to join
+ * live in the Sessions window instead, so this list only shows ones you could still join.
+ */
 export default function LobbyBrowserWindow({
   id,
   open,
@@ -39,10 +69,39 @@ export default function LobbyBrowserWindow({
   onOpenLobby,
   onHost,
   isHosting,
+  freeSlots = [],
+  subjects = [],
 }: LobbyBrowserWindowProps) {
+  const panelId = useId();
   const [query, setQuery] = useState('');
+  const [filters, setFilters] = useState<LobbyFilters>(DEFAULT_FILTERS);
+  const [showFilters, setShowFilters] = useState(false);
+
+  const ctx = useMemo(() => ({ freeSet: new Set(freeSlots), subjects }), [freeSlots, subjects]);
+  const scheduleKnown = ctx.freeSet.size > 0;
+  const subjectsKnown = subjects.length > 0;
+  const activeCount = activeFilterCount(filters, ctx);
+
+  const set = (patch: Partial<LobbyFilters>) => setFilters((f) => ({ ...f, ...patch }));
+  const toggleSize = (n: number) =>
+    set({ sizes: filters.sizes.includes(n) ? filters.sizes.filter((s) => s !== n) : [...filters.sizes, n].sort((a, b) => a - b) });
+
+  // Only lobbies you're not already part of
+  const joinable = lobbies.filter((l) => {
+    const role = roleIn(l);
+    return role === 'open' || role === 'full';
+  });
   const q = query.trim().toLowerCase();
-  const shown = q ? lobbies.filter((l) => l.subject.toLowerCase().includes(q)) : lobbies;
+  const shown = joinable.filter(
+    (l) => (!q || l.subject.toLowerCase().includes(q)) && passesFilters(l, filters, ctx),
+  );
+
+  const tagsFor = (lobby: Lobby) => [
+    ...(scheduleKnown && fitsSchedule(lobby, ctx.freeSet) ? ['Fits your free time'] : []),
+    ...(subjectsKnown && matchesSubjects(lobby, subjects) ? ['Your subject'] : []),
+  ];
+
+  const checkboxRow = 'flex items-start gap-2 text-sm';
 
   return (
     <AppWindow
@@ -51,11 +110,12 @@ export default function LobbyBrowserWindow({
       open={open}
       onClose={onClose}
       controls={{ close: 'enabled', fullscreen: 'enabled' }}
-      initialSize={{ width: 440, height: 560 }}
+      initialSize={LOBBY_SIZE}
       minWidth={320}
       minHeight={280}
       bodyClassName="p-3 flex flex-col gap-3"
     >
+      {/* SEARCH + FILTERS + HOST */}
       <div className="flex flex-wrap items-center gap-2">
         <label className="flex-1 min-w-[10rem]">
           <span className="sr-only">Search lobbies by subject</span>
@@ -69,51 +129,113 @@ export default function LobbyBrowserWindow({
             className="w-full px-2 py-1"
           />
         </label>
-        <button type="button" onClick={onHost} className="px-3 py-1">
-          {isHosting ? 'Your lobby' : '+ Host a session'}
+        <button
+          type="button"
+          onClick={() => setShowFilters((s) => !s)}
+          aria-expanded={showFilters}
+          aria-controls={panelId}
+          className="px-3 py-1"
+        >
+          Filters{activeCount > 0 ? ` (${activeCount})` : ''}
+        </button>
+        <button
+          type="button"
+          onClick={onHost}
+          disabled={isHosting}
+          title={isHosting ? 'You already host a session. Find it under Sessions.' : undefined}
+          className="px-3 py-1"
+        >
+          + Host a session
         </button>
       </div>
 
+      {/* FILTER PANEL */}
+      {showFilters && (
+        <fieldset
+          id={panelId}
+          className="m-0 min-w-0 px-3 pb-3 pt-1 flex flex-col gap-2 motion-safe:transition motion-safe:duration-200 starting:opacity-0 starting:-translate-y-1"
+        >
+          <legend className="px-1 text-sm">Match lobbies to me</legend>
+
+          <label className={checkboxRow}>
+            <input type="checkbox" checked={filters.schedule} onChange={(e) => set({ schedule: e.target.checked })} />
+            <span>
+              Fits my free time
+              <span className="block text-xs opacity-70">
+                {scheduleKnown
+                  ? 'The whole session falls during times you marked free.'
+                  : 'Your free times aren’t saved yet, so this doesn’t hide anything for now.'}
+              </span>
+            </span>
+          </label>
+
+          <label className={checkboxRow}>
+            <input type="checkbox" checked={filters.subjects} onChange={(e) => set({ subjects: e.target.checked })} />
+            <span>
+              My subjects
+              <span className="block text-xs opacity-70">
+                {subjectsKnown
+                  ? subjects.join(', ')
+                  : 'Your subjects aren’t saved yet, so this doesn’t hide anything for now.'}
+              </span>
+            </span>
+          </label>
+
+          <div className="flex flex-col gap-1">
+            <label className={checkboxRow}>
+              <input type="checkbox" checked={filters.size} onChange={(e) => set({ size: e.target.checked })} />
+              <span>Group size</span>
+            </label>
+            <div role="group" aria-label="Group sizes to show" className="flex flex-wrap gap-1.5 pl-6">
+              {ALL_SIZES.map((n) => (
+                <label key={n} className={SIZE_CHIP}>
+                  <input
+                    type="checkbox"
+                    checked={filters.sizes.includes(n)}
+                    disabled={!filters.size}
+                    onChange={() => toggleSize(n)}
+                    aria-label={`Groups of ${n}`}
+                    className="sr-only"
+                  />
+                  {n}
+                </label>
+              ))}
+            </div>
+          </div>
+
+          <label className={checkboxRow}>
+            <input type="checkbox" checked={filters.openSpots} onChange={(e) => set({ openSpots: e.target.checked })} />
+            <span>Only lobbies with open spots</span>
+          </label>
+
+          <button type="button" onClick={() => setFilters(DEFAULT_FILTERS)} className="self-start px-3 py-0.5 text-sm">
+            Reset filters
+          </button>
+        </fieldset>
+      )}
+
+      <p role="status" className="m-0 text-xs opacity-70">
+        Showing {shown.length} of {joinable.length} {joinable.length === 1 ? 'lobby' : 'lobbies'}. Lobbies you’re in are under Sessions.
+      </p>
+
       {shown.length === 0 ? (
         <p className="m-auto text-center text-sm opacity-70">
-          {q ? 'No lobbies for that subject yet. Host one!' : 'No open lobbies right now. Host one!'}
+          {joinable.length === 0
+            ? 'No open lobbies right now. Host one!'
+            : 'No lobbies match. Try turning off a filter or changing your search.'}
         </p>
       ) : (
         <ul className="m-0 p-0 list-none flex flex-col gap-2">
-          {shown.map((lobby) => {
-            const role = roleIn(lobby);
-            const status = STATUS[role];
-            const host = people.get(lobby.hostId);
-            const isOpenTab = openTabIds.includes(lobby.id);
-
-            return (
-              <li key={lobby.id} className="list-none">
-                <button
-                  type="button"
-                  onClick={() => onOpenLobby(lobby.id)}
-                  aria-label={`${lobby.subject}, hosted by ${host?.name ?? 'someone'}, ${lobby.memberIds.length} of ${lobby.maxSize} spots, ${status.label}`}
-                  className={[
-                    'w-full p-3 flex items-center gap-3 text-left rounded-md',
-                    'border-2 [border-image:none] bg-[#FDF7F1] transition-colors',
-                    'hover:bg-[#EADBC8]/60 hover:border-[#3c3c3c]/70',
-                    isOpenTab ? 'border-[#3c3c3c]/70' : 'border-[#3c3c3c]/25',
-                  ].join(' ')}
-                >
-                  {host && <PersonAvatar person={host} className="w-11 h-11" />}
-
-                  <span className="flex-1 min-w-0 flex flex-col gap-1">
-                    <span className="text-lg leading-tight truncate">{lobby.subject}</span>
-                    <span className="text-xs opacity-70 truncate">Host: {host?.name ?? 'Unknown'}</span>
-                  </span>
-
-                  <span className="shrink-0 flex flex-col items-end gap-1" aria-hidden="true">
-                    <SpotPips filled={lobby.memberIds.length} max={lobby.maxSize} />
-                    <span className={`px-2 rounded text-xs ${status.className}`}>{status.label}</span>
-                  </span>
-                </button>
-              </li>
-            );
-          })}
+          {shown.map((lobby) => (
+            <LobbyRow
+              key={lobby.id}
+              lobby={lobby}
+              people={people}
+              isOpenTab={openTabIds.includes(lobby.id)}
+              onOpen={onOpenLobby}
+              tags={tagsFor(lobby)}
+            />
+          ))}
         </ul>
       )}
     </AppWindow>
