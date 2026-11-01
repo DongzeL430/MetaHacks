@@ -40,6 +40,13 @@ reset role;
 
 -- A deletes their account -----------------------------------------------------------------
 
+do $$
+begin
+  perform set_config('test.a_nickname',
+    (select nickname from public.public_profiles where id = 'a5000000-0000-4000-8000-00000000000a'), true);
+end;
+$$;
+
 set local role authenticated;
 set local request.jwt.claims to '{"sub": "a5000000-0000-4000-8000-00000000000a", "role": "authenticated"}';
 select lives_ok($$select public.delete_my_account()$$, 'A signed-in student can delete their account');
@@ -71,10 +78,11 @@ select ok(
   'Reports about the deleted student are gone'
 );
 select is(
-  (select array_agg(m.user_id) from public.study_session_members m
+  (select array_agg(coalesce(m.user_id::text, m.nickname || ' (deleted)') order by m.user_id nulls first)
+   from public.study_session_members m
    join public.study_sessions s on s.id = m.session_id where s.location = 'test: Snell Library'),
-  array['b5000000-0000-4000-8000-00000000000b']::uuid[],
-  'A shared study session stays in the partner''s record, without the deleted student'
+  array[current_setting('test.a_nickname') || ' (deleted)', 'b5000000-0000-4000-8000-00000000000b'],
+  'The partner''s study record still shows the deleted student''s nickname, marked as deleted'
 );
 
 select * from finish();

@@ -406,16 +406,25 @@ export type Database = {
       }
       study_session_members: {
         Row: {
+          account_deleted: boolean | null
+          id: number
+          nickname: string
           session_id: number
-          user_id: string
+          user_id: string | null
         }
         Insert: {
+          account_deleted?: boolean | null
+          id?: never
+          nickname: string
           session_id: number
-          user_id: string
+          user_id?: string | null
         }
         Update: {
+          account_deleted?: boolean | null
+          id?: never
+          nickname?: string
           session_id?: number
-          user_id?: string
+          user_id?: string | null
         }
         Relationships: [
           {

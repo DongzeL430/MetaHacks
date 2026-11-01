@@ -51,13 +51,13 @@ Other students can't see any of these rows except where noted. Server code with 
 | `blocks` | Who they blocked | Block someone they were paired with, unblock | 200 |
 | `reports` | Reports they filed: `reason`, optional `details` (500 characters) | File a report about someone they were paired with | 30 |
 | `study_sessions` | Study record: when (`starts_at`, `ends_at`), where (typed `location`), which course, `status` (`planned`, `completed`, `cancelled`) | Read sessions they were in | Read only (written by server) |
-| `study_session_members` | Who was in each session | See who was in their own sessions | Read only; up to 4 people per session |
+| `study_session_members` | Who was in each session: `nickname`, and `account_deleted` once that student deletes their account | See who was in their own sessions | Read only; up to 4 people per session |
 
 ## Deleting an account
 
 `supabase.rpc('delete_my_account')` deletes the signed-in student's login. The database then removes their profiles, courses, free times, survey answers, interests, accessories, contact handles, pairings, Vibe choices, sharing choices, and blocks. What stays:
 
-- Study sessions they shared, in their partners' records, without them.
+- Study sessions they shared, in their partners' records. Their row keeps their nickname, with an empty `user_id` and `account_deleted` set to true, so partners still see who they studied with. The nickname can later be given to a new student.
 - Courses they added to the school's list.
 - Reports they filed, for review, with the reporter removed. Reports about them are deleted.
 
@@ -134,8 +134,9 @@ await supabase.from('reports').insert({ reported_id: partnerId, pairing_id, reas
 // Study record: past and upcoming sessions, with who was there
 const { data: sessions } = await supabase
   .from('study_sessions')
-  .select('starts_at, ends_at, location, status, courses(code), study_session_members(user_id)')
+  .select('starts_at, ends_at, location, status, courses(code), study_session_members(nickname, account_deleted)')
   .order('starts_at', { ascending: false })
+// Show "Sunny Penguin 67 (account deleted)" when account_deleted is true.
 ```
 
 `reason` is one of `harassment`, `inappropriate`, `spam`, `safety`, `other`. The partner's id is whichever of `user_low` and `user_high` on the pairing isn't the signed-in student.
