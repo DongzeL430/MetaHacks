@@ -61,8 +61,7 @@ export default function AboutYouWindow({
   };
 
   const majors = value.majors.filter((m) => m.name.trim());
-  const minors = value.minors.map((m) => m.trim()).filter(Boolean);
-  const hasEnough = (majors.length > 0 || minors.length > 0) && !!value.gradYear;
+  const hasEnough = majors.length > 0 && !!value.gradYear;
 
   const findCourses = async () => {
     if (!suggestCourses) return;
@@ -71,7 +70,6 @@ export default function AboutYouWindow({
     try {
       const result = await suggestCourses({
         majors: majors.map((m) => ({ name: m.name.trim(), track: m.track.trim() })),
-        minors,
         year: value.year,
         gradYear: value.gradYear,
       });
@@ -79,7 +77,7 @@ export default function AboutYouWindow({
       onChange(profile);
       if (added > 0) onFilled?.(added, result);
       else if (result.failed.length > 0) setNote(`Couldn’t search ${result.failed.join(', ')} right now. Try again in a minute.`);
-      else setNote('No new courses found for those programs.');
+      else setNote('Muse didn’t find courses from past terms. If this is your first term, add the ones you’re taking now yourself.');
     } catch (err) {
       setNote(err instanceof Error ? err.message : 'Couldn’t get suggestions right now. You can still add courses yourself.');
     } finally {
@@ -90,7 +88,7 @@ export default function AboutYouWindow({
   const footerNote = !suggestCourses
     ? 'Course search isn’t connected yet.'
     : !hasEnough
-      ? 'Add a major or minor and your graduation year first.'
+      ? 'Add a major and your graduation year first.'
       : searching
         ? 'Muse is searching your school’s catalog. This can take a minute.'
         : note;
@@ -157,7 +155,7 @@ export default function AboutYouWindow({
           }
         >
           <p className="m-0 text-sm opacity-80">
-            Tell us your majors, minors, and when you expect to graduate. We'll try our best to fill each one!.
+            Muse looks up your majors in your school’s catalog and adds courses you’ve most likely already taken. Check each one.
           </p>
 
           {/* MAJORS, each with an optional track */}
