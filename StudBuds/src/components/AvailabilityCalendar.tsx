@@ -1,5 +1,6 @@
 import { Fragment, useMemo, useRef, useState } from 'react';
-import type { KeyboardEvent, PointerEvent } from 'react';
+import type { ChangeEvent, KeyboardEvent, PointerEvent } from 'react';
+import { icsToAvailability } from '../utils/IcsAvailability.ts';
 
 export type DayKey = 'sun' | 'mon' | 'tue' | 'wed' | 'thu' | 'fri' | 'sat';
 
@@ -34,7 +35,15 @@ interface AvailabilityCalendarProps {
   defaultValue?: string[];
   /** Called with sorted available slot keys like "mon|09:30" (user's local time) */
   onChange?: (slots: string[]) => void;
+  /** Shows the "Import .ics" button */
+  allowIcsImport?: boolean;
+  /** 'busy' (default): event times become unavailable. 'free': event times become available. */
+  icsEventsMean?: 'busy' | 'free';
 }
+
+type ImportStatus = { kind: 'ok' | 'error'; text: string } | null;
+
+const MAX_ICS_BYTES = 5 * 1024 * 1024;
 
 const pad = (n: number) => String(n).padStart(2, '0');
 const toTimeKey = (mins: number) => `${pad(Math.floor(mins / 60))}:${pad(mins % 60)}`;
@@ -65,6 +74,8 @@ export default function AvailabilityCalendar({
   slotMinutes = 30,
   defaultValue = [],
   onChange,
+  allowIcsImport = true,
+  icsEventsMean = 'busy',
 }: AvailabilityCalendarProps) {
   const columns = useMemo(() => {
     if (days) return days.map((k) => DAYS.find((d) => d.key === k)!);
@@ -85,6 +96,63 @@ export default function AvailabilityCalendar({
   const [focusPos, setFocusPos] = useState({ r: 0, c: 0 }); // roving tabindex
   const dragMode = useRef<'add' | 'remove' | null>(null);
   const gridRef = useRef<HTMLDivElement>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [importStatus, setImportStatus] = useState<ImportStatus>(null);
+  // Selection from before the last import, so it can be undone
+  const [beforeImport, setBeforeImport] = useState<Set<string> | null>(null);
+
+  const replaceSelection = (next: Set<string>) => {
+    selectedRef.current = next;
+    setSelected(next);
+    onChange?.([...next].sort());
+  };
+
+  const handleIcsFile = async (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = ''; // lets the same file be picked again
+    if (!file) return;
+
+    if (file.size > MAX_ICS_BYTES) {
+      setImportStatus({ kind: 'error', text: 'That file is too big. Calendar files are usually under 5 MB.' });
+      return;
+    }
+
+    try {
+      const result = icsToAvailability(await file.text(), {
+        dayKeys: columns.map((d) => d.key),
+        startHour,
+        endHour,
+        slotMinutes,
+        eventsMean: icsEventsMean,
+      });
+
+      setBeforeImport(selectedRef.current);
+      replaceSelection(new Set(result.slots));
+
+      const week = result.weekStart.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+      const n = result.eventCount;
+      const rule =
+        icsEventsMean === 'busy'
+          ? 'Times without events are marked available.'
+          : 'Times during events are marked available.';
+      setImportStatus({
+        kind: 'ok',
+        text: `Filled in from ${n} event${n === 1 ? '' : 's'} in the week of ${week}. ${rule} Adjust anything that’s off.`,
+      });
+    } catch (err) {
+      setImportStatus({
+        kind: 'error',
+        text: err instanceof Error ? err.message : 'Couldn’t read that file.',
+      });
+    }
+  };
+
+  const undoImport = () => {
+    if (!beforeImport) return;
+    replaceSelection(beforeImport);
+    setBeforeImport(null);
+    setImportStatus(null);
+  };
 
   const setSlot = (key: string, on: boolean) => {
     const current = selectedRef.current;
@@ -160,7 +228,55 @@ export default function AvailabilityCalendar({
       <div className="flex flex-wrap items-center gap-x-5 gap-y-1 text-sm">
         <LegendSwatch color="bg-[#F2A99E]" label="Unavailable" />
         <LegendSwatch color="bg-[#9FD6A6]" label="Available" />
+
+        {allowIcsImport && (
+          <>
+            <button
+              type="button"
+              onClick={() => fileRef.current?.click()}
+              className="ml-auto px-3 py-0.5 text-sm flex items-center gap-2"
+              title="Fill the calendar from an .ics file (Google Calendar, Outlook, Apple Calendar)"
+            >
+              <svg viewBox="0 0 20 20" className="w-4 h-4" aria-hidden="true">
+                <path
+                  d="M10 13V3M6 7l4-4 4 4M4 13v3h12v-3"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+              Import .ics
+            </button>
+            {/* No name, so the file itself never ends up in the form's data */}
+            <input
+              ref={fileRef}
+              type="file"
+              accept=".ics,text/calendar"
+              onChange={handleIcsFile}
+              className="hidden"
+              tabIndex={-1}
+            />
+          </>
+        )}
       </div>
+
+      {importStatus && (
+        <p
+          role="status"
+          className={`m-0 text-sm flex flex-wrap items-center gap-x-3 ${
+            importStatus.kind === 'error' ? 'text-[#B23A2E]' : ''
+          }`}
+        >
+          {importStatus.text}
+          {importStatus.kind === 'ok' && beforeImport && (
+            <button type="button" onClick={undoImport} className="px-2 py-0 text-sm">
+              Undo
+            </button>
+          )}
+        </p>
+      )}
 
       <div className="overflow-x-auto">
         <div className="min-w-max w-full rounded-md border-2 border-[#3c3c3c] overflow-hidden">
