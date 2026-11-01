@@ -1,5 +1,5 @@
 import { useEffect, useId, useRef, useState } from 'react';
-import AppWindow from './Appwindow';
+import AppWindow from './AppWindow';
 import { YEAR_OPTIONS } from '../dataFiles/AcademicOptions';
 import { CHIP, FIELD_LABEL, blockEnter, mergeSuggestions } from './CoursesSection';
 import type { AcademicProfile, CourseSuggestionQuery } from './CoursesSection';
