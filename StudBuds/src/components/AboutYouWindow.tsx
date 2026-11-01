@@ -261,7 +261,8 @@ export default function AboutYouWindow({
           <select
             value={value.gradYear}
             onChange={(e) => update({ gradYear: e.target.value })}
-            className="px-2 py-1"
+            // Room on the right for doodle.css's arrow, which px-2 would cover
+            className="pl-2 pr-8 py-1"
           >
             <option value="">Pick a year</option>
             {GRAD_YEARS.map((year) => (

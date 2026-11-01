@@ -406,7 +406,8 @@ export default function CoursesSection({ value, onChange, missing, onOpenAutofil
                     <select
                       value={course.grade}
                       onChange={(e) => updateCourse(course.id, { grade: e.target.value })}
-                      className="px-2 py-1"
+                      // Room on the right for doodle.css's arrow, which px-2 would cover
+                      className="pl-2 pr-8 py-1"
                     >
                       <option value="">No grade</option>
                       {GRADE_OPTIONS.map((grade) => (
