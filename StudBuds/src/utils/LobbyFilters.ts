@@ -13,6 +13,8 @@ export interface LobbyFilters {
   sizes: number[];
   /** Hide lobbies with no open spots */
   openSpots: boolean;
+  /** Hide lobbies you host, joined or asked to join (they're always in Sessions too) */
+  hideMine: boolean;
 }
 
 export const ALL_SIZES = Array.from({ length: MAX_GROUP_SIZE - MIN_GROUP_SIZE + 1 }, (_, i) => MIN_GROUP_SIZE + i);
@@ -24,6 +26,7 @@ export const DEFAULT_FILTERS: LobbyFilters = {
   size: true,
   sizes: ALL_SIZES,
   openSpots: false,
+  hideMine: false,
 };
 
 const normalize = (text: string) => text.trim().toLowerCase();
@@ -64,5 +67,6 @@ export function activeFilterCount(filters: LobbyFilters, ctx: MatchContext): num
     filters.subjects && ctx.subjects.length > 0,
     filters.size && filters.sizes.length < ALL_SIZES.length,
     filters.openSpots,
+    filters.hideMine,
   ].filter(Boolean).length;
 }

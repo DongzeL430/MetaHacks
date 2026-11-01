@@ -56,8 +56,9 @@ const SIZE_CHIP = [
 ].join(' ');
 
 /**
- * Finds lobbies to join, like a game's server browser. Lobbies you host, joined or asked to join
- * live in the Sessions window instead, so this list only shows ones you could still join.
+ * Finds lobbies to join, like a game's server browser.
+ * Lobbies you host, joined or asked to join are listed first and always shown (the matching
+ * criteria don't hide your own lobbies), unless "Hide lobbies I'm in" is ticked.
  */
 export default function LobbyBrowserWindow({
   id,
@@ -86,15 +87,17 @@ export default function LobbyBrowserWindow({
   const toggleSize = (n: number) =>
     set({ sizes: filters.sizes.includes(n) ? filters.sizes.filter((s) => s !== n) : [...filters.sizes, n].sort((a, b) => a - b) });
 
-  // Only lobbies you're not already part of
-  const joinable = lobbies.filter((l) => {
+  const isMine = (l: Lobby) => {
     const role = roleIn(l);
-    return role === 'open' || role === 'full';
-  });
+    return role === 'host' || role === 'member' || role === 'requested';
+  };
   const q = query.trim().toLowerCase();
-  const shown = joinable.filter(
-    (l) => (!q || l.subject.toLowerCase().includes(q)) && passesFilters(l, filters, ctx),
-  );
+  const shown = lobbies
+    .filter((l) => !q || l.subject.toLowerCase().includes(q))
+    // Your own lobbies skip the matching criteria; only "Hide lobbies I'm in" removes them
+    .filter((l) => (isMine(l) ? !filters.hideMine : passesFilters(l, filters, ctx)))
+    // Yours first, then everything else in its original order
+    .sort((a, b) => Number(isMine(b)) - Number(isMine(a)));
 
   const tagsFor = (lobby: Lobby) => [
     ...(scheduleKnown && fitsSchedule(lobby, ctx.freeSet) ? ['Fits your free time'] : []),
@@ -208,6 +211,16 @@ export default function LobbyBrowserWindow({
             <span>Only lobbies with open spots</span>
           </label>
 
+          <label className={checkboxRow}>
+            <input type="checkbox" checked={filters.hideMine} onChange={(e) => set({ hideMine: e.target.checked })} />
+            <span>
+              Hide lobbies I’m in
+              <span className="block text-xs opacity-70">
+                Ones you host, joined or asked to join. They’re always in Sessions.
+              </span>
+            </span>
+          </label>
+
           <button type="button" onClick={() => setFilters(DEFAULT_FILTERS)} className="self-start px-3 py-0.5 text-sm">
             Reset filters
           </button>
@@ -215,12 +228,12 @@ export default function LobbyBrowserWindow({
       )}
 
       <p role="status" className="m-0 text-xs opacity-70">
-        Showing {shown.length} of {joinable.length} {joinable.length === 1 ? 'lobby' : 'lobbies'}. Lobbies you’re in are under Sessions.
+        Showing {shown.length} of {lobbies.length} {lobbies.length === 1 ? 'lobby' : 'lobbies'}.
       </p>
 
       {shown.length === 0 ? (
         <p className="m-auto text-center text-sm opacity-70">
-          {joinable.length === 0
+          {lobbies.length === 0
             ? 'No open lobbies right now. Host one!'
             : 'No lobbies match. Try turning off a filter or changing your search.'}
         </p>
