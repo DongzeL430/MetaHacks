@@ -1,6 +1,6 @@
 import type { FormEvent, ReactNode } from 'react';
-import AppWindow from './components/Appwindow';
-import Taskbar, { TASKBAR_CLEARANCE } from './components/TaskBar';
+import AppWindow from './components/AppWindow';
+import Taskbar, { TASKBAR_CLEARANCE } from './components/Taskbar';
 
 interface PreSurveyPageProps {
   /** The user's generated name, shown next to the avatar in the taskbar */

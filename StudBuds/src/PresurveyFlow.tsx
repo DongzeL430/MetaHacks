@@ -1,12 +1,13 @@
 import { useMemo, useRef, useState } from 'react';
 import type { FormEvent, ReactNode } from 'react';
-import AppWindow from './components/Appwindow';
+import AppWindow from './components/AppWindow';
 import AboutYouWindow from './components/AboutYouWindow';
-import Taskbar, { TASKBAR_CLEARANCE } from './components/TaskBar';
+import Taskbar, { TASKBAR_CLEARANCE } from './components/Taskbar';
 import AvailabilityCalendar from './components/AvailabilityCalendar';
 import CoursesSection, {
   cleanAcademics,
   emptyAcademics,
+  mergeSuggestions,
   validateAcademics,
 } from './components/CoursesSection';
 import type { AcademicProfile, CourseSuggestionQuery } from './components/CoursesSection';
@@ -103,17 +104,27 @@ export default function PreSurveyFlow({
   // About you popup (course auto-fill)
   const [aboutOpen, setAboutOpen] = useState(false);
   const [autofillNotice, setAutofillNotice] = useState('');
+  // Shown on the Courses page after Muse finds course codes in a schedule screenshot
+  const [courseImportNote, setCourseImportNote] = useState('');
   const openerRef = useRef<HTMLElement | null>(null);
 
   const current = steps[step];
   const isLast = step === total - 1;
 
   const goTo = (next: number) => {
+    if (current.kind === 'courses') setCourseImportNote('');
     setStep(next);
     setError('');
     setMissing(new Set());
     setAutofillNotice('');
     setAboutOpen(false);
+  };
+
+  const handleCoursesFound = (codes: string[]) => {
+    const { profile, added } = mergeSuggestions(academics, codes);
+    if (added === 0) return;
+    setAcademics(profile);
+    setCourseImportNote(`Muse added ${added} course${added === 1 ? '' : 's'} from your schedule. Rate each one or remove it.`);
   };
 
   const openAutofill = () => {
@@ -247,6 +258,7 @@ export default function PreSurveyFlow({
           setAvailability(slots);
           if (slots.length > 0) setError('');
         }}
+        onCoursesFound={includeCourses ? handleCoursesFound : undefined}
       />
     );
   } else if (current.kind === 'courses') {
@@ -256,7 +268,7 @@ export default function PreSurveyFlow({
         onChange={handleAcademicsChange}
         missing={missing}
         onOpenAutofill={openAutofill}
-        notice={autofillNotice}
+        notice={autofillNotice || courseImportNote}
       />
     );
   } else {
