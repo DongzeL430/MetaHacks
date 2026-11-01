@@ -5,7 +5,7 @@
 begin;
 create extension if not exists pgtap with schema extensions;
 
-select plan(40);
+select plan(41);
 
 insert into auth.users (id, email, raw_user_meta_data) values
   ('a1000000-0000-4000-8000-00000000000a', 'a@northeastern.edu', '{"adult_confirmed": true}'),
@@ -73,6 +73,10 @@ select lives_ok(
 select lives_ok(
   $$insert into public.user_courses (course_id, status) select id, 'planned' from public.courses where code = 'LIMIT 3'$$,
   'A planned course needs no grade'
+);
+select lives_ok(
+  $$insert into public.user_courses (course_id, status) select id, 'transferred' from public.courses where code = 'LIMIT 4'$$,
+  'A transferred course needs no grade'
 );
 select throws_ok(
   $$insert into public.user_courses (course_id) select id from public.courses where code = 'CS 2500'$$,

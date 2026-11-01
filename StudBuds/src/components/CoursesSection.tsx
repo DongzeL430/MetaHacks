@@ -73,6 +73,12 @@ export const emptyAcademics = (): AcademicProfile => ({
  * What makes two rows the same course: the code when the name starts with one
  * ("CS 2500 · Fundamentals of CS 1" and "cs2500" match), otherwise the whole name.
  */
+/**
+ * Only courses taken here or being taken now get a confidence rating: a planned course hasn't
+ * started, and transferred courses skip it.
+ */
+const needsConfidence = (status: CourseStatus) => status === 'taken' || status === 'taking';
+
 const courseKey = (name: string) => {
   const code = name.trim().match(/^([A-Za-z&]{2,6})[\s-]*(\d{2,5}[A-Za-z]?)\b/);
   return (code ? code[1] + code[2] : name).replace(/\s/g, '').toLowerCase();
@@ -92,15 +98,14 @@ export function validateAcademics(profile: AcademicProfile): { message: string; 
   if (!used.some((c) => c.name.trim())) missing.add('courses');
   for (const c of used) {
     if (!c.name.trim()) missing.add(`${c.id}:name`);
-    // You can't rate a course you haven't started
-    if (c.status !== 'planned' && c.confidence === null) missing.add(`${c.id}:confidence`);
+    if (needsConfidence(c.status) && c.confidence === null) missing.add(`${c.id}:confidence`);
   }
 
   if (missing.size === 0) return null;
   return {
     message: missing.has('courses')
       ? 'Add at least one course you’ve taken or are taking.'
-      : 'Finish the highlighted courses. Each one needs a name, and a confidence rating unless it’s planned.',
+      : 'Finish the highlighted courses. Each one needs a name, and a confidence rating unless it’s planned or transferred.',
     missing,
   };
 }
@@ -119,8 +124,9 @@ export function cleanAcademics(profile: AcademicProfile): AcademicProfile {
       .map(({ suggested: _suggested, ...c }) => ({
         ...c,
         name: c.name.trim(),
-        // Planned courses have no rating or grade yet
-        ...(c.status === 'planned' ? { confidence: null, grade: '' } : {}),
+        ...(needsConfidence(c.status) ? {} : { confidence: null }),
+        // A planned course has no grade yet
+        ...(c.status === 'planned' ? { grade: '' } : {}),
       })),
   };
 }
@@ -359,9 +365,8 @@ export default function CoursesSection({ value, onChange, missing, onOpenAutofil
                     </div>
                   </div>
 
-                  {course.status !== 'planned' && (
-                  <>
-                  {/* Confidence 1-5. Planned courses skip it and the grade. */}
+                  {/* Confidence 1-5, for courses taken here or being taken now */}
+                  {needsConfidence(course.status) && (
                   <div>
                     <p className={`m-0 mb-1 ${FIELD_LABEL}`} aria-hidden="true">
                       Confidence
@@ -392,8 +397,10 @@ export default function CoursesSection({ value, onChange, missing, onOpenAutofil
                     </div>
                     {confidenceMissing && <p className={`m-0 mt-1 ${ERROR_TEXT}`}>Pick 1 to 5.</p>}
                   </div>
+                  )}
 
-                  {/* Optional grade */}
+                  {/* Optional grade. A planned course has none yet. */}
+                  {course.status !== 'planned' && (
                   <label className="flex flex-col gap-1">
                     <span className={FIELD_LABEL}>
                       {course.status === 'taking' ? 'Current grade' : 'Grade'}{' '}
@@ -412,7 +419,6 @@ export default function CoursesSection({ value, onChange, missing, onOpenAutofil
                       ))}
                     </select>
                   </label>
-                  </>
                   )}
                 </div>
               </div>

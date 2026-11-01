@@ -37,7 +37,7 @@ Other students can't see any of these rows except where noted. Server code with 
 | `user_programs` | Majors (each with an optional `track`) and minors, in order by `position` 1 to 3 | Add, edit, remove their own | 3 majors and 3 minors |
 | `public_profiles` | Nickname, animal, equipped accessories, points | Read their own, and other students' once onboarded | Read only |
 | `courses` | Shared course list per school | Read their school's list; add a code | 15 new codes |
-| `user_courses` | Courses `taking`, `completed`, or `planned`, with self-reported grade | Add, update `status` and `grade`, remove | 40 |
+| `user_courses` | Courses `taking`, `completed`, `planned`, or `transferred` (credit from another school), with self-reported grade | Add, update `status` and `grade`, remove | 40 |
 | `availability_slots` | Weekly free time | Add, edit, remove | 30 |
 | `survey_questions` | This or That questions | Read approved ones | Read only |
 | `survey_answers` | Their pick, `a` or `b`, per question | Answer, change, remove | 1 per question |
@@ -72,6 +72,7 @@ These keep prejudice on our side out of pairing. They aren't enforced by the dat
 - Vibe Check results are counts only (`agreements`, `reactions`). Don't infer anything about a person from them.
 - Skip a pair when `pair_on_cooldown(a, b)` is true (a Pass in the last day) or a block exists in either direction.
 - Pair only students at the same school, using nothing that describes who they are. Grades are for matching complementary strengths, never shown to the partner.
+- Treat `transferred` courses like `completed` ones: the student knows the material even without a confidence rating. Ignore where the credit came from; it isn't recorded.
 - Set `mutual_at` only when both students picked Vibe. Leave it empty otherwise, so a Pass looks the same as no answer.
 - Show contact handles only when both students said yes in that pairing, and only the platforms each one picked.
 - The study record is a history, never a score. Don't rank or filter students by how many sessions they've had or cancelled.
@@ -80,7 +81,7 @@ These keep prejudice on our side out of pairing. They aren't enforced by the dat
 ## Formats
 
 - **Course codes:** uppercase, single spaces, letters, digits, `.`, `-`, `/`, 2 to 20 characters, e.g. `CS 2500`. `CS2500` and `CS 2500` count as the same course. Search the list before adding, and add only if the code is missing.
-- **Grades:** `A` `A-` `B+` `B` `B-` `C+` `C` `C-` `D+` `D` `D-` `F` `P`. Required for `completed`, optional otherwise. `planned` courses have no grade or confidence yet.
+- **Grades:** `A` `A-` `B+` `B` `B-` `C+` `C` `C-` `D+` `D` `D-` `F` `P`. Required for `completed`, optional otherwise. `planned` courses have no grade or confidence yet; `transferred` courses skip confidence and may have a grade.
 - **Course search cache:** `course_search_cache` holds Muse's course list per school, program, track, and graduation year for 7 days. Server code only; see [muse-schedule.md](muse-schedule.md).
 - **Availability:** `weekday` is 1 (Monday) to 7 (Sunday), times like `'09:00'`, in the school's local time. The end must be after the start.
 - **Instagram:** without the `@`, up to 30 letters, digits, `.` or `_`.
