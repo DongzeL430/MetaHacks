@@ -408,6 +408,11 @@ deno_version = 2
 # [edge_runtime.secrets]
 # secret_key = "env(SECRET_VALUE)"
 
+# Muse Spark reads schedule screenshots. The function checks the student's login itself
+# (supabase.auth.getUser), which works with both legacy and new JWT signing keys.
+[functions.read-schedule]
+verify_jwt = false
+
 [analytics]
 enabled = true
 port = 54327

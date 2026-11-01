@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { ChangeEvent, FormEvent } from 'react';
+import { useNavigate } from 'react-router';
 import type { AuthError, Session } from '@supabase/supabase-js';
 import { supabase } from './lib/supabase.ts';
 import Turnstile from './Turnstile.tsx';
@@ -63,6 +64,7 @@ export default function AuthPage() {
   const [session, setSession] = useState<Session | null | undefined>(undefined);
 
   const signup = mode === 'signup';
+  const navigate = useNavigate();
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => setSession(data.session));
@@ -322,6 +324,9 @@ export default function AuthPage() {
               <div className="flex flex-col gap-4">
                 <p>You are signed in as {session.user.email}.</p>
                 {notice && <p>{notice}</p>}
+                <button type="button" onClick={() => navigate('/')} className="self-center px-10 py-2">
+                  Continue
+                </button>
                 <button type="button" onClick={onLogOut} className="self-center px-10 py-2">
                   Log out
                 </button>
