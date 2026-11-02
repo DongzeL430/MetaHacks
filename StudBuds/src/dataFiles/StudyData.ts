@@ -128,14 +128,15 @@ export const SAMPLE_LOBBIES: Lobby[] = [
     requestIds: [],
     timeSlots: slotsBetween('fri', '13:00', '14:00'),
   },
-  // One you host, with someone waiting, so the host view has something to show
+  // One you host, with people waiting, so the host view has something to show
   {
     id: 'lobby-mine',
     hostId: ME,
     subject: 'Calculus II',
     maxSize: 3,
     memberIds: [ME],
-    requestIds: ['sam-oconnor'],
+    // More than 3 waiting, so the "View all" button shows
+    requestIds: ['sam-oconnor', 'maya-ortiz', 'devin-park', 'priya-shah'],
     timeSlots: slotsBetween('mon', '09:00', '10:30'),
   },
 ];

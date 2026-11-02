@@ -1,7 +1,8 @@
-import type { ReactNode } from 'react';
-import AppWindow from './AppWindow';
+import { useId, useState } from 'react';
+import AppWindow, { WINDOW_ACCENTS } from './AppWindow';
 import PersonAvatar from './PersonAvatar';
 import { ConnectControl } from './PersonCard';
+import ViewTabs, { viewPanelId, viewTabId } from './ViewTabs';
 import type { ConnectionStatus, Person } from '../dataFiles/StudyData';
 import type { StudyDispatch } from '../utils/StudyState';
 
@@ -14,62 +15,74 @@ interface ConnectionsWindowProps {
   dispatch: StudyDispatch;
 }
 
-function Group({ title, people, empty, connections, dispatch }: {
-  title: ReactNode;
-  people: Person[];
-  empty: string;
-  connections: Record<string, ConnectionStatus>;
-  dispatch: StudyDispatch;
-}) {
-  return (
-    <section className="flex flex-col gap-2">
-      <h3 className="m-0 text-base opacity-80">{title}</h3>
-      {people.length === 0 ? (
-        <p className="m-0 text-sm opacity-60">{empty}</p>
-      ) : (
-        <ul className="m-0 p-0 list-none flex flex-col gap-2">
-          {people.map((p) => (
-            <li key={p.id} className="list-none flex items-center gap-3 p-2 rounded-md border-2 border-[#3c3c3c]/25 bg-[#FDF7F1]">
-              <PersonAvatar person={p} className="w-9 h-9" />
-              <span className="flex-1 min-w-0 truncate">{p.name}</span>
-              <ConnectControl person={p} status={connections[p.id] ?? 'none'} dispatch={dispatch} />
-            </li>
-          ))}
-        </ul>
-      )}
-    </section>
-  );
-}
+type View = 'received' | 'connected' | 'sent';
 
-/** Friend-request style connections: requests to answer, people you're connected with, requests you sent */
+const VIEWS: { id: View; label: string; empty: string }[] = [
+  { id: 'received', label: 'Requests', empty: 'No requests right now.' },
+  { id: 'connected', label: 'Connected', empty: 'No connections yet. Use the Connect button on someone’s card in a lobby.' },
+  { id: 'sent', label: 'Sent', empty: 'No pending requests.' },
+];
+
+/**
+ * Friend-request style connections, split into views like a nav bar:
+ * Requests to answer, people you're Connected with, and requests you've Sent.
+ */
 export default function ConnectionsWindow({ id, open, onClose, people, connections, dispatch }: ConnectionsWindowProps) {
-  const withStatus = (status: ConnectionStatus) => people.filter((p) => connections[p.id] === status);
-  const received = withStatus('received');
+  const baseId = useId();
+  const listFor = (view: View) => people.filter((p) => connections[p.id] === view);
+
+  // Starts on Requests if there are any, otherwise the first view with someone in it
+  const [view, setView] = useState<View>(() => VIEWS.find((v) => listFor(v.id).length > 0)?.id ?? 'received');
+  const current = VIEWS.find((v) => v.id === view)!;
+  const list = listFor(view);
 
   return (
     <AppWindow
       id={id}
       title="Connections"
+      accent={WINDOW_ACCENTS.lilac}
+      info="Your study buddies, like a friends list. Answer connection requests, see who you’re connected with, and keep track of requests you’ve sent."
       open={open}
       onClose={onClose}
       controls={{ close: 'enabled', fullscreen: 'enabled' }}
-      initialSize={{ width: 380, height: 500 }}
+      // No initialSize: opened from the nav bar, it takes as much room as the current layout allows
       minWidth={300}
       minHeight={260}
-      bodyClassName="p-3 flex flex-col gap-5"
+      bodyClassName="p-3 flex flex-col gap-3"
     >
-      <p className="m-0 text-sm opacity-80">
-        Connect with people from lobbies using the Connect button on their card.
-      </p>
-      <Group
-        title={`Requests${received.length > 0 ? ` (${received.length})` : ''}`}
-        people={received}
-        empty="No requests right now."
-        connections={connections}
-        dispatch={dispatch}
+      <ViewTabs
+        baseId={baseId}
+        label="Your connections"
+        tabs={VIEWS.map((v) => ({ id: v.id, label: v.label, count: listFor(v.id).length }))}
+        value={view}
+        onChange={setView}
       />
-      <Group title="Connected" people={withStatus('connected')} empty="No connections yet." connections={connections} dispatch={dispatch} />
-      <Group title="Sent" people={withStatus('sent')} empty="No pending requests." connections={connections} dispatch={dispatch} />
+
+      {/* VIEW: keyed so switching views fades the new list in */}
+      <div
+        key={view}
+        role="tabpanel"
+        id={viewPanelId(baseId)}
+        aria-labelledby={viewTabId(baseId, view)}
+        className="flex-1 min-h-0 flex flex-col motion-safe:transition-opacity motion-safe:duration-200 starting:opacity-0"
+      >
+        {list.length === 0 ? (
+          <p className="m-auto text-center text-sm opacity-70">{current.empty}</p>
+        ) : (
+          <ul className="m-0 p-0 list-none flex flex-col gap-2">
+            {list.map((p) => (
+              <li
+                key={p.id}
+                className="list-none flex items-center gap-3 p-3 rounded-md border-2 border-[#3c3c3c]/25 bg-[#FDF7F1]"
+              >
+                <PersonAvatar person={p} className="w-10 h-10" />
+                <span className="flex-1 min-w-0 truncate text-lg">{p.name}</span>
+                <ConnectControl person={p} status={connections[p.id] ?? 'none'} dispatch={dispatch} />
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
     </AppWindow>
   );
 }

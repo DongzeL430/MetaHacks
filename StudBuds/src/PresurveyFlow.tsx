@@ -307,7 +307,7 @@ export default function PreSurveyFlow({
       <Taskbar userName={userName} avatar={avatar} right={taskbarRight} />
 
       {/* No `isolate` / z-index on main: a full screen window has to be able to rise above the taskbar */}
-      <main className={`relative flex-1 min-h-0 flex flex-col px-4 pb-4 md:px-6 md:pb-6 ${TASKBAR_CLEARANCE}`}>
+      <main className={`relative flex-1 min-h-0 flex flex-col px-2 pb-2 md:px-3 md:pb-3 ${TASKBAR_CLEARANCE}`}>
         <div
           aria-hidden
           className="absolute inset-0 pointer-events-none bg-cover bg-center opacity-30"
@@ -324,6 +324,7 @@ export default function PreSurveyFlow({
               <AppWindow
                 id="survey"
                 title={page.title}
+                info="Your pre-survey. Fill in each page so we can match you with study partners. Use the dots at the bottom to jump back to pages you’ve already reached."
                 footer={windowFooter}
                 open={windowOpen}
                 onClose={() => setWindowOpen(false)}

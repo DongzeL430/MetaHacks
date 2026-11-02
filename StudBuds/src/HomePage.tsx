@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import type { FormEvent, ReactNode } from 'react';
-import AppWindow, { WindowManagerProvider } from './components/AppWindow';
+import type { ReactNode } from 'react';
+import { WindowManagerProvider } from './components/AppWindow';
 import Taskbar, { TASKBAR_CLEARANCE } from './components/TaskBar';
 import type { TaskbarApp } from './components/TaskBar';
 import StudyLayout from './components/StudyLayout';
@@ -48,19 +48,8 @@ interface HomePageProps {
   avatar?: ReactNode;
   /** Image URL for the user's own card inside lobbies (optional) */
   avatarUrl?: string;
-  sectionTitle?: string;
-  /** Short note on what this info is used for (optional) */
-  sectionBio?: string;
-  /** Text shown in the input window's title bar */
-  windowTitle?: string;
-  /** Inputs / custom components rendered inside the input window */
-  children?: ReactNode;
-  /** Pinned to the bottom of the window (Back / Submit buttons, progress dots) */
-  footer?: ReactNode;
   /** Optional content for the right side of the taskbar (step counter, clock, etc.) */
   taskbarRight?: ReactNode;
-  /** Receives every named field inside the input window */
-  onSubmit?: (data: FormData) => void;
   /** Other users who can appear in lobbies and connections */
   people?: Person[];
   /** The user's free slots from the pre-survey calendar ("mon|09:30"), shown when hosting and used by lobby filters */
@@ -77,13 +66,7 @@ export default function HomePage({
   userName = 'Generated Name',
   avatar,
   avatarUrl,
-  sectionTitle = 'Survey Section Name',
-  sectionBio,
-  windowTitle = 'Your answers',
-  children,
-  footer,
   taskbarRight,
-  onSubmit,
   people = [],
   myAvailability,
   mySubjects,
@@ -99,10 +82,6 @@ export default function HomePage({
   // People waiting to join the lobby you host
   const waitingToJoin = study.lobbies.find((l) => l.hostId === ME)?.requestIds.length ?? 0;
 
-  const handleSubmit = (e: FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    onSubmit?.(new FormData(e.currentTarget));
-  };
 
   const taskbarApps: TaskbarApp[] = [
     {
@@ -143,41 +122,30 @@ export default function HomePage({
       {/* The picture is this container's own background, so only the area under the taskbar gets it
           and children keep their own backgrounds on top. */}
       <main
-        className={`flex-1 min-h-0 flex flex-col px-4 pb-4 md:px-8 md:pb-8 bg-cover bg-no-repeat ${TASKBAR_CLEARANCE}`}
+        className={`flex-1 min-h-0 flex flex-col px-2 pb-2 md:px-3 md:pb-3 bg-cover bg-no-repeat ${TASKBAR_CLEARANCE}`}
         style={{ backgroundImage: `url(${defaultbg})`, backgroundPosition: BG_FOCUS }}
       >
-        <section className="flex-1 min-w-0 min-h-0 flex flex-col gap-4">
-          <form onSubmit={handleSubmit} className="flex-1 min-h-0 flex flex-col" noValidate>
-            {/* Desk area: windows rest inside this box. `relative` so window layers can cover it. */}
-            <div className="relative flex-1 min-h-0 min-w-0">
-              {/* All windows on the desk share one stack: the newest is in front, the ones behind shrink a little */}
-              <WindowManagerProvider>
-                <AppWindow id="home" title={windowTitle} footer={footer} controls={{ close: 'enabled', fullscreen: 'enabled' }}>
-                  {children ?? (
-                    <p className="m-auto text-center opacity-60">
-                      Reserved for input forms and custom components
-                    </p>
-                  )}
-                </AppWindow>
-
-                <StudyLayout
-                  me={{ name: userName, avatar: avatarUrl }}
-                  people={people}
-                  myAvailability={myAvailability}
-                  mySubjects={mySubjects}
-                  state={study}
-                  dispatch={dispatch}
-                  lobbiesOpen={lobbiesOpen}
-                  onLobbiesClose={() => setLobbiesOpen(false)}
-                  connectionsOpen={connectionsOpen}
-                  onConnectionsClose={() => setConnectionsOpen(false)}
-                  sessionsOpen={sessionsOpen}
-                  onSessionsClose={() => setSessionsOpen(false)}
-                />
-              </WindowManagerProvider>
-            </div>
-          </form>
-        </section>
+        {/* Desk area: windows rest inside this box. `relative` so window layers can cover it.
+            It starts empty; windows open from the nav bar. */}
+        <div className="relative flex-1 min-h-0 min-w-0">
+          {/* All windows on the desk share one stack and one tiling layout */}
+          <WindowManagerProvider>
+            <StudyLayout
+              me={{ name: userName, avatar: avatarUrl }}
+              people={people}
+              myAvailability={myAvailability}
+              mySubjects={mySubjects}
+              state={study}
+              dispatch={dispatch}
+              lobbiesOpen={lobbiesOpen}
+              onLobbiesClose={() => setLobbiesOpen(false)}
+              connectionsOpen={connectionsOpen}
+              onConnectionsClose={() => setConnectionsOpen(false)}
+              sessionsOpen={sessionsOpen}
+              onSessionsClose={() => setSessionsOpen(false)}
+            />
+          </WindowManagerProvider>
+        </div>
       </main>
     </div>
   );

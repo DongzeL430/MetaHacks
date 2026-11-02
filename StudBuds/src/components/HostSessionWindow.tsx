@@ -1,5 +1,5 @@
 import { useEffect, useId, useRef, useState } from 'react';
-import AppWindow from './AppWindow';
+import AppWindow, { WINDOW_ACCENTS } from './AppWindow';
 import type { InitialSize } from './AppWindow';
 import AvailabilityCalendar, { PICKED_BUSY } from './AvailabilityCalendar';
 import { MAX_GROUP_SIZE, MIN_GROUP_SIZE, SUBJECT_SUGGESTIONS } from '../dataFiles/StudyData';
@@ -43,7 +43,12 @@ const CHIP = [
   'has-focus-visible:outline-2 has-focus-visible:outline-dashed has-focus-visible:outline-offset-2',
 ].join(' ');
 
-/** Form for hosting a new study lobby: subject, group size, and when it meets */
+/**
+ * Popup form for hosting a new study lobby: subject, group size, and when it meets.
+ * Dims the whole page, floats above every other window, and stays out of the tiling layout.
+ * Closes with its X, Cancel, Escape, or a click on the dimmed area.
+ * Render it in the desk area (which needs `relative`), not inside a WindowLayer.
+ */
 export default function HostSessionWindow({
   id,
   open,
@@ -53,6 +58,7 @@ export default function HostSessionWindow({
   onCreate,
 }: HostSessionWindowProps) {
   const fieldId = useId();
+  const titleId = useId();
   const subjectRef = useRef<HTMLInputElement>(null);
   const [subject, setSubject] = useState('');
   const [size, setSize] = useState(3);
@@ -81,13 +87,44 @@ export default function HostSessionWindow({
       ? `${describeSlots(slots, { slotMinutes: grid.slotMinutes })} (${durationLabel(slots.length * grid.slotMinutes)})`
       : '';
 
+  if (!open) return null;
+
   return (
+    <>
+      {/* Dims the whole page, taskbar included. Clicking it closes the popup. */}
+      <div
+        aria-hidden="true"
+        onPointerDown={onClose}
+        className="fixed inset-0 z-[45] bg-[#3c3c3c]/25 motion-safe:transition-opacity motion-safe:duration-200 starting:opacity-0"
+      />
+
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        // No background of its own: this layer only keeps the popup inside the desk area
+        className="absolute inset-0 z-50 p-3"
+        onPointerDown={(e) => {
+          if (e.target === e.currentTarget) onClose(); // click on the dimmed area around the popup
+        }}
+        onKeyDown={(e) => {
+          if (e.key === 'Escape') {
+            e.preventDefault(); // so a full screen window behind doesn't also exit
+            e.stopPropagation();
+            onClose();
+          }
+        }}
+      >
     <AppWindow
       id={id}
       title="Host a session"
-      open={open}
+      accent={WINDOW_ACCENTS.rose}
+      info="Start your own study session. Pick a subject, how many people can join, and when it meets. Others request to join, and you choose who gets in."
+      titleId={titleId}
       onClose={onClose}
-      controls={{ close: 'enabled', fullscreen: 'enabled' }}
+      // A popup: never tiled, and it doesn't push the other windows around
+      excludeFromLayout
+      controls={{ close: 'enabled', fullscreen: 'hidden', pin: 'hidden' }}
       initialSize={HOST_SIZE}
       minWidth={320}
       minHeight={360}
@@ -192,5 +229,7 @@ export default function HostSessionWindow({
         )}
       </section>
     </AppWindow>
+      </div>
+    </>
   );
 }

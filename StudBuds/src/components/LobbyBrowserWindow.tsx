@@ -1,6 +1,5 @@
 import { useId, useMemo, useState } from 'react';
-import AppWindow from './AppWindow';
-import type { InitialSize } from './AppWindow';
+import AppWindow, { WINDOW_ACCENTS } from './AppWindow';
 import LobbyRow from './LobbyRow';
 import type { Lobby, Person } from '../dataFiles/StudyData';
 import { roleIn } from '../utils/StudyState';
@@ -32,20 +31,6 @@ interface LobbyBrowserWindowProps {
   /** The user's subjects (e.g. their courses), for the "my subjects" criterion */
   subjects?: string[];
 }
-
-/**
- * Opening size, as a share of the desk area (the space under the nav bar):
- *   wide monitors (1280px+):  60% wide, 80% tall
- *   smaller monitors (768px+): 70% wide, 70% tall
- *   phones:                    almost the whole desk, so the list is readable
- * When 2 to 4 windows are open on a big screen, the tiling layout decides the size instead.
- */
-const LOBBY_SIZE: InitialSize = ({ width, height }) => {
-  const screen = window.innerWidth;
-  if (screen >= 1280) return { width: width * 0.6, height: height * 0.8 };
-  if (screen >= 768) return { width: width * 0.7, height: height * 0.7 };
-  return { width: width * 0.96, height: height * 0.92 };
-};
 
 const SIZE_CHIP = [
   'inline-flex items-center justify-center w-9 py-0.5 rounded-md border-2 border-[#3c3c3c]/45 text-sm',
@@ -110,10 +95,12 @@ export default function LobbyBrowserWindow({
     <AppWindow
       id={id}
       title="Study Lobbies"
+      accent={WINDOW_ACCENTS.sky}
+      info="Browse study sessions other students are hosting. Use Filters to match lobbies to your free time, subjects and group size, or host your own."
       open={open}
       onClose={onClose}
       controls={{ close: 'enabled', fullscreen: 'enabled' }}
-      initialSize={LOBBY_SIZE}
+      // No initialSize: opened from the nav bar, it takes as much room as the current layout allows
       minWidth={320}
       minHeight={280}
       bodyClassName="p-3 flex flex-col gap-3"

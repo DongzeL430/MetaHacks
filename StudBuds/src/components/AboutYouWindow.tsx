@@ -1,5 +1,5 @@
 import { useEffect, useId, useRef, useState } from 'react';
-import AppWindow from './AppWindow';
+import AppWindow, { WINDOW_ACCENTS } from './AppWindow';
 import { MAX_PROGRAMS, YEAR_OPTIONS } from '../dataFiles/AcademicOptions';
 import { CHIP, FIELD_LABEL, blockEnter, mergeSuggestions } from './CoursesSection';
 import type { AcademicProfile, CourseSearchResult, CourseSuggestionQuery, MajorEntry } from './CoursesSection';
@@ -61,7 +61,8 @@ export default function AboutYouWindow({
   };
 
   const majors = value.majors.filter((m) => m.name.trim());
-  const hasEnough = majors.length > 0 && !!value.gradYear;
+  const minors = value.minors.map((m) => m.trim()).filter(Boolean);
+  const hasEnough = (majors.length > 0 || minors.length > 0) && !!value.gradYear;
 
   const findCourses = async () => {
     if (!suggestCourses) return;
@@ -70,6 +71,7 @@ export default function AboutYouWindow({
     try {
       const result = await suggestCourses({
         majors: majors.map((m) => ({ name: m.name.trim(), track: m.track.trim() })),
+        minors,
         year: value.year,
         gradYear: value.gradYear,
       });
@@ -77,7 +79,7 @@ export default function AboutYouWindow({
       onChange(profile);
       if (added > 0) onFilled?.(added, result);
       else if (result.failed.length > 0) setNote(`Couldn’t search ${result.failed.join(', ')} right now. Try again in a minute.`);
-      else setNote('Muse didn’t find courses from past terms. If this is your first term, add the ones you’re taking now yourself.');
+      else setNote('No new courses found for those programs.');
     } catch (err) {
       setNote(err instanceof Error ? err.message : 'Couldn’t get suggestions right now. You can still add courses yourself.');
     } finally {
@@ -88,7 +90,7 @@ export default function AboutYouWindow({
   const footerNote = !suggestCourses
     ? 'Course search isn’t connected yet.'
     : !hasEnough
-      ? 'Add a major and your graduation year first.'
+      ? 'Add a major or minor and your graduation year first.'
       : searching
         ? 'Muse is searching your school’s catalog. This can take a minute.'
         : note;
@@ -125,6 +127,8 @@ export default function AboutYouWindow({
       >
         <AppWindow
           title="About you"
+          accent={WINDOW_ACCENTS.rose}
+          info="Tell us your majors, minors and graduation year, and we’ll search your school’s catalog to fill in courses you’ve likely taken."
           titleId={titleId}
           // A modal popup: keep it out of the auto-arranging, and don't let the survey window move for it
           excludeFromLayout
@@ -155,7 +159,7 @@ export default function AboutYouWindow({
           }
         >
           <p className="m-0 text-sm opacity-80">
-            Muse looks up your majors in your school’s catalog and adds courses you’ve most likely already taken. Check each one.
+            Tell us your majors, minors, and when you expect to graduate. We'll try our best to fill each one!.
           </p>
 
           {/* MAJORS, each with an optional track */}

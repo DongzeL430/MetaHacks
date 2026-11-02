@@ -20,17 +20,61 @@ export function SpotPips({ filled, max }: { filled: number; max: number }) {
   );
 }
 
+/** Join requests shown on the lobby page before "View all" takes over */
+export const MAX_INLINE_REQUESTS = 3;
+
+/** One person asking to join: avatar, name, Accept (unless the lobby is full) and Decline */
+export function JoinRequestRow({
+  lobby,
+  person,
+  dispatch,
+}: {
+  lobby: Lobby;
+  person: Person;
+  dispatch: StudyDispatch;
+}) {
+  const isFull = lobby.memberIds.length >= lobby.maxSize;
+  return (
+    <li className="list-none flex items-center gap-3 p-2 rounded-md border-2 border-[#3c3c3c]/25 bg-[#FDF7F1]">
+      <PersonAvatar person={person} className="w-8 h-8" />
+      <span className="flex-1 min-w-0 truncate">{person.name}</span>
+      <button
+        type="button"
+        onClick={() => dispatch({ type: 'accept-join', lobbyId: lobby.id, personId: person.id })}
+        disabled={isFull}
+        title={isFull ? 'The lobby is full' : undefined}
+        aria-label={`Let ${person.name} join`}
+        className="px-2.5 py-0.5 text-sm"
+      >
+        Accept
+      </button>
+      <button
+        type="button"
+        onClick={() => dispatch({ type: 'decline-join', lobbyId: lobby.id, personId: person.id })}
+        aria-label={`Decline ${person.name}’s request`}
+        className="px-2.5 py-0.5 text-sm"
+      >
+        Decline
+      </button>
+    </li>
+  );
+}
+
 interface LobbyViewProps {
   lobby: Lobby;
   people: Map<string, Person>;
   connections: Record<string, ConnectionStatus>;
   dispatch: StudyDispatch;
+  /** Opens this lobby's chat (shown to the host and members) */
+  onOpenChat?: (lobbyId: string) => void;
+  /** Opens the popup with every join request, once there are more than MAX_INLINE_REQUESTS */
+  onViewAllRequests?: (lobbyId: string) => void;
 }
 
 const ACTION_BUTTON = 'px-4 py-1';
 
 /** One lobby's page: header, your actions, join requests (host only), and the member slots */
-export default function LobbyView({ lobby, people, connections, dispatch }: LobbyViewProps) {
+export default function LobbyView({ lobby, people, connections, dispatch, onOpenChat, onViewAllRequests }: LobbyViewProps) {
   const role = roleIn(lobby);
   const host = people.get(lobby.hostId);
   const members = lobby.memberIds.map((id) => people.get(id)).filter((p): p is Person => !!p);
@@ -51,7 +95,8 @@ export default function LobbyView({ lobby, people, connections, dispatch }: Lobb
         </div>
         <div className="flex flex-col items-end gap-1">
           <SpotPips filled={lobby.memberIds.length} max={lobby.maxSize} />
-          <span className="text-sm">
+          {/* Hidden when this lobby's window is narrow (a container query on the window's page, not the screen) */}
+          <span className="hidden @md:inline text-sm">
             {lobby.memberIds.length} / {lobby.maxSize} {isFull ? '· Full' : `· ${openSpots} open`}
           </span>
         </div>
@@ -73,6 +118,20 @@ export default function LobbyView({ lobby, people, connections, dispatch }: Lobb
           </>
         )}
         {role === 'full' && <span className="text-sm opacity-70">This lobby is full.</span>}
+        {(role === 'host' || role === 'member') && onOpenChat && (
+          <button type="button" onClick={() => onOpenChat(lobby.id)} className={`${ACTION_BUTTON} flex items-center gap-2`}>
+            <svg viewBox="0 0 20 20" className="w-4 h-4" aria-hidden="true">
+              <path
+                d="M3.5 4.5h13v8h-7l-4 3v-3h-2z"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.8"
+                strokeLinejoin="round"
+              />
+            </svg>
+            Chat
+          </button>
+        )}
         {role === 'member' && (
           <button type="button" onClick={() => dispatch({ type: 'leave', lobbyId: lobby.id })} className={ACTION_BUTTON}>
             Leave lobby
@@ -92,32 +151,18 @@ export default function LobbyView({ lobby, people, connections, dispatch }: Lobb
           {requests.length === 0 ? (
             <p className="m-0 text-sm opacity-70">No one is waiting right now.</p>
           ) : (
-            <ul className="m-0 p-0 list-none flex flex-col gap-2">
-              {requests.map((p) => (
-                <li key={p.id} className="list-none flex items-center gap-3 p-2 rounded-md border-2 border-[#3c3c3c]/25">
-                  <PersonAvatar person={p} className="w-8 h-8" />
-                  <span className="flex-1 min-w-0 truncate">{p.name}</span>
-                  <button
-                    type="button"
-                    onClick={() => dispatch({ type: 'accept-join', lobbyId: lobby.id, personId: p.id })}
-                    disabled={isFull}
-                    title={isFull ? 'The lobby is full' : undefined}
-                    aria-label={`Let ${p.name} join`}
-                    className="px-2.5 py-0.5 text-sm"
-                  >
-                    Accept
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => dispatch({ type: 'decline-join', lobbyId: lobby.id, personId: p.id })}
-                    aria-label={`Decline ${p.name}’s request`}
-                    className="px-2.5 py-0.5 text-sm"
-                  >
-                    Decline
-                  </button>
-                </li>
-              ))}
-            </ul>
+            <>
+              <ul className="m-0 p-0 list-none flex flex-col gap-2">
+                {requests.slice(0, MAX_INLINE_REQUESTS).map((p) => (
+                  <JoinRequestRow key={p.id} lobby={lobby} person={p} dispatch={dispatch} />
+                ))}
+              </ul>
+              {requests.length > MAX_INLINE_REQUESTS && onViewAllRequests && (
+                <button type="button" onClick={() => onViewAllRequests(lobby.id)} className="self-start px-3 py-0.5 text-sm">
+                  View all {requests.length} requests
+                </button>
+              )}
+            </>
           )}
         </section>
       )}

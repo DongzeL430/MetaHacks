@@ -5,10 +5,13 @@ import ConnectionsWindow from './ConnectionsWindow';
 import HostSessionWindow from './HostSessionWindow';
 import LobbyBrowserWindow from './LobbyBrowserWindow';
 import LobbyView from './LobbyView';
+import ChatWindow from './ChatWindow';
+import JoinRequestsPopup from './JoinRequestPopup';
 import SessionsWindow from './SessionsWindow';
 import PersonAvatar from './PersonAvatar';
 import { ME } from '../dataFiles/StudyData';
 import type { Lobby, Person } from '../dataFiles/StudyData';
+import { roleIn } from '../utils/StudyState';
 import type { StudyDispatch, StudyState } from '../utils/StudyState';
 
 const WINDOWS = {
@@ -17,13 +20,8 @@ const WINDOWS = {
   host: 'host-session',
   connections: 'connections',
   sessions: 'sessions',
+  chat: 'lobby-chat',
 };
-
-const slugOf = (text: string) =>
-  text
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-|-$/g, '');
 
 interface StudyLayoutProps {
   /** The signed-in user, shown in lobbies they're part of */
@@ -51,8 +49,10 @@ interface StudyLayoutProps {
  * Every study-session window on the desk:
  *  - Study Lobbies: lobbies you could join (search, filters, host a session)
  *  - Sessions: lobbies you host, joined or asked to join
+ *  - Chat: live group chat (Supabase Realtime) for a lobby you host or joined
+ *  - Join requests: popup with every request, from "View all" on your lobby's page
  *  - Lobbies: a browser-style window with a tab per lobby you've opened
- *  - Host a session: subject + group size form
+ *  - Host a session: popup form (subject, group size, time block) that dims the page
  *  - Connections: friend-request style list
  * Render inside a WindowManagerProvider, in a desk area with `relative`.
  */
@@ -74,6 +74,10 @@ export default function StudyLayout({
   const [tabIds, setTabIds] = useState<string[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [hostOpen, setHostOpen] = useState(false);
+  /** Lobby whose chat is open (one chat window, switched between lobbies) */
+  const [chatLobbyId, setChatLobbyId] = useState<string | null>(null);
+  /** Lobby whose "View all" join requests popup is open */
+  const [requestsLobbyId, setRequestsLobbyId] = useState<string | null>(null);
 
   const peopleById = useMemo(() => {
     const map = new Map(people.map((p) => [p.id, p]));
@@ -86,6 +90,17 @@ export default function StudyLayout({
   const tabs = tabIds.map((id) => lobbiesById.get(id)).filter((l): l is Lobby => !!l);
   const active = tabs.find((l) => l.id === activeId) ?? tabs[0];
   const myLobby = state.lobbies.find((l) => l.hostId === ME);
+
+  // Chat is only for people in the lobby: leaving it (or it closing) closes the chat too
+  const chatLobby = chatLobbyId ? lobbiesById.get(chatLobbyId) : undefined;
+  const chatAllowed = !!chatLobby && (roleIn(chatLobby) === 'host' || roleIn(chatLobby) === 'member');
+  const requestsLobby = requestsLobbyId ? lobbiesById.get(requestsLobbyId) ?? null : null;
+
+  const openChat = (lobbyId: string) => {
+    setChatLobbyId(lobbyId);
+    stack?.focus(WINDOWS.chat); // already open but behind another window: bring it forward
+  };
+
 
   const openLobby = (id: string) => {
     setTabIds((prev) => (prev.includes(id) ? prev : [...prev, id]));
@@ -103,7 +118,6 @@ export default function StudyLayout({
   const host = () => {
     if (myLobby) return openLobby(myLobby.id); // one hosted lobby at a time
     setHostOpen(true);
-    stack?.focus(WINDOWS.host);
   };
 
   const create = (subject: string, maxSize: number, timeSlots: string[]) => {
@@ -158,23 +172,22 @@ export default function StudyLayout({
             setTabIds([]);
             setActiveId(null);
           }}
-          address={active ? `studbuds / lobbies / ${slugOf(active.subject)}` : undefined}
+          info="Each lobby you open gets its own tab. See who’s in it and when it meets, request to join, chat with your group, or manage requests if you’re the host."
         >
           {active && (
-            <LobbyView lobby={active} people={peopleById} connections={state.connections} dispatch={dispatch} />
+            <LobbyView
+              lobby={active}
+              people={peopleById}
+              connections={state.connections}
+              dispatch={dispatch}
+              onOpenChat={openChat}
+              onViewAllRequests={setRequestsLobbyId}
+            />
           )}
         </BrowserWindow>
       </WindowLayer>
 
-      <WindowLayer>
-        <HostSessionWindow
-          id={WINDOWS.host}
-          open={hostOpen}
-          onClose={() => setHostOpen(false)}
-          availability={myAvailability}
-          onCreate={create}
-        />
-      </WindowLayer>
+
 
       <WindowLayer>
         <SessionsWindow
@@ -185,7 +198,6 @@ export default function StudyLayout({
           people={peopleById}
           openTabIds={tabIds}
           onOpenLobby={openLobby}
-          onHost={host}
         />
       </WindowLayer>
 
@@ -199,6 +211,31 @@ export default function StudyLayout({
           dispatch={dispatch}
         />
       </WindowLayer>
+
+      <WindowLayer>
+        <ChatWindow
+          id={WINDOWS.chat}
+          lobby={chatAllowed ? chatLobby! : null}
+          people={peopleById}
+          onClose={() => setChatLobbyId(null)}
+        />
+      </WindowLayer>
+
+      {/* Popups over everything, so they go last and outside the window layers */}
+      <JoinRequestsPopup
+        lobby={requestsLobby}
+        people={peopleById}
+        dispatch={dispatch}
+        onClose={() => setRequestsLobbyId(null)}
+      />
+
+      <HostSessionWindow
+        id={WINDOWS.host}
+        open={hostOpen}
+        onClose={() => setHostOpen(false)}
+        availability={myAvailability}
+        onCreate={create}
+      />
     </>
   );
 }

@@ -1,6 +1,6 @@
 import { useId } from 'react';
 import type { KeyboardEvent, ReactNode } from 'react';
-import AppWindow from './AppWindow';
+import AppWindow, { WINDOW_ACCENTS } from './AppWindow';
 
 export interface BrowserTab {
   id: string;
@@ -14,6 +14,10 @@ interface BrowserWindowProps {
   open: boolean;
   /** Window title. Defaults to the active tab's label. */
   title?: string;
+  /** Title bar color, e.g. WINDOW_ACCENTS.mint */
+  accent?: string;
+  /** Short explanation shown from the "i" beside the title */
+  info?: ReactNode;
   tabs: BrowserTab[];
   activeId: string | null;
   onSelect: (tabId: string) => void;
@@ -36,6 +40,8 @@ export default function BrowserWindow({
   id,
   open,
   title,
+  accent = WINDOW_ACCENTS.mint,
+  info,
   tabs,
   activeId,
   onSelect,
@@ -79,6 +85,8 @@ export default function BrowserWindow({
     <AppWindow
       id={id}
       title={title ?? active?.label ?? 'Browser'}
+      accent={accent}
+      info={info}
       open={open}
       onClose={onClose}
       controls={{ close: 'enabled', fullscreen: 'enabled' }}
@@ -164,7 +172,8 @@ export default function BrowserWindow({
             id={panelId}
             aria-labelledby={tabDomId(active.id)}
             tabIndex={0}
-            className="flex-1 min-h-0 overflow-auto p-4 flex flex-col gap-5 motion-safe:transition-opacity motion-safe:duration-200 starting:opacity-0"
+            // @container: pages inside can style themselves by this window's width (e.g. @md:inline)
+            className="@container flex-1 min-h-0 overflow-auto p-4 flex flex-col gap-5 motion-safe:transition-opacity motion-safe:duration-200 starting:opacity-0"
           >
             {children}
           </div>

@@ -50,7 +50,10 @@ interface Box {
  *  - Stacking: the last window opened or clicked sits on top. Sizes never change on click.
  *  - Tiling: when a window opens, the unpinned windows are moved and resized into a pattern:
  *      2 windows  -> left and right halves
- *      3-4        -> quadrants (oldest top-left, then top-right, bottom-left, bottom-right)
+ *      3 windows  -> oldest takes the full right half, the next two stack top-left and bottom-left
+ *      4 windows  -> quadrants (oldest top-left, then top-right, bottom-left, bottom-right)
+ *    When a tiled window closes, the rest step down a level the same way (4 -> 3 -> 2),
+ *    and a single window left over grows to fill the desk.
  *      5 or more  -> no rearranging; the new window just opens on top
  *    Pinned windows and windows with `excludeFromLayout` are left alone and don't take a tile.
  *    Drag a tiled window by its title bar onto another tile to swap places (or into an empty
@@ -80,18 +83,20 @@ const TOP_LEFT: Tile = { left: 0, top: 0, width: 0.5, height: 0.5 };
 const TOP_RIGHT: Tile = { left: 0.5, top: 0, width: 0.5, height: 0.5 };
 const BOTTOM_LEFT: Tile = { left: 0, top: 0.5, width: 0.5, height: 0.5 };
 const BOTTOM_RIGHT: Tile = { left: 0.5, top: 0.5, width: 0.5, height: 0.5 };
+/** The last window left after closing others fills the whole desk */
+const FULL: Tile = { left: 0, top: 0, width: 1, height: 1 };
 
 /** Tile patterns by number of tiled windows. Counts not listed here don't rearrange anything. */
 const LAYOUTS: Record<number, Tile[]> = {
   2: [HALF_LEFT, HALF_RIGHT],
-  3: [TOP_LEFT, TOP_RIGHT, BOTTOM_LEFT],
+  3: [HALF_RIGHT, TOP_LEFT, BOTTOM_LEFT],
   4: [TOP_LEFT, TOP_RIGHT, BOTTOM_LEFT, BOTTOM_RIGHT],
 };
 
-/** Spots a dragged window can be dropped into, by number of tiled windows (3 windows can use the empty quadrant) */
+/** Spots a dragged window can be dropped into, by number of tiled windows */
 const DROP_SLOTS: Record<number, Tile[]> = {
   2: [HALF_LEFT, HALF_RIGHT],
-  3: [TOP_LEFT, TOP_RIGHT, BOTTOM_LEFT, BOTTOM_RIGHT],
+  3: [HALF_RIGHT, TOP_LEFT, BOTTOM_LEFT],
   4: [TOP_LEFT, TOP_RIGHT, BOTTOM_LEFT, BOTTOM_RIGHT],
 };
 
@@ -207,11 +212,27 @@ export function WindowManagerProvider({
           return { ...prev, opened, excluded, zOrder, layout };
         }),
       close: (id) =>
-        setState((prev) =>
-          prev.opened.includes(id)
-            ? { ...prev, opened: prev.opened.filter((w) => w !== id), zOrder: prev.zOrder.filter((w) => w !== id) }
-            : prev,
-        ),
+        setState((prev) => {
+          if (!prev.opened.includes(id)) return prev;
+          const opened = prev.opened.filter((w) => w !== id);
+          const zOrder = prev.zOrder.filter((w) => w !== id);
+
+          // Step the remaining windows down a level, but only if the closed one was part of the layout
+          // (closing a popup or a pinned window leaves everything where it is)
+          const wasTiled = !prev.excluded.has(id) && !prev.pinned.has(id);
+          const tiledIds = opened.filter((w) => !prev.excluded.has(w) && !prev.pinned.has(w));
+          const pattern = tiledIds.length === 1 ? [FULL] : LAYOUTS[tiledIds.length];
+          const layout =
+            tilingRef.current && wasTiled && pattern
+              ? {
+                  version: prev.layout.version + 1,
+                  tiles: Object.fromEntries(tiledIds.map((w, i) => [w, pattern[i]])),
+                  apply: tiledIds,
+                }
+              : prev.layout;
+
+          return { ...prev, opened, zOrder, layout };
+        }),
       focus: (id) =>
         setState((prev) =>
           !prev.zOrder.includes(id) || prev.zOrder[prev.zOrder.length - 1] === id
@@ -253,6 +274,145 @@ export function WindowManagerProvider({
 
 /* ------------------------------------------------------------------ */
 
+/** Below this width the info note opens centered on the screen instead of under the "i" */
+const INFO_CENTER_QUERY = '(max-width: 639px)';
+
+/**
+ * The little "i" beside a window's title. Hovering or focusing it shows a short explanation;
+ * clicking keeps it open (handy on touch screens) until you click elsewhere or press Escape.
+ * On small screens the note opens in the middle of the screen over a light shade instead,
+ * so it's never cut off by a narrow window or the screen edge.
+ */
+function WindowInfo({ children, windowTitle }: { children: ReactNode; windowTitle: ReactNode }) {
+  const popoverId = useId();
+  const wrapRef = useRef<HTMLSpanElement>(null);
+  const popoverRef = useRef<HTMLSpanElement>(null);
+  const [hovered, setHovered] = useState(false);
+  const [pinned, setPinned] = useState(false);
+  const open = hovered || pinned;
+
+  const [isSmall, setIsSmall] = useState(
+    () => typeof window !== 'undefined' && window.matchMedia(INFO_CENTER_QUERY).matches,
+  );
+  useEffect(() => {
+    const media = window.matchMedia(INFO_CENTER_QUERY);
+    const onChange = () => setIsSmall(media.matches);
+    media.addEventListener('change', onChange);
+    return () => media.removeEventListener('change', onChange);
+  }, []);
+
+  const close = () => {
+    setPinned(false);
+    setHovered(false);
+  };
+
+  // While pinned open: a click anywhere else or Escape closes it
+  useEffect(() => {
+    if (!pinned) return;
+    const onPointer = (e: PointerEvent) => {
+      const target = e.target as Node;
+      // The centered note lives outside the button's wrapper, so check both
+      if (!wrapRef.current?.contains(target) && !popoverRef.current?.contains(target)) close();
+    };
+    const onKey = (e: globalThis.KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault(); // so it doesn't also close a popup or leave full screen
+        close();
+      }
+    };
+    document.addEventListener('pointerdown', onPointer);
+    document.addEventListener('keydown', onKey, true);
+    return () => {
+      document.removeEventListener('pointerdown', onPointer);
+      document.removeEventListener('keydown', onKey, true);
+    };
+  }, [pinned]);
+
+  return (
+    <span
+      ref={wrapRef}
+      className="relative shrink-0 flex"
+      onPointerEnter={(e) => e.pointerType === 'mouse' && setHovered(true)}
+      onPointerLeave={() => setHovered(false)}
+    >
+      <button
+        type="button"
+        onClick={() => setPinned((p) => !p)}
+        // Small screens open by tap only; focus there would make a second tap unable to close it
+        onFocus={() => !isSmall && setHovered(true)}
+        onBlur={() => setHovered(false)}
+        aria-label={`About this window: ${typeof windowTitle === 'string' ? windowTitle : 'info'}`}
+        aria-expanded={open}
+        aria-describedby={open ? popoverId : undefined}
+        className={`w-6 h-6 p-0 flex items-center justify-center rounded-full border-2 border-[#3c3c3c]/70 [border-image:none] transition-colors ${
+          pinned ? 'bg-[#3c3c3c] text-[#FDF7F1]' : 'bg-transparent hover:bg-[#FDF7F1]/70'
+        }`}
+      >
+        <svg viewBox="0 0 20 20" className="w-3.5 h-3.5" aria-hidden="true">
+          <circle cx="10" cy="5" r="1.6" fill="currentColor" />
+          <path d="M10 9v7" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" />
+        </svg>
+      </button>
+
+      {open && !isSmall && (
+        // Big screens: drops down under the "i"
+        <span
+          id={popoverId}
+          role="tooltip"
+          className="absolute left-0 top-full mt-2 z-40 w-64 max-w-[70vw] p-3 rounded-md border-2 border-[#3c3c3c] bg-[#FFFDFA] text-sm font-normal leading-snug whitespace-normal shadow-[3px_4px_0_rgba(60,60,60,0.25)] motion-safe:transition motion-safe:duration-150 starting:opacity-0 starting:-translate-y-1"
+        >
+          {children}
+        </span>
+      )}
+
+      {open &&
+        isSmall &&
+        // Small screens: centered on the screen. Rendered at the page root so no window can clip it.
+        createPortal(
+          <>
+            <span
+              aria-hidden="true"
+              onPointerDown={close}
+              className="fixed inset-0 z-[79] bg-[#3c3c3c]/25 motion-safe:transition-opacity motion-safe:duration-150 starting:opacity-0"
+            />
+            <span
+              ref={popoverRef}
+              id={popoverId}
+              // A small dialog here, since it has its own close button
+              role="dialog"
+              className="fixed left-1/2 top-1/2 z-[80] -translate-x-1/2 -translate-y-1/2 w-[min(20rem,calc(100vw-2rem))] flex flex-col gap-3 p-4 rounded-md border-2 border-[#3c3c3c] bg-[#FFFDFA] font-sans text-base text-[#3c3c3c] leading-snug shadow-[4px_6px_0_rgba(60,60,60,0.3)] motion-safe:transition motion-safe:duration-150 starting:opacity-0 starting:scale-95"
+            >
+              <span className="font-bold">{windowTitle}</span>
+              <span>{children}</span>
+              <button
+                type="button"
+                onClick={close}
+                className="self-end px-3 py-1 text-sm rounded-md border-2 border-[#3c3c3c] [border-image:none] bg-[#FDF7F1] font-sans"
+              >
+                Got it
+              </button>
+            </span>
+          </>,
+          document.body,
+        )}
+    </span>
+  );
+}
+
+/**
+ * Title bar colors, one per kind of window, so several open windows are easy to tell apart.
+ * Pass one as `accent`. Soft enough that the dark title text and buttons stay readable.
+ */
+export const WINDOW_ACCENTS = {
+  sand: '#EADBC8', // default (main windows)
+  sky: '#BFD8EE',
+  mint: '#C6E5C9',
+  peach: '#F6CFA8',
+  lilac: '#D9CBEE',
+  butter: '#F2E2A6',
+  rose: '#F2C9C4',
+} as const;
+
 /** A fixed size in px, or a function that works it out from the desk area's size when the window opens */
 export type InitialSize =
   | { width: number; height: number }
@@ -261,6 +421,10 @@ export type InitialSize =
 interface AppWindowProps {
   /** Text shown in the title bar */
   title?: ReactNode;
+  /** Title bar color, e.g. WINDOW_ACCENTS.sky. Defaults to sand. */
+  accent?: string;
+  /** Short explanation of what this window is for, shown from an "i" button beside the title */
+  info?: ReactNode;
   /** Stable id for the window manager. Optional; one is generated if left out. */
   id?: string;
   /**
@@ -309,8 +473,19 @@ const KEYBOARD_STEP = 16;
 /** Body fill. A shade lighter than the page (#FDF7F1) so the window reads as a solid sheet, not a hole. */
 const BODY_BG = 'bg-[#FFFDFA]';
 
-/** How far the window's fill sits inside the hand-drawn border. Nudge this if the fill peeks past the line. */
-const SURFACE_INSET = 5;
+/**
+ * Space between the window's box and its visible edge. Leaves room for the resize handles
+ * (which straddle the box edge) and the drop shadow.
+ */
+const SURFACE_INSET = 4;
+
+/**
+ * The window's frame: a real border drawn on the fill itself, so the fill always reaches the line
+ * exactly, at any size. (doodle.css's image border wobbles around inside a 10px band, so no fixed
+ * inset could line a fill up with it everywhere.) Uneven corner radii keep the hand-drawn feel.
+ * Change the radii to make it more or less wobbly.
+ */
+const FRAME = 'border-[2.5px] border-[#3c3c3c] rounded-[14px_7px_16px_8px/8px_16px_7px_14px]';
 
 /** While dragging, keep at least this much of the window on screen so it can always be grabbed again */
 const DRAG_KEEP_VISIBLE = 80;
@@ -388,6 +563,8 @@ function usePrefersReducedMotion() {
 
 export default function AppWindow({
   title = 'Untitled',
+  accent = WINDOW_ACCENTS.sand,
+  info,
   id,
   open,
   children,
@@ -846,23 +1023,27 @@ export default function AppWindow({
       // Pops in when it first appears (or reopens)
       className={`relative starting:opacity-0 starting:scale-90 ${className}`}
     >
-      {/* SURFACE: the window's fill. Inset so its edges tuck under the hand-drawn line.
-          Full screen: square, edge to edge, no shadow. */}
+      {/* SURFACE: the window's fill and frame in one element, so they can never separate.
+          Full screen: square, edge to edge, no frame or shadow. */}
       <div
         style={{ inset: isFullscreen ? 0 : SURFACE_INSET }}
         className={`absolute flex flex-col overflow-hidden bg-[#FDF7F1] ${
-          isFullscreen ? '' : isDragging ? SHADOW_LIFTED : SHADOW_RESTING
+          isFullscreen ? '' : `${FRAME} ${isDragging ? SHADOW_LIFTED : SHADOW_RESTING}`
         }`}
       >
         {/* TITLE BAR: drag it to move the window */}
         <div
           onPointerDown={startMove}
           onDoubleClick={handleTitleDoubleClick}
-          className={`shrink-0 flex items-center gap-3 pl-4 pr-2.5 py-2 bg-[#EADBC8] touch-none select-none ${
+          style={{ backgroundColor: accent }}
+          className={`shrink-0 flex items-center gap-3 pl-4 pr-2.5 py-2 touch-none select-none ${
             canMove ? (isDragging ? 'cursor-grabbing' : 'cursor-grab') : ''
           }`}
         >
-          <p id={titleId} className="flex-1 min-w-0 m-0 truncate text-lg">{title}</p>
+          <div className="flex-1 min-w-0 flex items-center gap-2">
+            <p id={titleId} className="min-w-0 m-0 truncate text-lg font-bold">{title}</p>
+            {info && <WindowInfo windowTitle={title}>{info}</WindowInfo>}
+          </div>
 
           <div className="flex items-center gap-2">
             {pinState !== 'hidden' && (
@@ -950,12 +1131,6 @@ export default function AppWindow({
           </>
         )}
       </div>
-
-      {/* Hand-drawn frame, painted over the surface's edges. Left out in full screen,
-          where its rounded corners would leave gaps at the corners of the screen. */}
-      {!isFullscreen && (
-        <div aria-hidden="true" className="doodle-border pointer-events-none absolute inset-0 z-10" />
-      )}
 
       {canResize && (
         <>
