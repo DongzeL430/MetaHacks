@@ -10,7 +10,9 @@
  *  - Harvest a ready crop for pennies; the soil stays, ready for the next seed.
  *  - Decorations go on grass. Clearing one gives nothing back.
  *  - A visitor can help once a day: watering a dry seed starts it, and watering a growing crop
- *    takes a quarter of its growing time off. The owner sees who helped.
+ *    takes a quarter of its growing time off. The owner sees who helped and can thank them.
+ *  - The village lists the school's crofts (only students who've played), and the valley counts
+ *    the week's harvests and help. "Here now" shows who's on a croft at the moment.
  *  - Growth runs on the server's clock, so crops keep growing while the site is closed.
  */
 
@@ -72,10 +74,44 @@ export interface CroftTile {
 
 /** Someone who helped on this croft recently */
 export interface CroftHelp {
+  /** For thanking it (the owner only) */
+  id: number;
   helperName: string;
   crop: CropKey;
   /** ISO time */
   at: string;
+  /** The owner already thanked them */
+  thanked: boolean;
+}
+
+/** A thank-you you got for helping on someone's croft */
+export interface CroftThanks {
+  ownerName: string;
+  crop: CropKey;
+  /** ISO time */
+  at: string;
+}
+
+/** A croft in your school's village (only students who've played appear) */
+export interface VillageCroft {
+  ownerId: string;
+  ownerName: string;
+  /** Public link to their avatar, if they have one */
+  avatar?: string;
+  /** Seeds waiting for water: where your help starts a crop */
+  drySeeds: number;
+  growing: number;
+  ready: number;
+  /** You already helped there today */
+  helpedToday: boolean;
+  connected: boolean;
+}
+
+/** This week in your school's valley (weeks start Monday) */
+export interface ValleyWeek {
+  harvests: number;
+  helps: number;
+  crofts: number;
 }
 
 /** A croft as the screen shows it: your own, or someone else's when visiting */
@@ -89,6 +125,8 @@ export interface CroftView {
   tiles: CroftTile[];
   /** Newest first, the last 10 */
   helpers: CroftHelp[];
+  /** Your own croft: thank-yous you got this week for helping elsewhere, newest first */
+  thanks: CroftThanks[];
   /** Visiting: you can still help today */
   canHelpToday: boolean;
 }
@@ -102,7 +140,9 @@ export type CroftAction =
   | { type: 'place'; index: number; decoration: DecorationKey }
   | { type: 'clear'; index: number }
   /** On someone else's croft, once a day */
-  | { type: 'help'; ownerId: string; index: number };
+  | { type: 'help'; ownerId: string; index: number }
+  /** Your own croft: thank someone who helped, once per help */
+  | { type: 'thank'; helpId: number };
 
 export type CropStage = 'seed' | 'sprout' | 'growing' | 'ready';
 
