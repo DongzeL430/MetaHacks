@@ -96,18 +96,28 @@ export default function LobbyBrowserWindow({
     .filter((l) => !q || l.subject.toLowerCase().includes(q))
     // Your own lobbies skip the matching criteria; only "Hide lobbies I'm in" removes them
     .filter((l) => (isMine(l) ? !filters.hideMine : passesFilters(l, filters, ctx)))
-    // Yours first, then everything else in its original order
-    .sort((a, b) => Number(isMine(b)) - Number(isMine(a)));
+    // Yours first, then the hosts who fit you best (public.lobby_matches); unranked ones last
+    .sort(
+      (a, b) =>
+        Number(isMine(b)) - Number(isMine(a)) ||
+        (a.match?.place ?? Number.MAX_SAFE_INTEGER) - (b.match?.place ?? Number.MAX_SAFE_INTEGER),
+    );
 
   // Lobbies the search would show but the filters hide
   const hiddenByFilters = lobbies.filter((l) => !q || l.subject.toLowerCase().includes(q)).length - shown.length;
   const showAll = () =>
     setFilters({ ...DEFAULT_FILTERS, schedule: false, subjects: false, size: false, openSpots: false, hideMine: false });
 
-  const tagsFor = (lobby: Lobby) => [
-    ...(scheduleKnown && fitsSchedule(lobby, ctx.freeSet) ? ['Fits your free time'] : []),
-    ...(subjectsKnown && matchesSubjects(lobby, subjects) ? ['Your subject'] : []),
-  ];
+  const tagsFor = (lobby: Lobby) => {
+    const reasons = lobby.match?.reasons ?? [];
+    // "Covers a course…" already says it's your subject
+    const coversCourse = reasons.some((r) => r.startsWith('Covers a course'));
+    return [
+      ...reasons,
+      ...(scheduleKnown && fitsSchedule(lobby, ctx.freeSet) ? ['Fits your free time'] : []),
+      ...(!coversCourse && subjectsKnown && matchesSubjects(lobby, subjects) ? ['Your subject'] : []),
+    ];
+  };
 
   const checkboxRow = 'flex items-start gap-2 text-sm';
 
@@ -116,7 +126,7 @@ export default function LobbyBrowserWindow({
       id={id}
       title="Study Lobbies"
       accent={WINDOW_ACCENTS.sky}
-      info="Browse study sessions other students are hosting. Use Filters to match lobbies to your free time, subjects and group size, or host your own."
+      info="Browse study sessions other students are hosting, best fit first: hosts with your courses, study habits and quick picks come to the top, and nobody’s ratings or answers are shown. Use Filters to match lobbies to your free time, subjects and group size, or host your own."
       open={open}
       onClose={onClose}
       controls={{ close: 'enabled', fullscreen: 'enabled' }}

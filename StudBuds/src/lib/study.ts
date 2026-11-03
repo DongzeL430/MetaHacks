@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { callFunction } from './edgeFunctions.ts';
 import { avatarUrlOf } from './profile.ts';
 import { rangesToSlots, slotsToRange } from './slots.ts';
 import { supabase } from './supabase.ts';
@@ -30,16 +31,20 @@ export function useStudyData() {
     if (!me) return;
     const local = (id: string) => (id === me ? ME : id);
 
-    const [lobbies, members, cards, links] = await Promise.all([
+    const [lobbies, members, cards, links, matches] = await Promise.all([
       supabase.from('lobbies').select('id, host_id, subject, max_size, location, weekday, starts_at, ends_at, locked'),
       supabase.from('lobby_members').select('lobby_id, user_id, role, joined_at').order('joined_at'),
       supabase.rpc('lobby_people'),
       supabase.from('connections').select('requester_id, addressee_id, status'),
+      // Best fit first: the host's courses, habits and quick picks next to this student's
+      supabase.rpc('lobby_matches'),
     ]);
     if (lobbies.error || members.error || cards.error || links.error) {
       setError('Couldn’t load lobbies right now. Check your connection.');
       return;
     }
+    // Without the ranking, lobbies still load, just unranked
+    const matchOf = new Map((matches.data ?? []).map((m) => [m.lobby_id, { place: m.place, reasons: m.reasons ?? [] }]));
 
     // Friend-request style statuses, from this student's side. A request they sent stays "sent"
     // even if it was declined: the database never tells the sender.
@@ -65,6 +70,7 @@ export function useStudyData() {
           timeSlots: rangesToSlots([{ weekday: l.weekday, starts_at: l.starts_at, ends_at: l.ends_at }]),
           location: l.location,
           locked: l.locked,
+          match: matchOf.get(l.id),
         };
       }),
     }));
@@ -134,6 +140,13 @@ export function useStudyData() {
             location: action.lobby.location,
             ...block,
           });
+          // A subject that doesn't name a course ("orgo midterm cram") gets one from Muse, so the
+          // session ranks first for students who need that course. Free when it's already linked.
+          if (!result.error) {
+            callFunction('link-session', { lobbyId: action.lobby.id }).catch((err) =>
+              console.warn('session not linked to a course', err),
+            );
+          }
           break;
         }
         case 'close-lobby':

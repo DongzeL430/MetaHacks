@@ -42,6 +42,11 @@ export interface Lobby {
   location: string;
   /** The host stopped taking new join requests. Requests already waiting stay. */
   locked?: boolean;
+  /**
+   * How well the host fits you (public.lobby_matches): `place` 1 is the best fit, with short
+   * reasons like "Covers a course you want help with". Not set for your own lobby.
+   */
+  match?: { place: number; reasons: string[] };
 }
 
 /** Friend-request style: 'sent' = you asked them, 'received' = they asked you */

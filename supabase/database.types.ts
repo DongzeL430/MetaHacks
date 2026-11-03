@@ -365,6 +365,7 @@ export type Database = {
       }
       lobbies: {
         Row: {
+          course_id: number | null
           created_at: string
           ends_at: string
           host_id: string
@@ -378,6 +379,7 @@ export type Database = {
           weekday: number
         }
         Insert: {
+          course_id?: number | null
           created_at?: string
           ends_at: string
           host_id: string
@@ -391,6 +393,7 @@ export type Database = {
           weekday: number
         }
         Update: {
+          course_id?: number | null
           created_at?: string
           ends_at?: string
           host_id?: string
@@ -404,6 +407,13 @@ export type Database = {
           weekday?: number
         }
         Relationships: [
+          {
+            foreignKeyName: "lobbies_course_id_fkey"
+            columns: ["course_id"]
+            isOneToOne: false
+            referencedRelation: "courses"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "lobbies_host_id_fkey"
             columns: ["host_id"]
@@ -1181,6 +1191,14 @@ export type Database = {
         }[]
       }
       leave_lobby: { Args: { lobby_id: string }; Returns: undefined }
+      lobby_matches: {
+        Args: never
+        Returns: {
+          lobby_id: string
+          place: number
+          reasons: string[]
+        }[]
+      }
       lobby_people: {
         Args: never
         Returns: {
