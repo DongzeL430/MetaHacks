@@ -15,7 +15,8 @@ import { SURVEY_SECTIONS } from './dataFiles/SurveySections.ts';
 /** The pre-survey, saving each page as the student goes */
 function SurveyPage() {
   const navigate = useNavigate();
-  // At sign-up, Muse starts finding this school's study spots (once per school) for the host form
+  // Muse starts finding the school's study spots when the account is created (AuthPage). This
+  // covers a student who confirmed their email somewhere else; it shares the same request.
   useEffect(() => prefetchStudySpots(), []);
   return (
     <PreSurveyFlow
