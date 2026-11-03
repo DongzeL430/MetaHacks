@@ -2,8 +2,8 @@
 
 Finding someone to study with in college is weirdly hard. Group chats are noisy, asking a stranger
 after class is awkward, and most "study buddy" apps want your name, photo and major before they show
-you anyone. StudBuds goes the other way: you're a nickname and a drawing, you only see students at
-your own school, and the app puts the sessions most likely to suit you at the top.
+you anyone. StudBuds goes the other way. You're a nickname and a drawing, and the app puts the
+sessions most likely to suit you at the top.
 
 **Live site:** _(Netlify link goes here)_
 
@@ -25,7 +25,8 @@ After that you land on Home, which works like a small desktop:
 
 - **Study Lobbies** lists sessions other students are hosting, best fit first. Each one says why it's
   there: "Covers a course you want help with", "Similar study habits", "You agreed on 6 of 8 quick
-  picks".
+  picks". It starts with your own school. Turn off "Only my school" in Filters to see sessions at
+  other schools too.
 - **Host a session** picks a subject, a time and a place. The places are real study spots at your
   school that Muse found on your school's own website.
 - Inside a lobby you can ask to join, chat live with the group, invite your connections, and connect
@@ -48,11 +49,12 @@ After that you land on Home, which works like a small desktop:
    the courses page if you want to see Muse at work.
 3. On Home, the welcome tour shows you around. Open Study Lobbies and host a session.
 4. To see the live parts (join requests, chat, connections, croft visits), sign up a second account
-   at the same school in another browser or a private window, and join the first account's session.
+   in another browser or a private window, and join the first account's session. If the two
+   accounts are at different schools, turn off "Only my school" in the lobby Filters first.
 5. Make a theme from the paintbrush in the nav bar, then open Upcoming and Croft.
 
-For testing, Vanderbilt and RIT count as one school, so a teammate at each could try it together.
-Every other school only sees itself.
+For testing, Vanderbilt and RIT count as one school in the "Only my school" filter, so a teammate at
+each could try it together.
 
 ## Where Muse does the work
 
@@ -75,7 +77,7 @@ sprites (see `docs/croft-muse-code.md`).
 
 ## Privacy and safety choices
 
-- You only see students at your own school, and only after they finish the survey.
+- Students only show up once they've finished the survey, so half-made accounts never appear.
 - Cards show a nickname, an avatar, course names, the courses someone wants help with, and the free
   time you share. Grades, confidence ratings, survey answers, email and contact details are never
   shown to anyone.
