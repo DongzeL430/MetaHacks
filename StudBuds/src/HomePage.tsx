@@ -6,6 +6,8 @@ import type { TaskbarApp } from './components/Taskbar';
 import StudyLayout from './components/StudyLayout';
 import ThemePromptWindow from './components/ThemePromptWindow';
 import { useUserTheme } from './utils/UserTheme';
+import { DEFAULT_MUSIC } from './utils/Music';
+import { useThemeMusic } from './utils/MusicPlayer';
 import ProfileEditorWindow from './components/ProfileEditorWindow';
 import type { MyProfile } from './dataFiles/StudyData';
 import { ME } from './dataFiles/StudyData';
@@ -114,6 +116,8 @@ export default function HomePage({
   // The user's theme: loaded from Supabase, applied to the whole page, saved when it changes
   const theme = useUserTheme();
   const [themePromptOpen, setThemePromptOpen] = useState(false);
+  // The custom theme's own piece, or the default one (also for themes made before music)
+  const music = useThemeMusic((theme.choice === 'custom' ? theme.savedTheme?.music : undefined) ?? DEFAULT_MUSIC);
 
   // The user's own profile. Saving it updates the nav bar, lobby filters and host form right away.
   const [profile, setProfile] = useState<MyProfile>(() => ({
@@ -180,6 +184,13 @@ export default function HomePage({
         avatar={avatar}
         right={taskbarRight}
         apps={taskbarApps}
+        music={{
+          title: music.title,
+          volume: music.volume,
+          muted: music.muted,
+          onVolume: music.setVolume,
+          onToggleMute: music.toggleMute,
+        }}
         theme={{
           // The star shows as selected while its prompt is open
           active: themePromptOpen ? 'custom' : theme.choice,

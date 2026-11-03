@@ -56,6 +56,8 @@ interface TaskbarProps {
    * capsule with a sun (default theme) above a star (custom theme). `active` highlights the current one.
    */
   theme?: ThemeMenuProps;
+  /** Shows the speaker button next to the paintbrush: the piece playing, mute and volume */
+  music?: MusicMenuProps;
   /**
    * Makes the avatar and name clickable, e.g. to open the profile editor.
    * `open` makes it look pressed while that window is open.
@@ -71,6 +73,16 @@ interface ThemeMenuProps {
   active: ThemeChoice;
   onSelectDefault: () => void;
   onSelectCustom: () => void;
+}
+
+interface MusicMenuProps {
+  /** The piece playing now */
+  title: string;
+  /** 0 to 1 */
+  volume: number;
+  muted: boolean;
+  onVolume: (volume: number) => void;
+  onToggleMute: () => void;
 }
 
 function SunIcon() {
@@ -172,6 +184,101 @@ function ThemeMenu({ active, onSelectDefault, onSelectCustom }: ThemeMenuProps) 
   );
 }
 
+/** Speaker, with sound waves or, when muted, a cross */
+function SpeakerIcon({ muted, className = 'w-5 h-5 md:w-6 md:h-6' }: { muted: boolean; className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z" fill="currentColor" />
+      {muted ? <path d="M16 9.5l5 5M21 9.5l-5 5" /> : <path d="M15.5 9.2a4 4 0 0 1 0 5.6M18.3 6.6a7.6 7.6 0 0 1 0 10.8" />}
+    </svg>
+  );
+}
+
+/** The speaker button and the small panel it drops down: what's playing, mute, and volume */
+function MusicMenu({ title, volume, muted, onVolume, onToggleMute }: MusicMenuProps) {
+  const menuId = useId();
+  const wrapRef = useRef<HTMLDivElement>(null);
+  const [open, setOpen] = useState(false);
+
+  // Close on a click anywhere else, or Escape
+  useEffect(() => {
+    if (!open) return;
+    const onPointer = (e: PointerEvent) => {
+      if (!wrapRef.current?.contains(e.target as Node)) setOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setOpen(false);
+    };
+    document.addEventListener('pointerdown', onPointer);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('pointerdown', onPointer);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [open]);
+
+  return (
+    <div ref={wrapRef} className="relative shrink-0">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        aria-expanded={open}
+        aria-controls={menuId}
+        aria-label={muted ? 'Music (muted)' : 'Music'}
+        title={muted ? 'Music (muted)' : `Music: ${title}`}
+        className={[
+          'w-10 h-10 md:w-11 md:h-11 p-0 flex items-center justify-center rounded-full',
+          'border-0 [border-image:none] text-nav-ink transition-colors duration-150',
+          open ? 'bg-paper/25' : 'bg-paper/10 hover:bg-paper/20',
+        ].join(' ')}
+      >
+        <SpeakerIcon muted={muted} />
+      </button>
+
+      {open && (
+        <div
+          id={menuId}
+          role="group"
+          aria-label="Music"
+          // Lines up with the bar's right end, so it never runs off a narrow screen
+          className="absolute right-0 top-full mt-3 w-60 flex flex-col gap-2 p-3 rounded-2xl bg-nav text-nav-ink shadow-[0_10px_24px_-10px_rgba(40,30,20,0.6)] motion-safe:transition motion-safe:duration-150 starting:opacity-0 starting:-translate-y-1"
+        >
+          <p className="m-0 text-xs opacity-80">Now playing</p>
+          <p className="m-0 -mt-1.5 text-sm truncate" title={title}>
+            {title}
+          </p>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={onToggleMute}
+              aria-pressed={muted}
+              aria-label="Mute music"
+              title={muted ? 'Unmute' : 'Mute'}
+              className={[
+                'shrink-0 w-9 h-9 p-0 flex items-center justify-center rounded-full',
+                'border-0 [border-image:none] text-nav-ink transition-colors duration-150',
+                muted ? 'bg-paper/25' : 'bg-transparent hover:bg-paper/15',
+              ].join(' ')}
+            >
+              <SpeakerIcon muted={muted} className="w-5 h-5" />
+            </button>
+            <input
+              type="range"
+              min={0}
+              max={100}
+              step={1}
+              value={muted ? 0 : Math.round(volume * 100)}
+              onChange={(e) => onVolume(Number(e.target.value) / 100)}
+              aria-label="Music volume"
+              className="flex-1 min-w-0 accent-accent"
+            />
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 /** Paintbrush, drawn at 24x24 */
 function PaintbrushIcon() {
   return (
@@ -227,6 +334,7 @@ export default function Taskbar({
   visibleApps,
   right,
   theme,
+  music,
   profile,
   className = '',
 }: TaskbarProps) {
@@ -297,7 +405,8 @@ export default function Taskbar({
 
         {right && <div className="shrink-0 hidden sm:flex items-center gap-3 px-3 text-sm">{right}</div>}
 
-        {/* Very right: theme menu */}
+        {/* Very right: music, then the theme menu */}
+        {music && <MusicMenu {...music} />}
         {theme && <ThemeMenu {...theme} />}
       </div>
     </header>
