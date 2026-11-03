@@ -54,8 +54,16 @@ interface PreSurveyFlowProps {
   onAvailabilitySubmit?: (slots: string[], timezone: string) => void | Promise<void>;
   /** Runs when the Courses page is submitted. Same rules as onAvailabilitySubmit. */
   onAcademicsSubmit?: (academics: AcademicProfile) => void | Promise<void>;
+  /** Runs when a questions page (not the last) is submitted, with every answer so far. Same rules. */
+  onAnswersSubmit?: (answers: Record<string, string>) => void | Promise<void>;
   /** Runs when the last page is submitted, with everything collected */
   onFinish?: (result: PreSurveyResult) => void | Promise<void>;
+  /** What was saved before (a reload partway through): fills the pages and starts at the first unfinished one */
+  initial?: {
+    availability: string[];
+    academics: AcademicProfile;
+    answers: Record<string, string>;
+  };
   /** Shows a "Go to StudBuds" button on the final page */
   onDone?: () => void;
 }
@@ -84,7 +92,7 @@ const DONE_PAGE = {
 };
 
 export default function PreSurveyFlow({
-  userName = 'Generated Name',
+  userName = '',
   avatar,
   taskbarRight,
   sections = SURVEY_SECTIONS,
@@ -93,8 +101,10 @@ export default function PreSurveyFlow({
   matchCourses,
   onAvailabilitySubmit,
   onAcademicsSubmit,
+  onAnswersSubmit,
   onFinish,
   onDone,
+  initial,
 }: PreSurveyFlowProps) {
   const steps = useMemo(() => {
     const list: Step[] = [{ kind: 'calendar' }];
@@ -106,11 +116,26 @@ export default function PreSurveyFlow({
   const total = steps.length;
   const timezone = useMemo(() => Intl.DateTimeFormat().resolvedOptions().timeZone, []);
 
-  const [step, setStep] = useState(0);
-  const [completed, setCompleted] = useState<boolean[]>(() => Array(total).fill(false));
-  const [availability, setAvailability] = useState<string[]>([]);
-  const [academics, setAcademics] = useState<AcademicProfile>(emptyAcademics);
-  const [answers, setAnswers] = useState<Record<string, string>>({});
+  // A page saved before counts as done, so a reload lands on the first page still to fill in
+  const savedDone = (s: Step): boolean => {
+    if (!initial) return false;
+    switch (s.kind) {
+      case 'calendar':
+        return initial.availability.length > 0;
+      case 'courses':
+        return validateAcademics(initial.academics) === null;
+      case 'questions':
+        return s.section.questions.every((q) => !!initial.answers[q.id]);
+    }
+  };
+  const [completed, setCompleted] = useState<boolean[]>(() => steps.map(savedDone));
+  const [step, setStep] = useState(() => {
+    const first = steps.findIndex((s) => !savedDone(s));
+    return first === -1 ? total - 1 : first;
+  });
+  const [availability, setAvailability] = useState<string[]>(() => initial?.availability ?? []);
+  const [academics, setAcademics] = useState<AcademicProfile>(() => initial?.academics ?? emptyAcademics());
+  const [answers, setAnswers] = useState<Record<string, string>>(() => initial?.answers ?? {});
   const [missing, setMissing] = useState<Set<string>>(() => new Set());
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -299,6 +324,7 @@ export default function PreSurveyFlow({
         if (await matchTypedCourses()) return;
         await onAcademicsSubmit?.(cleanAcademics(academics));
       }
+      if (current.kind === 'questions' && !isLast) await onAnswersSubmit?.(answers);
       if (isLast) {
         await onFinish?.({ availability, timezone, academics: cleanAcademics(academics), answers });
       }

@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { Navigate, Routes, Route, useLocation, useNavigate } from 'react-router';
 import AuthPage from './AuthPage.tsx';
 import HomePage from './HomePage.tsx';
@@ -9,7 +9,8 @@ import type { TourStep } from './components/Tour.tsx';
 import { supabase } from './lib/supabase.ts';
 import { finishOnboarding, saveAnswers, saveAvailability } from './lib/onboarding.ts';
 import { findCourses, matchCourses, saveAcademics } from './lib/courses.ts';
-import { deleteMyAccount, useMyProfile } from './lib/profile.ts';
+import { deleteMyAccount, loadSurveyProgress, useMyProfile } from './lib/profile.ts';
+import type { SurveyProgress } from './lib/profile.ts';
 import { useStudyData } from './lib/study.ts';
 import { prefetchStudySpots, useStudySpots } from './lib/spots.ts';
 import { SURVEY_SECTIONS } from './dataFiles/SurveySections.ts';
@@ -39,14 +40,40 @@ function SurveyPage() {
   // Muse starts finding the school's study spots when the account is created (AuthPage). This
   // covers a student who confirmed their email somewhere else; it shares the same request.
   useEffect(() => prefetchStudySpots(), []);
+  // Pages already saved (a reload partway through). If they can't be read, it starts fresh.
+  const [saved, setSaved] = useState<SurveyProgress | null | 'none'>(null);
+  useEffect(() => {
+    loadSurveyProgress().then(setSaved, (err) => {
+      console.warn('survey progress not loaded', err);
+      setSaved('none');
+    });
+  }, []);
+  if (saved === null) {
+    return (
+      <main className="doodle min-h-dvh flex items-center justify-center p-6">
+        <p role="status" className="m-0 text-lg">
+          Loading your survey…
+        </p>
+      </main>
+    );
+  }
+  const progress = saved === 'none' ? undefined : saved;
   return (
     <>
       {tour.status === 'open' && <Tour steps={SURVEY_TOUR} onClose={tour.close} />}
       <PreSurveyFlow
+        userName={progress?.nickname}
+        avatar={
+          progress?.avatarUrl ? (
+            <img src={progress.avatarUrl} alt="" className="w-full h-full object-cover rounded-none border-0 [border-image:none]" />
+          ) : undefined
+        }
+        initial={progress}
         onAvailabilitySubmit={(slots) => saveAvailability(slots)}
         suggestCourses={findCourses}
         matchCourses={matchCourses}
         onAcademicsSubmit={saveAcademics}
+        onAnswersSubmit={(answers) => saveAnswers(answers, SURVEY_SECTIONS)}
         onFinish={async ({ answers }) => {
           await saveAnswers(answers, SURVEY_SECTIONS);
           await finishOnboarding();

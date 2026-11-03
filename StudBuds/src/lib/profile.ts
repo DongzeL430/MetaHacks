@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { applyMatches, cleanAcademics, namesToMatch } from '../components/CoursesSection';
+import { applyMatches, cleanAcademics, emptyAcademics, namesToMatch } from '../components/CoursesSection';
 import type { AcademicProfile, CourseEntry, MajorEntry } from '../components/CoursesSection';
 import { SURVEY_SECTIONS } from '../dataFiles/SurveySections.ts';
 import type { MyProfile } from '../dataFiles/StudyData';
@@ -59,6 +59,87 @@ function cleanContact(contact: MyProfile['contact']) {
   return { instagram: instagram || null, discord: discord || null, phone: phone || null };
 }
 
+const COURSE_COLUMNS = 'id, status, confidence, grade, custom_name, courses(code, title)';
+
+interface SavedCourseRow {
+  id: number;
+  status: string;
+  confidence: number;
+  grade: string | null;
+  custom_name: string | null;
+  courses: { code: string; title: string | null } | null;
+}
+
+/** Saved user_courses rows as the Courses page's rows */
+function coursesFromRows(rows: SavedCourseRow[]): CourseEntry[] {
+  return rows.map((c) => ({
+    id: String(c.id),
+    name: c.courses ? courseLabel(c.courses) : (c.custom_name ?? ''),
+    status: c.status === 'completed' ? 'taken' : 'taking',
+    confidence: c.confidence,
+    grade: c.grade ?? '',
+    code: c.courses?.code,
+    // A course kept under its typed name was already looked for in the catalog
+    checked: !c.courses,
+  }));
+}
+
+/** Saved option numbers back to the option text the survey shows */
+function answersFromRows(rows: { choice: number; survey_questions: { key: string } | null }[]): Record<string, string> {
+  const picked: Record<string, string> = {};
+  for (const a of rows) {
+    const q = SURVEY_QUESTIONS.find((x) => x.id === a.survey_questions?.key);
+    const option = q?.options[a.choice - 1];
+    if (q && option) picked[q.id] = option;
+  }
+  return picked;
+}
+
+/** What a student saved in the pre-survey so far, so a reload picks up where they left off */
+export interface SurveyProgress {
+  nickname: string;
+  avatarUrl?: string;
+  availability: string[];
+  academics: AcademicProfile;
+  answers: Record<string, string>;
+}
+
+/**
+ * Loads the pre-survey's saved pages (free times, majors, minors and courses, answers) and the
+ * generated nickname for the nav bar. Throws if any read fails. Never draws an avatar: the first
+ * one is drawn on Home.
+ */
+export async function loadSurveyProgress(): Promise<SurveyProgress> {
+  const { data: session } = await supabase.auth.getSession();
+  const id = session.session?.user.id;
+  if (!id) throw new Error('Not signed in');
+  const [pub, slots, saved, picks, programs] = await Promise.all([
+    supabase.from('public_profiles').select('nickname, avatar_path').eq('id', id).single(),
+    supabase.from('availability_slots').select('weekday, starts_at, ends_at'),
+    supabase.from('user_courses').select(COURSE_COLUMNS).order('id'),
+    supabase.from('survey_answers').select('choice, survey_questions(key)'),
+    supabase.from('user_programs').select('kind, name, track').order('position'),
+  ]);
+  if (pub.error || slots.error || saved.error || picks.error || programs.error) throw new Error('Couldn’t load your survey');
+
+  const blank = emptyAcademics();
+  const majors = (programs.data ?? []).filter((p) => p.kind === 'major').map((p) => ({ name: p.name, track: p.track ?? '' }));
+  const minors = (programs.data ?? []).filter((p) => p.kind === 'minor').map((p) => p.name);
+  const courses = coursesFromRows(saved.data ?? []);
+  return {
+    nickname: pub.data.nickname,
+    avatarUrl: avatarUrlOf(pub.data.avatar_path),
+    availability: rangesToSlots(slots.data ?? []),
+    academics: {
+      ...blank,
+      majors: majors.length > 0 ? majors : blank.majors,
+      minors: minors.length > 0 ? minors : blank.minors,
+      courses: courses.length > 0 ? courses : blank.courses,
+    },
+    answers: answersFromRows(picks.data ?? []),
+  };
+}
+
 // One first-avatar request per student per page load, even if the hook mounts twice (React dev
 // mode does). Per student, so a second account signed up in the same tab still gets one.
 const starterRequested = new Set<string>();
@@ -102,7 +183,7 @@ export function useMyProfile() {
         supabase.from('profiles').select('instagram, discord, phone').eq('id', id).single(),
         supabase.from('availability_slots').select('weekday, starts_at, ends_at'),
         supabase.rpc('identity_changes_left'),
-        supabase.from('user_courses').select('id, status, confidence, grade, custom_name, courses(code, title)').order('id'),
+        supabase.from('user_courses').select(COURSE_COLUMNS).order('id'),
         supabase.from('survey_answers').select('choice, survey_questions(key)'),
         supabase.from('user_programs').select('name, track').eq('kind', 'major').order('position'),
       ]);
@@ -114,26 +195,8 @@ export function useMyProfile() {
         return;
       }
       setFailed(false);
-      setCourses(
-        (saved.data ?? []).map((c) => ({
-          id: String(c.id),
-          name: c.courses ? courseLabel(c.courses) : (c.custom_name ?? ''),
-          status: c.status === 'completed' ? 'taken' : 'taking',
-          confidence: c.confidence,
-          grade: c.grade ?? '',
-          code: c.courses?.code,
-          // A course kept under its typed name was already looked for in the catalog
-          checked: !c.courses,
-        })),
-      );
-      // Saved option numbers back to the option text the survey shows
-      const picked: Record<string, string> = {};
-      for (const a of picks.data ?? []) {
-        const q = SURVEY_QUESTIONS.find((x) => x.id === a.survey_questions?.key);
-        const option = q?.options[a.choice - 1];
-        if (q && option) picked[q.id] = option;
-      }
-      setAnswers(picked);
+      setCourses(coursesFromRows(saved.data ?? []));
+      setAnswers(answersFromRows(picks.data ?? []));
       setMajors((programs.data ?? []).map((p) => ({ name: p.name, track: p.track ?? '' })));
       setNickname(pub.data?.nickname ?? '');
       setAvatarPath(pub.data?.avatar_path ?? null);
