@@ -18,7 +18,7 @@ export interface ScheduleGrid {
   slotMinutes: 15 | 30 | 60;
 }
 
-const DEFAULT_GRID: ScheduleGrid = { startHour: 9, endHour: 17, slotMinutes: 30 };
+const DEFAULT_GRID: ScheduleGrid = { startHour: 8, endHour: 23, slotMinutes: 30 };
 
 export interface NewLobbyDetails {
   subject: string;
@@ -39,7 +39,7 @@ interface HostSessionWindowProps {
   locationSuggestions?: string[];
   /** Subjects offered while typing. Leave out for the defaults. */
   subjectSuggestions?: string[];
-  /** Hours shown on the schedule. Defaults to the availability calendar's 9 AM to 5 PM in 30-minute slots. */
+  /** Hours shown on the schedule. Defaults to the availability calendar’s 8 AM to 11 PM in 30-minute slots. */
   grid?: ScheduleGrid;
   onCreate: (details: NewLobbyDetails) => void;
 }

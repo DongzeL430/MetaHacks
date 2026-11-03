@@ -49,7 +49,7 @@ interface AvailabilityCalendarProps {
   weekStartsOn?: 0 | 1;
   /** First visible hour, 0-23 */
   startHour?: number;
-  /** Last hour (exclusive): 17 means the final slot ends at 5 PM */
+  /** Last hour (exclusive): 23 means the final slot ends at 11 PM */
   endHour?: number;
   slotMinutes?: 15 | 30 | 60;
   /** Slots that start out available */
@@ -97,8 +97,8 @@ export default function AvailabilityCalendar({
   name = 'availability',
   days,
   weekStartsOn = 0,
-  startHour = 9,
-  endHour = 17,
+  startHour = 8,
+  endHour = 23,
   slotMinutes = 30,
   defaultValue = [],
   onChange,
