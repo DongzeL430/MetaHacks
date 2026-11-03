@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { Navigate, Routes, Route, useNavigate } from 'react-router';
+import { Navigate, Routes, Route, useLocation, useNavigate } from 'react-router';
 import AuthPage from './AuthPage.tsx';
 import HomePage from './HomePage.tsx';
 import PreSurveyFlow from './PresurveyFlow.tsx';
@@ -9,11 +9,15 @@ import { finishOnboarding, saveAnswers, saveAvailability } from './lib/onboardin
 import { findCourses, matchCourses, saveAcademics } from './lib/courses.ts';
 import { deleteMyAccount, useMyProfile } from './lib/profile.ts';
 import { useStudyData } from './lib/study.ts';
+import { prefetchStudySpots, useStudySpots } from './lib/spots.ts';
 import { SURVEY_SECTIONS } from './dataFiles/SurveySections.ts';
 
 /** The pre-survey, saving each page as the student goes */
 function SurveyPage() {
   const navigate = useNavigate();
+  // Muse starts finding the school's study spots when the account is created (AuthPage). This
+  // covers a student who confirmed their email somewhere else; it shares the same request.
+  useEffect(() => prefetchStudySpots(), []);
   return (
     <PreSurveyFlow
       onAvailabilitySubmit={(slots) => saveAvailability(slots)}
@@ -23,8 +27,9 @@ function SurveyPage() {
       onFinish={async ({ answers }) => {
         await saveAnswers(answers, SURVEY_SECTIONS);
         await finishOnboarding();
+        // Straight to Home, with the Study Lobbies window open
+        navigate('/', { replace: true, state: { openLobbies: true } });
       }}
-      onDone={() => navigate('/')}
     />
   );
 }
@@ -33,6 +38,9 @@ function SurveyPage() {
 function Home() {
   const me = useMyProfile();
   const study = useStudyData();
+  const studySpots = useStudySpots();
+  const location = useLocation();
+  const openLobbies = (location.state as { openLobbies?: boolean } | null)?.openLobbies ?? false;
 
   // Refusals ("This session is full.") show in the nav bar for a few seconds
   const { error, clearError } = study;
@@ -62,16 +70,21 @@ function Home() {
         ) : undefined
       }
       people={study.people}
+      locationSuggestions={studySpots}
       myAvailability={me.availability}
       mySubjects={[...new Set([...me.seekingHelpWith, ...me.coursesTaken])]}
       initialStudyState={study.state}
       studyState={study.state}
+      onRefreshStudy={study.refresh}
+      openLobbiesAtStart={openLobbies}
       onStudyAction={(action) => void study.act(action)}
       initialProfile={{
         availability: me.availability,
         contact: me.contact,
         coursesTaken: me.coursesTaken,
         seekingHelpWith: me.seekingHelpWith,
+        courses: me.courses,
+        answers: me.answers,
       }}
       onSaveProfile={me.save}
       onRedrawAvatar={me.redrawAvatar}
@@ -96,7 +109,9 @@ export default function App() {
       <Route
         path="/survey"
         element={
-          <RequireAuth need="new">
+          // Each page gets its own key: without one, React reuses the same RequireAuth (and its
+          // "not finished" status) when moving from the survey to Home, and Home bounced back
+          <RequireAuth key="survey" need="new">
             <SurveyPage />
           </RequireAuth>
         }
@@ -104,7 +119,7 @@ export default function App() {
       <Route
         path="/"
         element={
-          <RequireAuth need="onboarded">
+          <RequireAuth key="home" need="onboarded">
             <Home />
           </RequireAuth>
         }

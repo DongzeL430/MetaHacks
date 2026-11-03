@@ -1,17 +1,21 @@
 import { useEffect, useId, useState } from 'react';
 import AppWindow, { WINDOW_ACCENTS } from './AppWindow';
 import AvailabilityCalendar from './AvailabilityCalendar';
-import { DoodleCombobox } from './DoodleSelect';
+import CoursesSection, { validateAcademics } from './CoursesSection';
+import type { AcademicProfile, CourseEntry } from './CoursesSection';
+import MultipleChoiceSection from './MultipleChoiceSection';
 import PersonAvatar from './PersonAvatar';
 import ViewTabs, { viewPanelId, viewTabId } from './ViewTabs';
-import { PROFILE_LIMITS, SUBJECT_SUGGESTIONS } from '../dataFiles/StudyData';
+import { PROFILE_LIMITS } from '../dataFiles/StudyData';
 import type { MyProfile } from '../dataFiles/StudyData';
+import { SURVEY_SECTIONS } from '../dataFiles/SurveySections';
 
-type Section = 'profile' | 'study' | 'schedule' | 'contact' | 'account';
+type Section = 'profile' | 'courses' | 'answers' | 'schedule' | 'contact' | 'account';
 
 const SECTIONS: { id: Section; label: string }[] = [
   { id: 'profile', label: 'Profile' },
-  { id: 'study', label: 'Study' },
+  { id: 'courses', label: 'Courses' },
+  { id: 'answers', label: 'Answers' },
   { id: 'schedule', label: 'Schedule' },
   { id: 'contact', label: 'Contact' },
   { id: 'account', label: 'Account' },
@@ -23,8 +27,11 @@ interface ProfileEditorWindowProps {
   onClose: () => void;
   /** The saved profile. Edits stay a draft until Save. */
   profile: MyProfile;
-  /** Saves the profile. Throw to show an error; the draft is kept so nothing is lost. */
-  onSave: (profile: MyProfile) => void | Promise<void>;
+  /**
+   * Saves the profile. Throw to show an error; the draft is kept so nothing is lost.
+   * Return the profile as saved to show what the backend changed (matched course names…).
+   */
+  onSave: (profile: MyProfile) => void | MyProfile | Promise<void | MyProfile>;
   /** The avatar Muse drew from the nickname. Initials show without one. */
   avatarUrl?: string;
   /** Nickname and avatar changes left today (they share a daily limit), or null if unknown */
@@ -61,19 +68,16 @@ function findProblems(p: MyProfile): Problems {
   return problems;
 }
 
-/** Trims text and removes empty or repeated tags before saving */
+/** The course list in the shape the pre-survey's Courses section edits */
+const asAcademics = (courses: CourseEntry[]): AcademicProfile => ({ majors: [], minors: [], year: '', gradYear: '', courses });
+
+const QUESTIONS = SURVEY_SECTIONS.flatMap((s) => s.questions);
+
+/** Trims text before saving */
 function tidy(p: MyProfile): MyProfile {
-  const cleanTags = (tags: string[]) => {
-    const seen = new Set<string>();
-    return tags
-      .map((t) => t.trim())
-      .filter((t) => t && !seen.has(t.toLowerCase()) && seen.add(t.toLowerCase()));
-  };
   return {
     ...p,
     nickname: p.nickname.trim(),
-    seekingHelpWith: cleanTags(p.seekingHelpWith),
-    coursesTaken: cleanTags(p.coursesTaken),
     contact: {
       discord: p.contact.discord.trim(),
       instagram: p.contact.instagram.trim().replace(/^@/, ''),
@@ -94,80 +98,11 @@ function FieldError({ id, children }: { id: string; children: string }) {
   );
 }
 
-/** A list of subjects as removable chips, plus a box (with suggestions) to add more */
-function TagEditor({
-  label,
-  tags,
-  onChange,
-  placeholder,
-}: {
-  label: string;
-  tags: string[];
-  onChange: (tags: string[]) => void;
-  placeholder: string;
-}) {
-  const fieldId = useId();
-  const [draft, setDraft] = useState('');
-  const full = tags.length >= PROFILE_LIMITS.maxTags;
-
-  const add = (value: string) => {
-    const tag = value.trim().slice(0, PROFILE_LIMITS.tagMax);
-    if (!tag || full) return;
-    if (!tags.some((t) => t.toLowerCase() === tag.toLowerCase())) onChange([...tags, tag]);
-    setDraft('');
-  };
-
-  return (
-    <div className="flex flex-col gap-2">
-      <label htmlFor={fieldId} className="text-sm">
-        {label}
-      </label>
-
-      {tags.length > 0 && (
-        <ul className="m-0 p-0 list-none flex flex-wrap gap-2">
-          {tags.map((tag) => (
-            <li key={tag} className="list-none flex items-center gap-1 pl-2.5 pr-1 py-0.5 rounded-md border-2 border-ink/30 bg-paper text-sm">
-              {tag}
-              <button
-                type="button"
-                onClick={() => onChange(tags.filter((t) => t !== tag))}
-                aria-label={`Remove ${tag}`}
-                className="w-5 h-5 p-0 flex items-center justify-center rounded border-0 [border-image:none] bg-transparent hover:bg-busy"
-              >
-                <svg viewBox="0 0 20 20" className="w-3 h-3" aria-hidden="true">
-                  <path d="M5 5l10 10M15 5L5 15" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" />
-                </svg>
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
-
-      <div className="flex items-center gap-2">
-        <div className="flex-1 min-w-0">
-          <DoodleCombobox
-            id={fieldId}
-            value={draft}
-            onChange={setDraft}
-            suggestions={SUBJECT_SUGGESTIONS.filter((s) => !tags.some((t) => t.toLowerCase() === s.toLowerCase()))}
-            onPick={add}
-            onSubmit={() => add(draft)}
-            placeholder={full ? `Up to ${PROFILE_LIMITS.maxTags} entries` : placeholder}
-            maxLength={PROFILE_LIMITS.tagMax}
-          />
-        </div>
-        <button type="button" onClick={() => add(draft)} disabled={!draft.trim() || full} className="px-3 py-0.5 text-sm">
-          Add
-        </button>
-      </div>
-    </div>
-  );
-}
-
 /* ---------- Window ---------- */
 
 /**
- * Edit your own profile, in sections like the Sessions window: Profile, Study, Schedule, Contact.
+ * Edit your own profile, in sections like the Sessions window: Profile, Courses, Answers (the
+ * pre-survey's questions), Schedule, Contact, Account.
  * Changes are a draft until Save; Undo changes goes back to what's saved. Reopening starts fresh.
  */
 export default function ProfileEditorWindow({
@@ -211,6 +146,15 @@ export default function ProfileEditorWindow({
 
   const problems = findProblems(draft);
   const shown = showProblems ? problems : {};
+  const courseProblem = validateAcademics(asAcademics(draft.courses));
+  const unanswered = new Set(QUESTIONS.filter((q) => !draft.answers[q.id]).map((q) => q.id));
+  // What still needs fixing in each section
+  const problemCounts: Partial<Record<Section, number>> = {
+    profile: problems.nickname ? 1 : 0,
+    courses: courseProblem?.missing.size ?? 0,
+    answers: unanswered.size,
+    contact: (['discord', 'instagram', 'phone'] as const).filter((f) => problems[f]).length,
+  };
   const dirty = !same(draft, profile);
 
   const update = (patch: Partial<MyProfile>) => {
@@ -220,17 +164,18 @@ export default function ProfileEditorWindow({
   const updateContact = (patch: Partial<MyProfile['contact']>) => update({ contact: { ...draft.contact, ...patch } });
 
   const save = async () => {
-    if (Object.keys(problems).length > 0) {
+    const firstProblem = SECTIONS.find((s) => (problemCounts[s.id] ?? 0) > 0);
+    if (firstProblem) {
       setShowProblems(true);
       // Jump to the section with the first problem
-      setSection(problems.nickname ? 'profile' : 'contact');
+      setSection(firstProblem.id);
       return;
     }
     setSaving(true);
     try {
       const clean = tidy(draft);
-      await onSave(clean);
-      setDraft(clean);
+      const saved = await onSave(clean);
+      setDraft(saved ?? clean);
       setShowProblems(false);
       setStatus({ kind: 'saved', text: 'Saved.' });
     } catch (err) {
@@ -279,17 +224,14 @@ export default function ProfileEditorWindow({
       : `${changesLeft} of 3 nickname or avatar changes left today.`;
 
   const errorId = (field: string) => `${baseId}-${field}-error`;
-  const sectionCounts: Partial<Record<Section, number>> = {
-    profile: shown.nickname ? 1 : 0,
-    contact: ['discord', 'instagram', 'phone'].filter((f) => shown[f as keyof Problems]).length,
-  };
+  const sectionCounts = showProblems ? problemCounts : {};
 
   return (
     <AppWindow
       id={id}
       title="Profile"
       accent={WINDOW_ACCENTS.sand}
-      info="Edit how you show up to other students and what StudBuds uses to match you: your nickname and avatar, your subjects, your free time, and contact details you can choose to share."
+      info="Edit how you show up to other students and what StudBuds uses to match you: your nickname and avatar, your courses and survey answers, your free time, and contact details you can choose to share."
       open={open}
       onClose={onClose}
       controls={{ close: 'enabled', fullscreen: 'enabled' }}
@@ -392,21 +334,29 @@ export default function ProfileEditorWindow({
           </>
         )}
 
-        {section === 'study' && (
+        {section === 'courses' && (
+          <CoursesSection
+            value={asAcademics(draft.courses)}
+            onChange={(next) => update({ courses: next.courses })}
+            missing={showProblems ? courseProblem?.missing : undefined}
+            notice="When you save, Muse matches new course names to your school’s catalog."
+          />
+        )}
+
+        {section === 'answers' && (
           <>
-            <TagEditor
-              label="Subjects I’d like help with"
-              tags={draft.seekingHelpWith}
-              onChange={(seekingHelpWith) => update({ seekingHelpWith })}
-              placeholder="e.g. Linear Algebra"
-            />
-            <TagEditor
-              label="Courses I’ve taken"
-              tags={draft.coursesTaken}
-              onChange={(coursesTaken) => update({ coursesTaken })}
-              placeholder="e.g. Calculus I"
-            />
-            <p className="m-0 text-xs opacity-70">These help match you with lobbies and study partners.</p>
+            <p className="m-0 text-sm opacity-70">Your pre-survey answers. Matching uses them to find study partners.</p>
+            {SURVEY_SECTIONS.map((s) => (
+              <section key={s.id} className="flex flex-col gap-1">
+                <h3 className="m-0 px-2 text-xl">{s.title}</h3>
+                <MultipleChoiceSection
+                  section={s}
+                  values={draft.answers}
+                  missing={showProblems ? unanswered : undefined}
+                  onAnswer={(questionId, option) => update({ answers: { ...draft.answers, [questionId]: option } })}
+                />
+              </section>
+            ))}
           </>
         )}
 

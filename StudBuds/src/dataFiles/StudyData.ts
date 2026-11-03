@@ -1,3 +1,5 @@
+import type { CourseEntry } from '../components/CoursesSection';
+
 /*
  * Data for study lobbies and connections.
  * The SAMPLE_ values are made-up data for building the UI. Replace them with real data from your backend.
@@ -40,6 +42,11 @@ export interface Lobby {
   location: string;
   /** The host stopped taking new join requests. Requests already waiting stay. */
   locked?: boolean;
+  /**
+   * How well the host fits you (public.lobby_matches): `place` 1 is the best fit, with short
+   * reasons like "Covers a course you want help with". Not set for your own lobby.
+   */
+  match?: { place: number; reasons: string[] };
 }
 
 /** Friend-request style: 'sent' = you asked them, 'received' = they asked you */
@@ -191,9 +198,6 @@ export const AVATAR_ANIMALS = ['Penguin', 'Cat', 'Fox', 'Frog', 'Bunny', 'Bear',
 export const PROFILE_LIMITS = {
   nicknameMin: 2,
   nicknameMax: 24,
-  /** Most entries in each subject list */
-  maxTags: 12,
-  tagMax: 60,
   discordMax: 40,
   instagramMax: 30,
   phoneMax: 20,
@@ -204,10 +208,14 @@ export interface MyProfile {
   nickname: string;
   /** One of AVATAR_ANIMALS */
   animal: string;
-  /** Subjects you'd like help with */
+  /** Subjects you'd like help with: courses rated 1 or 2. Follows `courses` on save. */
   seekingHelpWith: string[];
-  /** Courses you've taken */
+  /** Courses you've taken. Follows `courses` on save. */
   coursesTaken: string[];
+  /** The pre-survey's course list (status, confidence, optional grade), edited in the Study tab */
+  courses: CourseEntry[];
+  /** Pre-survey answers, question id to the option picked (SurveySections.ts) */
+  answers: Record<string, string>;
   /** Weekly free slots ("mon|09:30"), the same as the pre-survey calendar */
   availability: string[];
   /** Only shared with someone when you choose to, never shown on your public card */

@@ -1,4 +1,6 @@
 import type { CSSProperties } from 'react';
+import { sanitizeMusic } from './Music';
+import type { ThemeMusic } from './Music';
 
 /*
  * Themes are DATA, never code: a list of color values plus a background description.
@@ -78,6 +80,8 @@ export interface UserTheme {
   /** Only the colors that differ from the default */
   colors: Partial<Record<ThemeColor, string>>;
   background?: ThemeBackground;
+  /** The piece Muse composed for this theme (Music.ts). Without one, the default piece plays. */
+  music?: ThemeMusic;
 }
 
 const HEX = /^#[0-9a-f]{6}$/i;
@@ -166,7 +170,14 @@ export function sanitizeTheme(input: unknown, userId?: string): { theme: UserThe
     }
   }
 
-  return { theme: { version: 1, name, colors, ...(background ? { background } : {}) }, problems };
+  // Music: kept only if the whole score checks out
+  const music = input.music === undefined ? null : sanitizeMusic(input.music);
+  if (input.music !== undefined && !music) problems.push('The theme’s music wasn’t usable, so the default piece plays.');
+
+  return {
+    theme: { version: 1, name, colors, ...(background ? { background } : {}), ...(music ? { music } : {}) },
+    problems,
+  };
 }
 
 /* ---------- Applying ---------- */

@@ -178,6 +178,48 @@ export type Database = {
           },
         ]
       }
+      connections: {
+        Row: {
+          addressee_id: string
+          connected_at: string | null
+          created_at: string
+          id: number
+          requester_id: string
+          status: string
+        }
+        Insert: {
+          addressee_id: string
+          connected_at?: string | null
+          created_at?: string
+          id?: never
+          requester_id: string
+          status?: string
+        }
+        Update: {
+          addressee_id?: string
+          connected_at?: string | null
+          created_at?: string
+          id?: never
+          requester_id?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "connections_addressee_id_fkey"
+            columns: ["addressee_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "connections_requester_id_fkey"
+            columns: ["requester_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       contact_shares: {
         Row: {
           decided_at: string
@@ -323,6 +365,7 @@ export type Database = {
       }
       lobbies: {
         Row: {
+          course_id: number | null
           created_at: string
           ends_at: string
           host_id: string
@@ -336,6 +379,7 @@ export type Database = {
           weekday: number
         }
         Insert: {
+          course_id?: number | null
           created_at?: string
           ends_at: string
           host_id: string
@@ -349,6 +393,7 @@ export type Database = {
           weekday: number
         }
         Update: {
+          course_id?: number | null
           created_at?: string
           ends_at?: string
           host_id?: string
@@ -362,6 +407,13 @@ export type Database = {
           weekday?: number
         }
         Relationships: [
+          {
+            foreignKeyName: "lobbies_course_id_fkey"
+            columns: ["course_id"]
+            isOneToOne: false
+            referencedRelation: "courses"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "lobbies_host_id_fkey"
             columns: ["host_id"]
@@ -744,6 +796,32 @@ export type Database = {
           },
         ]
       }
+      study_spots: {
+        Row: {
+          searched_at: string
+          spots: Json
+          university_domain: string
+        }
+        Insert: {
+          searched_at?: string
+          spots: Json
+          university_domain: string
+        }
+        Update: {
+          searched_at?: string
+          spots?: Json
+          university_domain?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "study_spots_university_domain_fkey"
+            columns: ["university_domain"]
+            isOneToOne: true
+            referencedRelation: "universities"
+            referencedColumns: ["domain"]
+          },
+        ]
+      }
       survey_answers: {
         Row: {
           answered_at: string
@@ -1070,13 +1148,22 @@ export type Database = {
         Args: { found: Json; school: string }
         Returns: undefined
       }
+      answer_connection: {
+        Args: { accept: boolean; person: string }
+        Returns: undefined
+      }
       answer_join: {
         Args: { accept: boolean; lobby_id: string; student: string }
+        Returns: undefined
+      }
+      cancel_connection_request: {
+        Args: { person: string }
         Returns: undefined
       }
       cancel_join: { Args: { lobby_id: string }; Returns: undefined }
       claim_muse_use: { Args: { student: string; what: string }; Returns: Json }
       close_lobby: { Args: { lobby_id: string }; Returns: undefined }
+      connect_with: { Args: { person: string }; Returns: undefined }
       delete_my_account: { Args: never; Returns: undefined }
       finish_onboarding: { Args: never; Returns: undefined }
       hook_before_user_created: { Args: { event: Json }; Returns: Json }
@@ -1104,6 +1191,14 @@ export type Database = {
         }[]
       }
       leave_lobby: { Args: { lobby_id: string }; Returns: undefined }
+      lobby_matches: {
+        Args: never
+        Returns: {
+          lobby_id: string
+          place: number
+          reasons: string[]
+        }[]
+      }
       lobby_people: {
         Args: never
         Returns: {

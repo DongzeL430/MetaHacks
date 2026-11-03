@@ -1,9 +1,13 @@
 import { useCallback, useEffect, useState } from 'react';
+import { applyMatches, cleanAcademics, namesToMatch } from '../components/CoursesSection';
+import type { AcademicProfile, CourseEntry, MajorEntry } from '../components/CoursesSection';
+import { SURVEY_SECTIONS } from '../dataFiles/SurveySections.ts';
+import type { MyProfile } from '../dataFiles/StudyData';
+import { matchCourses, saveCourses } from './courses.ts';
 import { callFunction } from './edgeFunctions.ts';
-import { saveAvailability } from './onboarding.ts';
+import { saveAnswers, saveAvailability } from './onboarding.ts';
 import { rangesToSlots } from './slots.ts';
 import { supabase } from './supabase.ts';
-import type { MyProfile } from '../dataFiles/StudyData';
 
 /** Public link to an avatar Muse drew (the avatars bucket is public; file names are random) */
 export const avatarUrlOf = (path: string | null | undefined) =>
@@ -11,6 +15,25 @@ export const avatarUrlOf = (path: string | null | undefined) =>
 
 /** "CS 2500 · Fundamentals of CS 1", or just the code when there's no title */
 const courseLabel = (c: { code: string; title: string | null }) => (c.title ? `${c.code} · ${c.title}` : c.code);
+
+const SURVEY_QUESTIONS = SURVEY_SECTIONS.flatMap((s) => s.questions);
+
+/**
+ * The subject lists the lobby filters use: finished courses, and the ones rated 1 or 2, which
+ * classmates see as "Looking for help with". Typed names count too, since only the student sees these.
+ */
+const subjectsOf = (courses: CourseEntry[]) => ({
+  coursesTaken: courses.filter((c) => c.status === 'taken' && c.name.trim()).map((c) => c.name),
+  seekingHelpWith: courses.filter((c) => c.confidence !== null && c.confidence <= 2 && c.name.trim()).map((c) => c.name),
+});
+
+const asAcademics = (courses: CourseEntry[], majors: MajorEntry[]): AcademicProfile => ({
+  majors,
+  minors: [],
+  year: '',
+  gradYear: '',
+  courses,
+});
 
 /**
  * Contact handles in the database's formats: Instagram without the @, Discord in lowercase,
@@ -46,9 +69,9 @@ interface StudioAnswer {
 }
 
 /**
- * The signed-in student's own profile for Home: nickname, Muse avatar, free times and contact
- * handles, plus how many nickname or avatar changes they have left today.
- * A student with no avatar yet gets their first one drawn in the background.
+ * The signed-in student's own profile for Home: nickname, Muse avatar, free times, contact
+ * handles, and their pre-survey courses and answers, plus how many nickname or avatar changes
+ * they have left today. A student with no avatar yet gets their first one drawn in the background.
  */
 export function useMyProfile() {
   const [ready, setReady] = useState(false);
@@ -57,10 +80,10 @@ export function useMyProfile() {
   const [availability, setAvailability] = useState<string[]>([]);
   const [contact, setContact] = useState<MyProfile['contact']>({ discord: '', instagram: '', phone: '' });
   const [changesLeft, setChangesLeft] = useState<number | null>(null);
-  // Own course names (typed ones included, since only they see these): finished ones, and the
-  // ones rated 1 or 2, which classmates see as "Looking for help with"
-  const [coursesTaken, setCoursesTaken] = useState<string[]>([]);
-  const [seekingHelpWith, setSeekingHelpWith] = useState<string[]>([]);
+  const [courses, setCourses] = useState<CourseEntry[]>([]);
+  const [answers, setAnswers] = useState<Record<string, string>>({});
+  // Muse matches new course names within the student's majors
+  const [majors, setMajors] = useState<MajorEntry[]>([]);
 
   useEffect(() => {
     let cancelled = false;
@@ -68,20 +91,37 @@ export function useMyProfile() {
       const { data: auth } = await supabase.auth.getUser();
       const id = auth.user?.id;
       if (!id) return;
-      const [pub, priv, slots, left, courses] = await Promise.all([
+      const [pub, priv, slots, left, saved, picks, programs] = await Promise.all([
         supabase.from('public_profiles').select('nickname, avatar_path').eq('id', id).single(),
         supabase.from('profiles').select('instagram, discord, phone').eq('id', id).single(),
         supabase.from('availability_slots').select('weekday, starts_at, ends_at'),
         supabase.rpc('identity_changes_left'),
-        supabase.from('user_courses').select('status, confidence, custom_name, courses(code, title)'),
+        supabase.from('user_courses').select('id, status, confidence, grade, custom_name, courses(code, title)').order('id'),
+        supabase.from('survey_answers').select('choice, survey_questions(key)'),
+        supabase.from('user_programs').select('name, track').eq('kind', 'major').order('position'),
       ]);
       if (cancelled) return;
-      const named = (courses.data ?? []).map((c) => ({
-        ...c,
-        label: c.courses ? courseLabel(c.courses) : (c.custom_name ?? ''),
-      }));
-      setCoursesTaken(named.filter((c) => c.status === 'completed' && c.label).map((c) => c.label));
-      setSeekingHelpWith(named.filter((c) => c.confidence <= 2 && c.label).map((c) => c.label));
+      setCourses(
+        (saved.data ?? []).map((c) => ({
+          id: String(c.id),
+          name: c.courses ? courseLabel(c.courses) : (c.custom_name ?? ''),
+          status: c.status === 'completed' ? 'taken' : 'taking',
+          confidence: c.confidence,
+          grade: c.grade ?? '',
+          code: c.courses?.code,
+          // A course kept under its typed name was already looked for in the catalog
+          checked: !c.courses,
+        })),
+      );
+      // Saved option numbers back to the option text the survey shows
+      const picked: Record<string, string> = {};
+      for (const a of picks.data ?? []) {
+        const q = SURVEY_QUESTIONS.find((x) => x.id === a.survey_questions?.key);
+        const option = q?.options[a.choice - 1];
+        if (q && option) picked[q.id] = option;
+      }
+      setAnswers(picked);
+      setMajors((programs.data ?? []).map((p) => ({ name: p.name, track: p.track ?? '' })));
       setNickname(pub.data?.nickname ?? '');
       setAvatarPath(pub.data?.avatar_path ?? null);
       setContact({
@@ -118,13 +158,17 @@ export function useMyProfile() {
 
   /**
    * Saves the profile window: a new nickname (checked by Muse, uses one of today's changes),
-   * free times and contact handles. Throws a message to show; nothing after a failed step saves.
+   * free times, contact handles, courses and survey answers. New course names go through the
+   * same Muse catalog matching as the pre-survey. Returns the profile as saved (matched course
+   * names, tidied handles). Throws a message to show; nothing after a failed step saves.
    */
   const save = useCallback(
-    async (next: MyProfile) => {
+    async (next: MyProfile): Promise<MyProfile> => {
+      const result = { ...next };
       if (next.nickname !== nickname) {
         const res = await callFunction<StudioAnswer>('avatar-studio', { action: 'rename', nickname: next.nickname });
         setNickname(res.nickname);
+        result.nickname = res.nickname;
         if (res.changesLeft !== null) setChangesLeft(res.changesLeft);
       }
       if (next.availability.join() !== availability.join()) {
@@ -136,10 +180,35 @@ export function useMyProfile() {
         const clean = cleanContact(next.contact);
         const { error } = await supabase.from('profiles').update(clean).eq('id', auth.user!.id);
         if (error) throw new Error('Your contact details didn’t save. Check them and try again.');
-        setContact({ instagram: clean.instagram ?? '', discord: clean.discord ?? '', phone: clean.phone ?? '' });
+        result.contact = { instagram: clean.instagram ?? '', discord: clean.discord ?? '', phone: clean.phone ?? '' };
+        setContact(result.contact);
       }
+      if (JSON.stringify(next.courses) !== JSON.stringify(courses)) {
+        let academics = asAcademics(next.courses, majors);
+        const names = namesToMatch(academics);
+        if (names.length > 0) {
+          try {
+            const found = await matchCourses({ names, majors, gradYear: '' });
+            // Muse wasn't reached: keep what the free first pass matched, and look at the rest next time
+            academics = applyMatches(academics, found.checked ? found.courses : found.courses.filter((m) => m.code)).profile;
+          } catch (err) {
+            // Saved as typed; the names are sent again on the next save
+            console.warn('course names not matched', err);
+          }
+        }
+        await saveCourses(cleanAcademics(academics));
+        result.courses = academics.courses
+          .filter((c) => c.name.trim())
+          .map((c) => ({ ...c, name: c.name.trim(), suggested: false }));
+        setCourses(result.courses);
+      }
+      if (JSON.stringify(next.answers) !== JSON.stringify(answers)) {
+        await saveAnswers(next.answers, SURVEY_SECTIONS);
+        setAnswers(next.answers);
+      }
+      return { ...result, ...subjectsOf(result.courses) };
     },
-    [nickname, availability, contact],
+    [nickname, availability, contact, courses, answers, majors],
   );
 
   return {
@@ -149,8 +218,9 @@ export function useMyProfile() {
     availability,
     contact,
     changesLeft,
-    coursesTaken,
-    seekingHelpWith,
+    courses,
+    answers,
+    ...subjectsOf(courses),
     redrawAvatar,
     save,
   };

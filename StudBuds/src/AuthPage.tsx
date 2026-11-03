@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import type { ChangeEvent, FormEvent } from 'react';
 import { useNavigate } from 'react-router';
 import type { AuthError, Session } from '@supabase/supabase-js';
+import { prefetchStudySpots } from './lib/spots.ts';
 import { supabase } from './lib/supabase.ts';
 import Turnstile from './Turnstile.tsx';
 // Background picture. Swap this import for any image in ./assets.
@@ -181,6 +182,8 @@ export default function AuthPage() {
       setError(describeError(authError));
     } else {
       setConfirmEmail('');
+      // The account now exists: Muse starts finding the school's study spots (from the .edu email)
+      prefetchStudySpots();
       goIn();
     }
   };

@@ -30,6 +30,8 @@ interface LobbyBrowserWindowProps {
   freeSlots?: string[];
   /** The user's subjects (e.g. their courses), for the "my subjects" criterion */
   subjects?: string[];
+  /** Loads the newest sessions. Shows the Refresh button when given. */
+  onRefresh?: () => Promise<void>;
 }
 
 const SIZE_CHIP = [
@@ -57,9 +59,22 @@ export default function LobbyBrowserWindow({
   isHosting,
   freeSlots = [],
   subjects = [],
+  onRefresh,
 }: LobbyBrowserWindowProps) {
   const panelId = useId();
   const [query, setQuery] = useState('');
+  const [refreshing, setRefreshing] = useState(false);
+  const [refreshedAt, setRefreshedAt] = useState<Date | null>(null);
+  const refresh = async () => {
+    if (!onRefresh || refreshing) return;
+    setRefreshing(true);
+    try {
+      await onRefresh();
+      setRefreshedAt(new Date());
+    } finally {
+      setRefreshing(false);
+    }
+  };
   const [filters, setFilters] = useState<LobbyFilters>(DEFAULT_FILTERS);
   const [showFilters, setShowFilters] = useState(false);
 
@@ -81,13 +96,28 @@ export default function LobbyBrowserWindow({
     .filter((l) => !q || l.subject.toLowerCase().includes(q))
     // Your own lobbies skip the matching criteria; only "Hide lobbies I'm in" removes them
     .filter((l) => (isMine(l) ? !filters.hideMine : passesFilters(l, filters, ctx)))
-    // Yours first, then everything else in its original order
-    .sort((a, b) => Number(isMine(b)) - Number(isMine(a)));
+    // Yours first, then the hosts who fit you best (public.lobby_matches); unranked ones last
+    .sort(
+      (a, b) =>
+        Number(isMine(b)) - Number(isMine(a)) ||
+        (a.match?.place ?? Number.MAX_SAFE_INTEGER) - (b.match?.place ?? Number.MAX_SAFE_INTEGER),
+    );
 
-  const tagsFor = (lobby: Lobby) => [
-    ...(scheduleKnown && fitsSchedule(lobby, ctx.freeSet) ? ['Fits your free time'] : []),
-    ...(subjectsKnown && matchesSubjects(lobby, subjects) ? ['Your subject'] : []),
-  ];
+  // Lobbies the search would show but the filters hide
+  const hiddenByFilters = lobbies.filter((l) => !q || l.subject.toLowerCase().includes(q)).length - shown.length;
+  const showAll = () =>
+    setFilters({ ...DEFAULT_FILTERS, schedule: false, subjects: false, size: false, openSpots: false, hideMine: false });
+
+  const tagsFor = (lobby: Lobby) => {
+    const reasons = lobby.match?.reasons ?? [];
+    // "Covers a course…" already says it's your subject
+    const coversCourse = reasons.some((r) => r.startsWith('Covers a course'));
+    return [
+      ...reasons,
+      ...(scheduleKnown && fitsSchedule(lobby, ctx.freeSet) ? ['Fits your free time'] : []),
+      ...(!coversCourse && subjectsKnown && matchesSubjects(lobby, subjects) ? ['Your subject'] : []),
+    ];
+  };
 
   const checkboxRow = 'flex items-start gap-2 text-sm';
 
@@ -96,7 +126,7 @@ export default function LobbyBrowserWindow({
       id={id}
       title="Study Lobbies"
       accent={WINDOW_ACCENTS.sky}
-      info="Browse study sessions other students are hosting. Use Filters to match lobbies to your free time, subjects and group size, or host your own."
+      info="Browse study sessions other students are hosting, best fit first: hosts with your courses, study habits and quick picks come to the top, and nobody’s ratings or answers are shown. Use Filters to match lobbies to your free time, subjects and group size, or host your own."
       open={open}
       onClose={onClose}
       controls={{ close: 'enabled', fullscreen: 'enabled' }}
@@ -128,6 +158,31 @@ export default function LobbyBrowserWindow({
         >
           Filters{activeCount > 0 ? ` (${activeCount})` : ''}
         </button>
+        {onRefresh && (
+          <button
+            type="button"
+            onClick={() => void refresh()}
+            disabled={refreshing}
+            title={
+              refreshedAt
+                ? `Updated ${refreshedAt.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}. Load the newest sessions.`
+                : 'Load the newest sessions'
+            }
+            className="px-3 py-1 flex items-center gap-1.5"
+          >
+            <svg viewBox="0 0 20 20" className={`w-4 h-4 ${refreshing ? 'motion-safe:animate-spin' : ''}`} aria-hidden="true">
+              <path
+                d="M16 10a6 6 0 1 1-1.8-4.3M16 3.5v3.2h-3.2"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+            {refreshing ? 'Refreshing…' : 'Refresh'}
+          </button>
+        )}
         <button
           type="button"
           onClick={onHost}
@@ -214,8 +269,19 @@ export default function LobbyBrowserWindow({
         </fieldset>
       )}
 
-      <p role="status" className="m-0 text-xs opacity-70">
+      <p role="status" className="m-0 text-xs opacity-70 flex flex-wrap items-center gap-x-2">
         Showing {shown.length} of {lobbies.length} {lobbies.length === 1 ? 'lobby' : 'lobbies'}.
+        {/* Filters are on by default, so say what they're hiding and offer a way past them */}
+        {hiddenByFilters > 0 && (
+          <>
+            <span>
+              {hiddenByFilters} hidden by your filters.
+            </span>
+            <button type="button" onClick={showAll} className="px-2 py-0 text-xs">
+              Show all
+            </button>
+          </>
+        )}
       </p>
 
       {shown.length === 0 ? (

@@ -43,14 +43,9 @@ export const SURVEY_SECTIONS: SurveySection[] = [
         options: ['Under an hour', '1 to 2 hours', '2 to 3 hours', 'More than 3 hours'],
       },
       {
-        id: 'whenStuck',
-        prompt: 'When you get stuck on a problem, what do you do first?',
-        options: [
-          'Keep at it on my own for a while',
-          'Ask someone right away',
-          'Look it up or watch a video',
-          'Skip it and come back later',
-        ],
+        id: 'groupSize',
+        prompt: 'How many people do you like to study with?',
+        options: ['One other person', 'A small group (3 or 4)', 'A full group (5)', 'Any size works'],
       },
     ],
   },
@@ -66,8 +61,8 @@ export const SURVEY_SECTIONS: SurveySection[] = [
       },
       {
         id: 'location',
-        prompt: 'Where do you get the most done?',
-        options: ['Library', 'Café', 'Dorm or home', 'Wherever’s free'],
+        prompt: 'Where would you rather meet?',
+        options: ['Library', 'Café', 'A study room or lounge', 'Wherever’s free'],
       },
       {
         id: 'noise',
@@ -84,7 +79,7 @@ export const SURVEY_SECTIONS: SurveySection[] = [
       {
         id: 'focus',
         prompt: 'What are you mostly studying for right now?',
-        options: ['Exams', 'Homework and problem sets', 'Projects', 'Learning something on my own'],
+        options: ['Exams', 'Homework and problem sets', 'Projects', 'Keeping up with classes'],
       },
       {
         id: 'frequency',
@@ -107,7 +102,7 @@ export const SURVEY_SECTIONS: SurveySection[] = [
       { id: 'deadlineStyle', prompt: 'Night before or a week ahead?', options: ['Night before', 'A week ahead', 'Both', 'No preference'] },
       { id: 'dayRhythm', prompt: 'Early bird or night owl?', options: ['Early bird', 'Night owl', 'Both', 'No preference'] },
       { id: 'practiceStyle', prompt: 'Flashcards or practice problems?', options: ['Flashcards', 'Practice problems', 'Both', 'No preference'] },
-      { id: 'noteStyle', prompt: 'Handwritten or typed notes?', options: ['Handwritten', 'Typed', 'Both', 'No preference'] },
+      { id: 'warmUp', prompt: 'Straight to work or chat first?', options: ['Straight to work', 'Chat first', 'Both', 'No preference'] },
       {
         id: 'breakStyle',
         prompt: 'Lots of short breaks or one long break?',
@@ -115,7 +110,7 @@ export const SURVEY_SECTIONS: SurveySection[] = [
       },
       { id: 'planStyle', prompt: 'Plan everything or wing it?', options: ['Plan everything', 'Wing it', 'Both', 'No preference'] },
       { id: 'petPick', prompt: 'Cats or dogs?', options: ['Cats', 'Dogs', 'Both', 'No preference'] },
-      { id: 'seatPick', prompt: 'Window seat or aisle seat?', options: ['Window seat', 'Aisle seat', 'Both', 'No preference'] },
+      { id: 'phones', prompt: 'Phones away or phones nearby?', options: ['Phones away', 'Phones nearby', 'Both', 'No preference'] },
     ],
   },
 ];
