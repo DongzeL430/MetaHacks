@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { callFunction } from './edgeFunctions.ts';
 import { avatarUrlOf } from './profile.ts';
 import { rangesToSlots, slotsToRange } from './slots.ts';
-import { supabase } from './supabase.ts';
+import { listenerTopic, supabase } from './supabase.ts';
 import { ME } from '../dataFiles/StudyData';
 import type { ConnectionStatus, Lobby, Person } from '../dataFiles/StudyData';
 import type { StudyAction, StudyState } from '../utils/StudyState';
@@ -135,7 +135,7 @@ export function useStudyData() {
       // they're allowed to see). A fresh topic each time, so a quick close and reopen can't land
       // on a channel that's still leaving.
       channel = supabase
-        .channel(`study-lobbies-${Math.random().toString(36).slice(2, 8)}`)
+        .channel(listenerTopic('study-lobbies'))
         .on('postgres_changes', { event: '*', schema: 'public', table: 'lobbies' }, reloadSoon)
         .on('postgres_changes', { event: '*', schema: 'public', table: 'lobby_members' }, reloadSoon)
         .on('postgres_changes', { event: '*', schema: 'public', table: 'connections' }, reloadSoon)

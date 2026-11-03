@@ -12,7 +12,7 @@ import type {
   VillageCroft,
 } from '../dataFiles/Croft';
 import { avatarUrlOf } from './profile.ts';
-import { supabase } from './supabase.ts';
+import { listenerTopic, supabase } from './supabase.ts';
 
 /** How often crops visibly grow on screen; the database's clock decides when they're ready */
 const TICK_MS = 15_000;
@@ -102,7 +102,7 @@ export function useCroft(ownerId: string | null, enabled = true) {
     void supabase.auth.getUser().then(({ data }) => {
       if (cancelled || !data.user) return;
       channel = supabase
-        .channel('croft-help')
+        .channel(listenerTopic('croft-help'))
         .on(
           'postgres_changes',
           { event: 'INSERT', schema: 'public', table: 'croft_help', filter: `owner_id=eq.${data.user.id}` },

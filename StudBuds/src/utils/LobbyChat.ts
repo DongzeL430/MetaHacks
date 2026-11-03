@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { PostgrestError } from '@supabase/supabase-js';
-import { supabase } from '../lib/supabase';
+import { listenerTopic, supabase } from '../lib/supabase';
 
 /**
  * Chat limits. The database enforces these (supabase/migrations/…_lobby_chat.sql);
@@ -123,7 +123,7 @@ export function useLobbyChat(lobbyId: string | null) {
     };
 
     const channel = supabase
-      .channel(`lobby-chat:${lobbyId}`)
+      .channel(listenerTopic(`lobby-chat:${lobbyId}`))
       .on(
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'lobby_messages', filter: `lobby_id=eq.${lobbyId}` },

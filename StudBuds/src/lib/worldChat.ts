@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { CROPS } from '../dataFiles/Croft';
 import { ME } from '../dataFiles/StudyData';
 import type { Lobby, Person } from '../dataFiles/StudyData';
-import { supabase } from './supabase.ts';
+import { listenerTopic, supabase } from './supabase.ts';
 
 /*
  * The live activity feed at the bottom right of Home, like a game's world chat. Lines appear when:
@@ -152,7 +152,7 @@ export function useWorldChat(lobbies: Lobby[], people: Map<string, Person>) {
       const me = data.user?.id;
       if (cancelled || !me) return;
       channel = supabase
-        .channel('world-chat')
+        .channel(listenerTopic('world-chat'))
         .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'croft_visits', filter: `owner_id=eq.${me}` }, async (e) => {
           const name = await nameOf(String(e.new.visitor_id));
           if (name && !cancelled) say(`${name} is visiting your croft`);
