@@ -16,5 +16,5 @@ export default function RequireAuth({ children }: { children: ReactNode }) {
   }, []);
 
   if (session === undefined) return null;
-  return session ? children : <Navigate to="/a" replace />;
+  return session ? children : <Navigate to="/h" replace />;
 }

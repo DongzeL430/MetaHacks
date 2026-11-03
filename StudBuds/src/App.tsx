@@ -3,8 +3,9 @@ import AuthPage from './AuthPage.tsx';
 import HomePage from './HomePage.tsx'
 import PreSurveyFlow from './PresurveyFlow.tsx';
 import RequireAuth from './RequireAuth.tsx';
-import { saveAvailability } from './lib/onboarding.ts';
-import { findCourses, savePrograms } from './lib/courses.ts';
+import { finishOnboarding, saveAnswers, saveAvailability } from './lib/onboarding.ts';
+import { findCourses, matchCourses, saveAcademics } from './lib/courses.ts';
+import { SURVEY_SECTIONS } from './dataFiles/SurveySections.ts';
 // import Home from './pages/Home';
 // import Profile from './pages/Profile';
 // import NotFound from './pages/NotFound';
@@ -15,19 +16,23 @@ export default function App() {
     <Routes>
       <Route path="/h" element={<AuthPage />} />
      <Route path="/" element={<HomePage/>} />
-     <Route path="/survey" element={<PreSurveyFlow/>} />
-     {/* <Route
-       path="/a"
+     <Route
+       path="/survey"
        element={
          <RequireAuth>
            <PreSurveyFlow
              onAvailabilitySubmit={(slots) => saveAvailability(slots)}
              suggestCourses={findCourses}
-             onAcademicsSubmit={savePrograms}
+             matchCourses={matchCourses}
+             onAcademicsSubmit={saveAcademics}
+             onFinish={async ({ answers }) => {
+               await saveAnswers(answers, SURVEY_SECTIONS);
+               await finishOnboarding();
+             }}
            />
          </RequireAuth>
        }
-     /> */}
+     />
 
      
       {/* Pages that share a layout (nav bar, etc.)

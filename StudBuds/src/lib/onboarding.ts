@@ -1,4 +1,5 @@
 import { supabase } from './supabase.ts';
+import type { SurveySection } from '../dataFiles/SurveySections.ts';
 
 // Calendar day keys to the database's weekday numbers (ISO: 1 = Monday, 7 = Sunday)
 const WEEKDAY: Record<string, number> = { mon: 1, tue: 2, wed: 3, thu: 4, fri: 5, sat: 6, sun: 7 };
@@ -49,4 +50,31 @@ export async function saveAvailability(slots: string[]): Promise<void> {
 
   const { error } = await supabase.from('availability_slots').insert(rows);
   if (error) throw error;
+}
+
+/**
+ * Saves every survey answer, replacing what was saved before (public.save_my_answers).
+ * answers maps a question id to the option text picked; the database stores the option's
+ * number, so ids and option order must match its copy of the questions.
+ */
+export async function saveAnswers(answers: Record<string, string>, sections: SurveySection[]): Promise<void> {
+  const rows = sections.flatMap((s) =>
+    s.questions
+      .map((q) => ({ key: q.id, choice: q.options.indexOf(answers[q.id]) + 1 }))
+      .filter((a) => a.choice > 0),
+  );
+  const { error } = await supabase.rpc('save_my_answers', { answers: rows });
+  if (error) throw new Error('Your answers didn’t save. Check your connection and try again.');
+}
+
+/**
+ * Puts the student in the match pool (public.finish_onboarding). The database checks they have
+ * a course, some free time and every answer, and says what's missing if not.
+ */
+export async function finishOnboarding(): Promise<void> {
+  const { error } = await supabase.rpc('finish_onboarding');
+  if (error) {
+    // P0001 messages ("Before finishing, add …") are written for students
+    throw new Error(error.code === 'P0001' ? error.message : 'That didn’t save. Check your connection and try again.');
+  }
 }

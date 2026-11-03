@@ -1,6 +1,6 @@
 import { Fragment, useRef } from 'react';
 import type { KeyboardEvent } from 'react';
-import { CONFIDENCE_LEVELS, GRADE_OPTIONS, STATUS_OPTIONS } from '../dataFiles/AcademicOptions';
+import { CONFIDENCE_LEVELS, GRADE_GROUPS, STATUS_OPTIONS } from '../dataFiles/AcademicOptions';
 
 export type CourseStatus = (typeof STATUS_OPTIONS)[number]['value'];
 
@@ -14,6 +14,14 @@ export interface CourseEntry {
   grade: string;
   /** Added by the suggestion search and not yet rated by the user */
   suggested?: boolean;
+  /**
+   * The school's course code, once known: from Find courses, a schedule screenshot, or Muse
+   * matching the typed name. Without one the course is saved privately under its typed name.
+   * Editing the name clears it.
+   */
+  code?: string;
+  /** Muse already tried to match this name (so it isn't sent again) */
+  checked?: boolean;
 }
 
 /** A major and its optional track or concentration */
@@ -39,6 +47,8 @@ export type CourseSuggestionQuery = Pick<AcademicProfile, 'majors' | 'year' | 'g
 export interface SuggestedCourse {
   name: string;
   status: CourseStatus;
+  /** The school's course code, when the source knows it */
+  code?: string;
 }
 
 /** What the course search returns */
@@ -48,6 +58,26 @@ export interface CourseSearchResult {
   sources: string[];
   /** Programs the search couldn't finish */
   failed: string[];
+}
+
+/** What Muse needs to match typed course names to the school's courses */
+export interface CourseMatchQuery {
+  names: string[];
+  majors: MajorEntry[];
+  gradYear: string;
+}
+
+/** One typed name and the course it matched, or a null code when Muse couldn't place it */
+export interface CourseMatch {
+  name: string;
+  code: string | null;
+  title: string | null;
+}
+
+/** Muse's answer. checked is false when Muse couldn't be reached, so nothing was really tried. */
+export interface CourseMatchResult {
+  courses: CourseMatch[];
+  checked: boolean;
 }
 
 const newId = () => Math.random().toString(36).slice(2, 10);
@@ -115,8 +145,44 @@ export function cleanAcademics(profile: AcademicProfile): AcademicProfile {
     gradYear: profile.gradYear,
     courses: profile.courses
       .filter((c) => c.name.trim())
-      .map(({ suggested: _suggested, ...c }) => ({ ...c, name: c.name.trim() })),
+      .map(({ suggested: _suggested, checked: _checked, ...c }) => ({ ...c, name: c.name.trim() })),
   };
+}
+
+/** Same spacing and case rules Muse's matcher uses, so its answers line up with the rows */
+const nameKey = (name: string) => name.trim().replace(/\s+/g, ' ').toLowerCase();
+
+/** Typed course names Muse hasn't looked at yet: no code, not checked before */
+export const namesToMatch = (profile: AcademicProfile): string[] => [
+  ...new Set(
+    profile.courses
+      .filter((c) => c.name.trim() && !c.code && !c.checked)
+      .map((c) => c.name.trim().replace(/\s+/g, ' ')),
+  ),
+];
+
+/**
+ * Applies Muse's matches: a matched row becomes "CODE · Official title" with its code, and every
+ * row Muse looked at is marked checked. Returns how many rows matched and how many didn't.
+ */
+export function applyMatches(
+  profile: AcademicProfile,
+  matches: CourseMatch[],
+): { profile: AcademicProfile; matched: number; unmatched: number } {
+  const byName = new Map(matches.map((m) => [nameKey(m.name), m]));
+  let matched = 0;
+  let unmatched = 0;
+  const courses = profile.courses.map((c) => {
+    const m = !c.code && !c.checked ? byName.get(nameKey(c.name)) : undefined;
+    if (!m) return c;
+    if (!m.code) {
+      unmatched++;
+      return { ...c, checked: true };
+    }
+    matched++;
+    return { ...c, name: m.title ? `${m.code} · ${m.title}` : m.code, code: m.code, checked: true };
+  });
+  return { profile: { ...profile, courses }, matched, unmatched };
 }
 
 /**
@@ -134,16 +200,16 @@ export function mergeSuggestions(
     const s: SuggestedCourse = typeof raw === 'string' ? { name: raw, status: 'taken' } : raw;
     const name = s.name.trim();
     const key = name && courseKey(name);
-    if (key && !have.has(key) && !fresh.has(key)) fresh.set(key, { name, status: s.status });
+    if (key && !have.has(key) && !fresh.has(key)) fresh.set(key, { name, status: s.status, code: s.code });
   }
 
   const queue = [...fresh.values()];
   const courses = profile.courses.map((c) => {
     if (!isBlank(c) || queue.length === 0) return c;
     const s = queue.shift()!;
-    return { ...c, name: s.name, status: s.status, suggested: true };
+    return { ...c, name: s.name, status: s.status, suggested: true, code: s.code };
   });
-  courses.push(...queue.map((s) => newCourse(s.name, true, s.status)));
+  courses.push(...queue.map((s) => ({ ...newCourse(s.name, true, s.status), code: s.code })));
   return { profile: { ...profile, courses }, added: fresh.size };
 }
 
@@ -195,7 +261,15 @@ export default function CoursesSection({ value, onChange, missing, onOpenAutofil
   const updateCourse = (id: string, patch: Partial<CourseEntry>) =>
     update({
       courses: valueRef.current.courses.map((c) =>
-        c.id === id ? { ...c, ...patch, suggested: patch.confidence != null ? false : c.suggested } : c,
+        c.id === id
+          ? {
+              ...c,
+              ...patch,
+              suggested: patch.confidence != null ? false : c.suggested,
+              // A renamed course is a new name to look up
+              ...(patch.name !== undefined ? { code: undefined, checked: false } : {}),
+            }
+          : c,
       ),
     });
 
@@ -230,7 +304,8 @@ export default function CoursesSection({ value, onChange, missing, onOpenAutofil
       <fieldset className="m-0 min-w-0 px-4 pb-4 pt-2">
         <legend className="px-2 text-lg">Courses</legend>
         <p className="m-0 mb-3 text-sm opacity-80">
-          Add at least one course. Confidence: 1 means lost, 5 means you could teach it.
+          Add at least one course. Confidence: 1 means lost, 5 means you could teach it. Courses you rate 1
+          or 2 show on your card as “Looking for help with”. Your ratings and grades are never shown.
         </p>
 
         {missing?.has('courses') && <p className={`m-0 mb-2 ${ERROR_TEXT}`}>Add a course to continue.</p>}
@@ -309,6 +384,12 @@ export default function CoursesSection({ value, onChange, missing, onOpenAutofil
                       className="w-full px-2 py-1"
                     />
                     {nameMissing && <span className={ERROR_TEXT}>Name this course or remove it.</span>}
+                    {course.checked && !course.code && course.name.trim() && (
+                      <span className="text-xs opacity-70">
+                        Not found in your school’s catalog. It’s saved as you typed it, kept private, and not used
+                        for matching. Edit the name to look again.
+                      </span>
+                    )}
                   </label>
 
                   <button
@@ -398,10 +479,14 @@ export default function CoursesSection({ value, onChange, missing, onOpenAutofil
                       className="pl-2 pr-8 py-1"
                     >
                       <option value="">No grade</option>
-                      {GRADE_OPTIONS.map((grade) => (
-                        <option key={grade} value={grade}>
-                          {grade}
-                        </option>
+                      {GRADE_GROUPS.map((group) => (
+                        <optgroup key={group.label} label={group.label}>
+                          {group.grades.map((grade) => (
+                            <option key={grade.value} value={grade.value}>
+                              {grade.label}
+                            </option>
+                          ))}
+                        </optgroup>
                       ))}
                     </select>
                   </label>
