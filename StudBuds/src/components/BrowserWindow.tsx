@@ -1,6 +1,7 @@
 import { useId } from 'react';
 import type { KeyboardEvent, ReactNode } from 'react';
 import AppWindow, { WINDOW_ACCENTS } from './AppWindow';
+import type { InitialSize } from './AppWindow';
 
 export interface BrowserTab {
   id: string;
@@ -26,7 +27,8 @@ interface BrowserWindowProps {
   onClose: () => void;
   /** Text in the fake address bar for the active tab */
   address?: string;
-  initialSize?: { width: number; height: number };
+  /** Opens at this size, centered. Left out, it follows the desk's layout like the nav bar's windows. */
+  initialSize?: InitialSize;
   /** The active tab's page */
   children?: ReactNode;
 }
@@ -48,7 +50,7 @@ export default function BrowserWindow({
   onCloseTab,
   onClose,
   address,
-  initialSize = { width: 640, height: 580 },
+  initialSize,
   children,
 }: BrowserWindowProps) {
   const baseId = useId();
@@ -90,6 +92,7 @@ export default function BrowserWindow({
       open={open}
       onClose={onClose}
       controls={{ close: 'enabled', fullscreen: 'enabled' }}
+      // No size by default: alone it fills the desk, next to others it takes a tile
       initialSize={initialSize}
       minWidth={320}
       minHeight={300}
