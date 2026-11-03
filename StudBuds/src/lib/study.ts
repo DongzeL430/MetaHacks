@@ -25,10 +25,17 @@ export function useStudyData() {
   const [error, setError] = useState('');
   const myId = useRef<string | null>(null);
   const reloadTimer = useRef<number | undefined>(undefined);
+  // Each load is numbered: a slow one that finishes after a newer one is dropped
+  const loadSeq = useRef(0);
+  // Until the first load works, it's tried again after 2, 4, 8… seconds (Home waits for it)
+  const loaded = useRef(false);
+  const retryTimer = useRef<number | undefined>(undefined);
+  const retries = useRef(0);
 
   const load = useCallback(async () => {
     const me = myId.current;
     if (!me) return;
+    const seq = ++loadSeq.current;
     const local = (id: string) => (id === me ? ME : id);
 
     const [lobbies, members, cards, links, matches, invites, community] = await Promise.all([
@@ -44,10 +51,17 @@ export function useStudyData() {
       // The student's school and the ones linked to it, for the "Only my school" filter
       supabase.rpc('my_community'),
     ]);
+    if (seq !== loadSeq.current) return;
     if (lobbies.error || members.error || cards.error || links.error) {
       setError('Couldn’t load lobbies right now. Check your connection.');
+      if (!loaded.current) {
+        window.clearTimeout(retryTimer.current);
+        retryTimer.current = window.setTimeout(() => void load(), Math.min(20_000, 2000 * 2 ** retries.current++));
+      }
       return;
     }
+    loaded.current = true;
+    retries.current = 0;
     // Without the ranking, lobbies still load, just unranked
     // Without the school list, every lobby counts as the student's own school (nothing hidden)
     const mySchools = community.error ? null : new Set<string>(community.data ?? []);
@@ -111,14 +125,17 @@ export function useStudyData() {
   useEffect(() => {
     let cancelled = false;
     let channel: ReturnType<typeof supabase.channel> | null = null;
-    supabase.auth.getUser().then(({ data }) => {
-      if (cancelled || !data.user) return;
-      myId.current = data.user.id;
+    // The saved session says who's signed in without a network call (RequireAuth already checked it)
+    void supabase.auth.getSession().then(({ data }) => {
+      const user = data.session?.user;
+      if (cancelled || !user) return;
+      myId.current = user.id;
       void load();
       // Any change to a lobby or its members reloads the lists (each student only gets changes
-      // they're allowed to see)
+      // they're allowed to see). A fresh topic each time, so a quick close and reopen can't land
+      // on a channel that's still leaving.
       channel = supabase
-        .channel('study-lobbies')
+        .channel(`study-lobbies-${Math.random().toString(36).slice(2, 8)}`)
         .on('postgres_changes', { event: '*', schema: 'public', table: 'lobbies' }, reloadSoon)
         .on('postgres_changes', { event: '*', schema: 'public', table: 'lobby_members' }, reloadSoon)
         .on('postgres_changes', { event: '*', schema: 'public', table: 'connections' }, reloadSoon)
@@ -131,9 +148,14 @@ export function useStudyData() {
     return () => {
       cancelled = true;
       window.clearTimeout(reloadTimer.current);
+      window.clearTimeout(retryTimer.current);
       if (channel) void supabase.removeChannel(channel);
     };
   }, [load, reloadSoon]);
+
+  // The same function every render, so the 6-second timer that clears an error isn't restarted
+  // by every reload
+  const clearError = useCallback(() => setError(''), []);
 
   /** Sends one action to the database. On a refusal, shows why and settles back on the real state. */
   const act = useCallback(
@@ -234,5 +256,5 @@ export function useStudyData() {
   );
 
   /** refresh: loads the newest lobbies now (the Refresh button), on top of the live updates */
-  return { ready, state, people, error, clearError: () => setError(''), act, refresh: load };
+  return { ready, state, people, error, clearError, act, refresh: load };
 }

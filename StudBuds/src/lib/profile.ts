@@ -59,8 +59,9 @@ function cleanContact(contact: MyProfile['contact']) {
   return { instagram: instagram || null, discord: discord || null, phone: phone || null };
 }
 
-// One first-avatar request per page load, even if the hook mounts twice (React dev mode does)
-let starterRequested = false;
+// One first-avatar request per student per page load, even if the hook mounts twice (React dev
+// mode does). Per student, so a second account signed up in the same tab still gets one.
+const starterRequested = new Set<string>();
 
 interface StudioAnswer {
   nickname: string;
@@ -84,12 +85,17 @@ export function useMyProfile() {
   const [answers, setAnswers] = useState<Record<string, string>>({});
   // Muse matches new course names within the student's majors
   const [majors, setMajors] = useState<MajorEntry[]>([]);
+  // The first load failed and is being tried again (Home says so instead of staying blank)
+  const [failed, setFailed] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
-    (async () => {
-      const { data: auth } = await supabase.auth.getUser();
-      const id = auth.user?.id;
+    let retryTimer: number | undefined;
+    let retries = 0;
+    const loadProfile = async () => {
+      // The saved session says who's signed in without a network call (RequireAuth checked it)
+      const { data: session } = await supabase.auth.getSession();
+      const id = session.session?.user.id;
       if (!id) return;
       const [pub, priv, slots, left, saved, picks, programs] = await Promise.all([
         supabase.from('public_profiles').select('nickname, avatar_path').eq('id', id).single(),
@@ -101,6 +107,13 @@ export function useMyProfile() {
         supabase.from('user_programs').select('name, track').eq('kind', 'major').order('position'),
       ]);
       if (cancelled) return;
+      // A failed read would show an empty profile that a Save could then write back: try again
+      if (pub.error || priv.error || slots.error || saved.error || picks.error || programs.error) {
+        setFailed(true);
+        retryTimer = window.setTimeout(() => void loadProfile(), Math.min(20_000, 2000 * 2 ** retries++));
+        return;
+      }
+      setFailed(false);
       setCourses(
         (saved.data ?? []).map((c) => ({
           id: String(c.id),
@@ -133,8 +146,8 @@ export function useMyProfile() {
       setChangesLeft(left.data ?? null);
       setReady(true);
 
-      if (pub.data && !pub.data.avatar_path && !starterRequested) {
-        starterRequested = true;
+      if (pub.data && !pub.data.avatar_path && !starterRequested.has(id)) {
+        starterRequested.add(id);
         try {
           const res = await callFunction<StudioAnswer>('avatar-studio', { action: 'starter' });
           if (!cancelled) setAvatarPath(res.avatarPath);
@@ -143,9 +156,11 @@ export function useMyProfile() {
           console.warn('first avatar not drawn', err);
         }
       }
-    })();
+    };
+    void loadProfile();
     return () => {
       cancelled = true;
+      window.clearTimeout(retryTimer);
     };
   }, []);
 
@@ -213,6 +228,8 @@ export function useMyProfile() {
 
   return {
     ready,
+    /** The first load failed and is being tried again */
+    failed,
     nickname,
     avatarUrl: avatarUrlOf(avatarPath),
     availability,

@@ -77,8 +77,24 @@ function Home() {
   }, [error, clearError]);
 
   // The profile window and nav bar start from the loaded profile, so wait for it
-  // ...and whether the tour shows, so the lobbies don't open first and then hide behind it
-  if (!me.ready || !study.ready || tour.status === 'checking') return null;
+  // ...and whether the tour shows, so the lobbies don't open first and then hide behind it.
+  // While waiting, say so; if a first load failed (both hooks keep retrying), say that instead
+  // of leaving the page blank.
+  if (!me.ready || !study.ready || tour.status === 'checking') {
+    const trouble = (!study.ready && !!study.error) || me.failed;
+    return (
+      <main className="doodle min-h-dvh flex flex-col items-center justify-center gap-3 p-6 text-center">
+        <p role="status" className="m-0 text-lg">
+          {trouble ? 'Can’t reach StudBuds right now. Trying again…' : 'Loading StudBuds…'}
+        </p>
+        {trouble && (
+          <button type="button" onClick={() => window.location.reload()} className="px-4 py-1">
+            Retry now
+          </button>
+        )}
+      </main>
+    );
+  }
   return (
     <HomePage
       userName={me.nickname}
