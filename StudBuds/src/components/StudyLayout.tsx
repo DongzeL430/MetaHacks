@@ -46,6 +46,8 @@ interface StudyLayoutProps {
   /** Sessions window (lobbies you host, joined or requested), driven by its taskbar button */
   sessionsOpen: boolean;
   onSessionsClose: () => void;
+  /** Loads the newest lobbies (the Study Lobbies window's Refresh button) */
+  onRefresh?: () => Promise<void>;
 }
 
 /**
@@ -73,6 +75,7 @@ export default function StudyLayout({
   onConnectionsClose,
   sessionsOpen,
   onSessionsClose,
+  onRefresh,
 }: StudyLayoutProps) {
   const stack = useWindowManager();
   const [tabIds, setTabIds] = useState<string[]>([]);
@@ -156,6 +159,7 @@ export default function StudyLayout({
           isHosting={!!myLobby}
           freeSlots={myAvailability}
           subjects={mySubjects}
+          onRefresh={onRefresh}
         />
       </WindowLayer>
 

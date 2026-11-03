@@ -63,6 +63,10 @@ interface HomePageProps {
   initialStudyState?: StudyState;
   /** The backend's live copy of lobbies and connections. Each new copy replaces what's shown. */
   studyState?: StudyState;
+  /** Loads the newest lobbies from the backend (the Study Lobbies window's Refresh button) */
+  onRefreshStudy?: () => Promise<void>;
+  /** Opens the Study Lobbies window right away, e.g. on arriving from the pre-survey */
+  openLobbiesAtStart?: boolean;
   /** Every lobby / connection action the user takes, e.g. to send to your backend */
   onStudyAction?: (action: StudyAction) => void;
   /** Starting values for the profile editor beyond the props above (animal, courses, contact…) */
@@ -89,6 +93,8 @@ export default function HomePage({
   locationSuggestions,
   initialStudyState = EMPTY_STUDY_STATE,
   studyState,
+  onRefreshStudy,
+  openLobbiesAtStart = false,
   onStudyAction,
   initialProfile,
   onSaveProfile,
@@ -97,7 +103,7 @@ export default function HomePage({
   onLogOut,
   onDeleteAccount,
 }: HomePageProps) {
-  const [lobbiesOpen, setLobbiesOpen] = useState(false);
+  const [lobbiesOpen, setLobbiesOpen] = useState(openLobbiesAtStart);
   const [connectionsOpen, setConnectionsOpen] = useState(false);
   const [sessionsOpen, setSessionsOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
@@ -205,6 +211,7 @@ export default function HomePage({
               onConnectionsClose={() => setConnectionsOpen(false)}
               sessionsOpen={sessionsOpen}
               onSessionsClose={() => setSessionsOpen(false)}
+              onRefresh={onRefreshStudy}
             />
 
             <WindowLayer>

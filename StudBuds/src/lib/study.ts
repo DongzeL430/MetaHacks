@@ -167,5 +167,6 @@ export function useStudyData() {
     [reloadSoon],
   );
 
-  return { ready, state, people, error, clearError: () => setError(''), act };
+  /** refresh: loads the newest lobbies now (the Refresh button), on top of the live updates */
+  return { ready, state, people, error, clearError: () => setError(''), act, refresh: load };
 }

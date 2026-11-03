@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { Navigate, Routes, Route, useNavigate } from 'react-router';
+import { Navigate, Routes, Route, useLocation, useNavigate } from 'react-router';
 import AuthPage from './AuthPage.tsx';
 import HomePage from './HomePage.tsx';
 import PreSurveyFlow from './PresurveyFlow.tsx';
@@ -23,8 +23,9 @@ function SurveyPage() {
       onFinish={async ({ answers }) => {
         await saveAnswers(answers, SURVEY_SECTIONS);
         await finishOnboarding();
+        // Straight to Home, with the Study Lobbies window open
+        navigate('/', { replace: true, state: { openLobbies: true } });
       }}
-      onDone={() => navigate('/')}
     />
   );
 }
@@ -33,6 +34,8 @@ function SurveyPage() {
 function Home() {
   const me = useMyProfile();
   const study = useStudyData();
+  const location = useLocation();
+  const openLobbies = (location.state as { openLobbies?: boolean } | null)?.openLobbies ?? false;
 
   // Refusals ("This session is full.") show in the nav bar for a few seconds
   const { error, clearError } = study;
@@ -66,6 +69,8 @@ function Home() {
       mySubjects={[...new Set([...me.seekingHelpWith, ...me.coursesTaken])]}
       initialStudyState={study.state}
       studyState={study.state}
+      onRefreshStudy={study.refresh}
+      openLobbiesAtStart={openLobbies}
       onStudyAction={(action) => void study.act(action)}
       initialProfile={{
         availability: me.availability,
@@ -96,7 +101,9 @@ export default function App() {
       <Route
         path="/survey"
         element={
-          <RequireAuth need="new">
+          // Each page gets its own key: without one, React reuses the same RequireAuth (and its
+          // "not finished" status) when moving from the survey to Home, and Home bounced back
+          <RequireAuth key="survey" need="new">
             <SurveyPage />
           </RequireAuth>
         }
@@ -104,7 +111,7 @@ export default function App() {
       <Route
         path="/"
         element={
-          <RequireAuth need="onboarded">
+          <RequireAuth key="home" need="onboarded">
             <Home />
           </RequireAuth>
         }
