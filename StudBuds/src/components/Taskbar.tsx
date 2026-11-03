@@ -256,9 +256,10 @@ export default function Taskbar({
           ].join(' ');
           const contents = (
             <>
-              {/* The default drawing sits in a round badge; a picture (a Muse avatar tile) shows on its own */}
+              {/* The default drawing sits in a round badge; a picture (a Muse avatar tile) shows on its own,
+                  inset so its square corners stay inside the pill's rounded end */}
               <span
-                className={`shrink-0 w-9 h-9 md:w-10 md:h-10 flex ${avatar ? '' : 'p-1 rounded-full bg-sand overflow-hidden'}`}
+                className={`shrink-0 w-9 h-9 md:w-10 md:h-10 flex ${avatar ? 'p-1.5' : 'p-1 rounded-full bg-sand overflow-hidden'}`}
               >
                 {avatar ?? <DefaultAvatar label={`${userName}'s avatar`} />}
               </span>
