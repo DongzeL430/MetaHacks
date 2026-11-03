@@ -17,7 +17,7 @@ import { SURVEY_SECTIONS } from './dataFiles/SurveySections.ts';
 /** The first thing a new account sees: what the survey is for, and how to close this popup */
 const SURVEY_TOUR: TourStep[] = [
   {
-    title: 'Welcome to StudBuds! 👋',
+    title: 'Welcome to StudBuds!',
     closeOnly: true,
     body: (
       <>

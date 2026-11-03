@@ -315,7 +315,7 @@ export default function Tour({ steps, onClose }: TourProps) {
               </button>
             )}
             {interactive ? (
-              <span className="ml-auto text-sm font-bold">Your turn ☝</span>
+              <span className="ml-auto text-sm font-bold">Your turn</span>
             ) : (
               <button type="button" onClick={next} className="ml-auto px-5 py-1">
                 {isLast ? 'Got it' : 'Next'}
