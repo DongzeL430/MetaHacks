@@ -202,5 +202,6 @@ export function useWorldChat(lobbies: Lobby[], people: Map<string, Person>) {
     }
   }, [lobbies, people, say]);
 
-  return { lines, history, unread, markRead };
+  /** notify: posts a line of Home's own, like a reminder */
+  return { lines, history, unread, markRead, notify: say };
 }

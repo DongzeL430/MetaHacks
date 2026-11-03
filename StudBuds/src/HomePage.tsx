@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { WindowLayer, WindowManagerProvider } from './components/AppWindow';
 import Taskbar, { TASKBAR_CLEARANCE } from './components/Taskbar';
@@ -14,6 +14,7 @@ import { welcomeTourSteps } from './components/WelcomeTourSteps';
 import CroftWindow from './components/croft/CroftWindow';
 import WorldChat from './components/WorldChat';
 import { useWorldChat } from './lib/worldChat';
+import { SURVEY_SECTIONS } from './dataFiles/SurveySections';
 import { CroftVisitContext } from './lib/croft';
 import type { MyProfile } from './dataFiles/StudyData';
 import { ME } from './dataFiles/StudyData';
@@ -189,6 +190,20 @@ export default function HomePage({
   // The live activity feed at the bottom right: sessions that fit you, and visits and help on your croft
   const peopleById = useMemo(() => new Map(people.map((p) => [p.id, p])), [people]);
   const chat = useWorldChat(study.lobbies, peopleById);
+  // Survey questions added after this student took the survey: one reminder per visit, since
+  // the profile window can't save until they're answered
+  const newQuestions = SURVEY_SECTIONS.flatMap((sec) => sec.questions).filter((q) => !profile.answers[q.id]).length;
+  const { notify } = chat;
+  const remindedAbout = useRef(0);
+  useEffect(() => {
+    if (newQuestions === 0 || newQuestions === remindedAbout.current) return;
+    remindedAbout.current = newQuestions;
+    notify(
+      newQuestions === 1
+        ? 'There’s 1 new survey question for you. Answer it in your profile, under Answers.'
+        : `There are ${newQuestions} new survey questions for you. Answer them in your profile, under Answers.`,
+    );
+  }, [newQuestions, notify]);
 
   const pendingRequests = Object.values(study.connections).filter((s) => s === 'received').length;
   // People waiting to join the lobby you host

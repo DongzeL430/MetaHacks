@@ -227,7 +227,8 @@ export default function ProfileEditorWindow({
       : `${changesLeft} of 3 nickname or avatar changes left today.`;
 
   const errorId = (field: string) => `${baseId}-${field}-error`;
-  const sectionCounts = showProblems ? problemCounts : {};
+  // Questions added after the student took the survey show from the start, since they block Save
+  const sectionCounts = showProblems ? problemCounts : { answers: unanswered.size || undefined };
 
   // A click outside is easy to make by accident, so unsaved edits are only dropped on purpose
   const requestClose = () => {
@@ -385,13 +386,20 @@ export default function ProfileEditorWindow({
             {section === 'answers' && (
               <>
                 <p className="m-0 text-sm opacity-70">Your pre-survey answers. Matching uses them to find study partners.</p>
+                {unanswered.size > 0 && (
+                  <p className="m-0 text-sm text-danger">
+                    {unanswered.size === 1
+                      ? 'There’s 1 new question since you took the survey. Answer it to save your profile.'
+                      : `There are ${unanswered.size} new questions since you took the survey. Answer them to save your profile.`}
+                  </p>
+                )}
                 {SURVEY_SECTIONS.map((s) => (
                   <section key={s.id} className="flex flex-col gap-1">
                     <h3 className="m-0 px-2 text-xl">{s.title}</h3>
                     <MultipleChoiceSection
                       section={s}
                       values={draft.answers}
-                      missing={showProblems ? unanswered : undefined}
+                      missing={unanswered.size > 0 ? unanswered : undefined}
                       onAnswer={(questionId, option) => update({ answers: { ...draft.answers, [questionId]: option } })}
                     />
                   </section>
