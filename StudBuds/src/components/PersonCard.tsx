@@ -1,11 +1,64 @@
 import { useState } from 'react';
 import PersonAvatar from './PersonAvatar';
+import { ME } from '../dataFiles/StudyData';
 import type { ConnectionStatus, Person } from '../dataFiles/StudyData';
+import { useVisitCroft } from '../lib/croft';
 import type { StudyDispatch } from '../utils/StudyState';
 import { toDayBlocks } from '../utils/ScheduleBlocks';
 
 const CHIP = 'px-1.5 py-0.5 rounded border-2 border-ink/25 text-xs';
 const SMALL_BUTTON = 'px-2.5 py-0.5 text-sm';
+
+/** Opens this person's croft (My Croft). Nothing shows where Home doesn't offer crofts. */
+export function VisitCroftButton({ person, onVisit }: { person: Person; onVisit?: () => void }) {
+  const visit = useVisitCroft();
+  if (!visit) return null;
+  const mine = person.id === ME;
+  return (
+    <button
+      type="button"
+      onClick={() => {
+        onVisit?.();
+        visit(person.id);
+      }}
+      aria-label={mine ? 'Open your croft' : `Visit ${person.name}’s croft`}
+      className={SMALL_BUTTON}
+    >
+      {mine ? 'Your croft' : 'Visit croft'}
+    </button>
+  );
+}
+
+/** "Connected", with a Remove button that asks once before ending the connection */
+function ConnectedControl({ person, dispatch }: { person: Person; dispatch: StudyDispatch }) {
+  const [confirming, setConfirming] = useState(false);
+  if (!confirming) {
+    return (
+      <span className="flex items-center gap-1.5">
+        <span className="px-2 py-0.5 rounded-md bg-free/60 text-sm">Connected</span>
+        <button
+          type="button"
+          onClick={() => setConfirming(true)}
+          aria-label={`Remove ${person.name} from your connections`}
+          className={SMALL_BUTTON}
+        >
+          Remove
+        </button>
+      </span>
+    );
+  }
+  return (
+    <span role="group" aria-label={`Remove ${person.name}?`} className="flex flex-wrap items-center gap-1.5 text-sm">
+      <span>Remove {person.name}?</span>
+      <button type="button" onClick={() => dispatch({ type: 'remove-connect', personId: person.id })} className={SMALL_BUTTON}>
+        Remove
+      </button>
+      <button type="button" onClick={() => setConfirming(false)} className={SMALL_BUTTON} autoFocus>
+        Keep
+      </button>
+    </span>
+  );
+}
 
 /** Friend-request style connect button. Shows what's possible for the current status. */
 export function ConnectControl({
@@ -19,7 +72,7 @@ export function ConnectControl({
 }) {
   switch (status) {
     case 'connected':
-      return <span className="px-2 py-0.5 rounded-md bg-free/60 text-sm">Connected</span>;
+      return <ConnectedControl person={person} dispatch={dispatch} />;
     case 'sent':
       return (
         <button
@@ -75,6 +128,8 @@ interface PersonCardProps {
   dispatch: StudyDispatch;
   /** Shown to the host on everyone else's card: removes them from the session */
   onKick?: () => void;
+  /** Runs before "Visit croft" opens their croft, e.g. to close the popup the card is in */
+  onVisitCroft?: () => void;
 }
 
 /** The host's Remove button, which asks once before removing someone for good */
@@ -106,7 +161,7 @@ function KickControl({ name, onKick }: { name: string; onKick: () => void }) {
 }
 
 /** A filled lobby slot: who they are, what they need help with, when you're both free, what they've taken */
-export default function PersonCard({ person, isHost = false, isMe = false, status, dispatch, onKick }: PersonCardProps) {
+export default function PersonCard({ person, isHost = false, isMe = false, status, dispatch, onKick, onVisitCroft }: PersonCardProps) {
   const blocks = toDayBlocks(person.sharedSlots);
 
   return (
@@ -173,7 +228,10 @@ export default function PersonCard({ person, isHost = false, isMe = false, statu
         </>
       )}
 
-      {onKick && !isMe && <KickControl name={person.name} onKick={onKick} />}
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        {onKick && !isMe ? <KickControl name={person.name} onKick={onKick} /> : <span />}
+        <VisitCroftButton person={person} onVisit={onVisitCroft} />
+      </div>
     </article>
   );
 }

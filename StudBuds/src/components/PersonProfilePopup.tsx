@@ -61,7 +61,8 @@ export default function PersonProfilePopup({ person, status, dispatch, onClose }
           minHeight={260}
           bodyClassName="p-3 flex flex-col gap-3"
         >
-          <PersonCard person={person} status={status} dispatch={dispatch} />
+          {/* Visiting their croft closes this popup, so the croft isn't hidden behind it */}
+          <PersonCard person={person} status={status} dispatch={dispatch} onVisitCroft={onClose} />
         </AppWindow>
       </div>
     </>

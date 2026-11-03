@@ -2,7 +2,8 @@
 -- Everything runs in one transaction that is rolled back, so no test data is left behind.
 -- V is the student looking. H1 hosts a course V rated 1 and H1 rated 5, and answered like V.
 -- H2 and H3 host other subjects and answered differently; H3 is connected with V.
--- N is at a school that isn't linked.
+-- N is at a school that isn't linked. The live database may hold real sessions too, so checks
+-- look only at this test's sessions (ids 10000000-…-00000000000N) and compare their places.
 
 begin;
 create extension if not exists pgtap with schema extensions;
@@ -80,17 +81,17 @@ select throws_ok(
 -- The ranking -------------------------------------------------------------------------------------
 
 select is(
-  (select count(*)::integer from public.lobby_matches()),
+  (select count(*)::integer from public.lobby_matches() where lobby_id::text like '10000000-%'),
   3,
   'V gets a place for every session they can see except their own'
 );
 select is(
-  (select lobby_id from public.lobby_matches() where place = 1),
+  (select lobby_id from public.lobby_matches() where lobby_id::text like '10000000-%' order by place limit 1),
   '10000000-0000-4000-8000-000000000001'::uuid,
   'The host who fits best comes first: their course, opposite ratings, the same answers'
 );
 select ok(
-  (select reasons from public.lobby_matches() where place = 1)
+  (select reasons from public.lobby_matches() where lobby_id = '10000000-0000-4000-8000-000000000001')
     @> array['Covers a course you want help with', 'Similar study habits', 'You agreed on 8 of 8 quick picks'],
   'With its reasons'
 );
@@ -105,7 +106,11 @@ select is(
   'And says so; different answers give no other reasons'
 );
 set local request.jwt.claims to '{"sub": "c1000000-0000-4000-8000-00000000000c", "role": "authenticated"}';
-select is((select count(*)::integer from public.lobby_matches()), 0, 'A school that isn''t linked sees none of them');
+select is(
+  (select count(*)::integer from public.lobby_matches() where lobby_id::text like '10000000-%'),
+  0,
+  'A school that isn''t linked sees none of them'
+);
 
 reset role;
 set local role anon;

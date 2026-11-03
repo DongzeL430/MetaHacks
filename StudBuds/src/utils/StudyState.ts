@@ -23,7 +23,9 @@ export type StudyAction =
   | { type: 'connect'; personId: string }
   | { type: 'cancel-connect'; personId: string }
   | { type: 'accept-connect'; personId: string }
-  | { type: 'decline-connect'; personId: string };
+  | { type: 'decline-connect'; personId: string }
+  /** Ends a connection, from either side */
+  | { type: 'remove-connect'; personId: string };
 
 export type StudyDispatch = (action: StudyAction) => void;
 
@@ -95,6 +97,7 @@ export function studyReducer(state: StudyState, action: StudyAction): StudyState
       return setConnection(action.personId, 'sent');
     case 'cancel-connect':
     case 'decline-connect':
+    case 'remove-connect':
       return setConnection(action.personId, 'none');
     case 'accept-connect':
       return setConnection(action.personId, 'connected');
