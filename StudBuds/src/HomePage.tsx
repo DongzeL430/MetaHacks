@@ -71,8 +71,11 @@ interface HomePageProps {
   onStudyAction?: (action: StudyAction) => void;
   /** Starting values for the profile editor beyond the props above (animal, courses, contact…) */
   initialProfile?: Partial<MyProfile>;
-  /** Saves the edited profile, e.g. to your backend. Throw to show an error in the window. */
-  onSaveProfile?: (profile: MyProfile) => void | Promise<void>;
+  /**
+   * Saves the edited profile, e.g. to your backend. Throw to show an error in the window.
+   * Return the profile as saved if the backend changed anything (matched course names…).
+   */
+  onSaveProfile?: (profile: MyProfile) => void | MyProfile | Promise<void | MyProfile>;
   /** Muse draws a new avatar from the nickname (the profile window's "Draw a new avatar") */
   onRedrawAvatar?: () => Promise<void>;
   /** Nickname and avatar changes left today, shown in the profile window */
@@ -118,13 +121,17 @@ export default function HomePage({
     animal: 'Penguin',
     seekingHelpWith: mySubjects ?? [],
     coursesTaken: [],
+    courses: [],
+    answers: {},
     availability: myAvailability ?? [],
     contact: { discord: '', instagram: '', phone: '' },
     ...initialProfile,
   }));
   const saveProfile = async (next: MyProfile) => {
-    await onSaveProfile?.(next); // if this throws, the window shows the error and keeps the draft
-    setProfile(next);
+    // If this throws, the window shows the error and keeps the draft
+    const saved = (await onSaveProfile?.(next)) ?? next;
+    setProfile(saved);
+    return saved;
   };
   const [study, dispatch] = useStudyState(initialStudyState, onStudyAction, studyState);
 

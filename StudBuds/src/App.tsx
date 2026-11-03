@@ -82,6 +82,8 @@ function Home() {
         contact: me.contact,
         coursesTaken: me.coursesTaken,
         seekingHelpWith: me.seekingHelpWith,
+        courses: me.courses,
+        answers: me.answers,
       }}
       onSaveProfile={me.save}
       onRedrawAvatar={me.redrawAvatar}
