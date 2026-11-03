@@ -1,10 +1,10 @@
 // Reads a screenshot of a weekly schedule with Muse Spark and returns its busy time blocks and
 // any course codes, so the availability calendar can fill itself in. Signed-in students only,
-// DAILY_LIMIT reads a day each. The image goes straight to Meta and is never stored.
+// a few reads a day each (private.muse_limits). The image goes straight to Meta and is never stored.
 
 import { createClient } from 'jsr:@supabase/supabase-js@2';
+import { BUDGET_PAUSED, LIMIT_CHECK_FAILED, claimMuseUse, untilFree } from '../_shared/museBudget.ts';
 
-const DAILY_LIMIT = 5;
 // Base64 of a ~6 MB image. The page shrinks screenshots to well under this before sending.
 const MAX_IMAGE_CHARS = 8_000_000;
 const DAYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
@@ -87,19 +87,12 @@ Deno.serve(async (req) => {
   }
   if (image.length > MAX_IMAGE_CHARS) return fail(413, 'That image is too large.');
 
-  const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-  const { count, error: countError } = await supabase
-    .from('ai_requests')
-    .select('id', { count: 'exact', head: true })
-    .eq('user_id', userId)
-    .eq('kind', 'read_schedule')
-    .gte('created_at', since);
-  if (countError) return fail(500, 'Could not check your daily limit. Try again.');
-  if ((count ?? 0) >= DAILY_LIMIT) {
-    return fail(429, `You've used today's ${DAILY_LIMIT} screenshot reads. Mark your times by hand, or try again tomorrow.`);
+  // Counted before calling Meta, so failed or abandoned reads still count toward the limit
+  const claim = await claimMuseUse(supabase, userId, 'read_schedule');
+  if (!claim.ok) {
+    if (claim.reason === 'student') return fail(429, `You've used today's screenshot reads. Mark your times by hand, or try again ${untilFree(claim.retry_at)}.`);
+    return claim.reason === 'everyone' ? fail(503, BUDGET_PAUSED) : fail(500, LIMIT_CHECK_FAILED);
   }
-  // Counted before calling Meta, so failed or abandoned reads still count toward the limit.
-  await supabase.from('ai_requests').insert({ user_id: userId, kind: 'read_schedule' });
 
   const meta = await fetch('https://api.meta.ai/v1/chat/completions', {
     method: 'POST',

@@ -2,11 +2,11 @@
 // searches the school's official catalog and sample plan of study for each of their majors.
 // Minors aren't searched, since they rarely place courses in terms. Each major's result is
 // cached for 7 days and shared by classmates in the same major. Signed-in students only,
-// DAILY_LIMIT "Find courses" clicks a day each.
+// a few "Find courses" clicks a day each (private.muse_limits).
 
 import { createClient } from 'jsr:@supabase/supabase-js@2';
+import { BUDGET_PAUSED, LIMIT_CHECK_FAILED, claimMuseUse, refundMuseUse, untilFree } from '../_shared/museBudget.ts';
 
-const DAILY_LIMIT = 3;
 const CACHE_DAYS = 7;
 const MAX_MAJORS = 3;
 const MAX_COURSES_PER_MAJOR = 40;
@@ -246,24 +246,12 @@ Deno.serve(async (req) => {
     return fail(400, 'Pick your expected graduation year.');
   }
 
-  const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-  const { count, error: countError } = await supabase
-    .from('ai_requests')
-    .select('id', { count: 'exact', head: true })
-    .eq('user_id', userId)
-    .eq('kind', 'suggest_courses')
-    .gte('created_at', since);
-  if (countError) return fail(500, 'Could not check your daily limit. Try again.');
-  if ((count ?? 0) >= DAILY_LIMIT) {
-    return fail(429, `You've used today's ${DAILY_LIMIT} course searches. Add courses by hand, or try again tomorrow.`);
+  // Counted before searching; given back below if every major fails, since that's on us
+  const claim = await claimMuseUse(supabase, userId, 'suggest_courses');
+  if (!claim.ok) {
+    if (claim.reason === 'student') return fail(429, `You've used today's course searches. Add courses by hand, or try again ${untilFree(claim.retry_at)}.`);
+    return claim.reason === 'everyone' ? fail(503, BUDGET_PAUSED) : fail(500, LIMIT_CHECK_FAILED);
   }
-  // Counted before searching so parallel clicks can't slip past the limit; given back below if
-  // every major fails, since that's on us, not the student.
-  const { data: usage } = await supabase
-    .from('ai_requests')
-    .insert({ user_id: userId, kind: 'suggest_courses' })
-    .select('id')
-    .single();
 
   const freshAfter = new Date(Date.now() - CACHE_DAYS * 24 * 60 * 60 * 1000).toISOString();
 
@@ -309,7 +297,7 @@ Deno.serve(async (req) => {
   const failed = results.filter((r) => r.courses === null).map((r) => r.major.name);
 
   if (courses.length === 0 && failed.length === majors.length) {
-    if (usage) await supabase.from('ai_requests').delete().eq('id', usage.id);
+    await refundMuseUse(supabase, claim);
     return fail(
       502,
       'Muse couldn’t search your school’s catalog right now. This try didn’t count toward your daily limit.',

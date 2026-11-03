@@ -1036,6 +1036,7 @@ export type Database = {
         Returns: undefined
       }
       cancel_join: { Args: { lobby_id: string }; Returns: undefined }
+      claim_muse_use: { Args: { student: string; what: string }; Returns: Json }
       close_lobby: { Args: { lobby_id: string }; Returns: undefined }
       delete_my_account: { Args: never; Returns: undefined }
       finish_onboarding: { Args: never; Returns: undefined }
@@ -1075,6 +1076,7 @@ export type Database = {
           shared_free: Json
         }[]
       }
+      muse_uses_left: { Args: { what: string }; Returns: number }
       pair_on_cooldown: {
         Args: { student_a: string; student_b: string }
         Returns: boolean

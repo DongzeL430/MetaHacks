@@ -4,14 +4,12 @@
 //   redraw   draws a new avatar from the current nickname
 // Muse Spark turns the nickname into one safe thing to draw (an animal, creature, plant or object,
 // never a person), Muse Image draws it in StudBuds' house style, and Muse Spark looks at the
-// picture before anyone else can see it. Renames and redraws share DAILY_CHANGES a day.
+// picture before anyone else can see it. Renames and redraws share one daily limit
+// (private.muse_limits, group 'identity').
 
 import { createClient } from 'jsr:@supabase/supabase-js@2';
+import { BUDGET_PAUSED, LIMIT_CHECK_FAILED, claimMuseUse, refundMuseUse, untilFree } from '../_shared/museBudget.ts';
 
-/** Renames plus redraws per student per 24 hours. Also in public.identity_changes_left(). */
-const DAILY_CHANGES = 3;
-/** First-avatar attempts per student, ever, in case one fails */
-const MAX_STARTERS = 3;
 const NICK_MIN = 2;
 const NICK_MAX = 24;
 // Letters (any language), digits, and spaces, apostrophes, periods, dashes, underscores inside
@@ -191,32 +189,8 @@ Deno.serve(async (req) => {
   if (!me || !account) return fail(403, 'Finish signing up first.');
   if (account.onboarding_status !== 'onboarded') return fail(403, 'Finish the pre-survey first.');
 
-  const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-  const countUses = async (kinds: string[], after?: string) => {
-    let query = supabase
-      .from('ai_requests')
-      .select('id', { count: 'exact', head: true })
-      .eq('user_id', userId)
-      .in('kind', kinds);
-    if (after) query = query.gte('created_at', after);
-    const { count, error } = await query;
-    if (error) throw new Error(error.message);
-    return count ?? 0;
-  };
-
-  // The limit, checked and then counted before any Muse call, so parallel clicks can't slip past it
-  let used: number;
-  try {
-    used =
-      action === 'starter' ? await countUses(['avatar_starter']) : await countUses(['nickname', 'avatar'], since);
-  } catch {
-    return fail(500, 'Could not check your daily limit. Try again.');
-  }
-  if (action === 'starter') {
-    if (me.avatar_path) return reply(200, { nickname: me.nickname, avatarPath: me.avatar_path, changesLeft: null });
-    if (used >= MAX_STARTERS) return fail(429, 'Your first avatar couldn’t be drawn. Try “Draw a new avatar” in your profile.');
-  } else if (used >= DAILY_CHANGES) {
-    return fail(429, `You’ve used today’s ${DAILY_CHANGES} nickname and avatar changes. Try again tomorrow.`);
+  if (action === 'starter' && me.avatar_path) {
+    return reply(200, { nickname: me.nickname, avatarPath: me.avatar_path, changesLeft: null });
   }
 
   let nickname = me.nickname as string;
@@ -239,11 +213,21 @@ Deno.serve(async (req) => {
     if (taken && taken.length > 0) return fail(409, 'Someone already has that nickname. Try another.');
   }
 
+  // Claimed only after the free checks, so a typo or a taken name doesn't use up a change
   const kind = action === 'starter' ? 'avatar_starter' : action === 'rename' ? 'nickname' : 'avatar';
-  const { data: usage } = await supabase.from('ai_requests').insert({ user_id: userId, kind }).select('id').single();
-  const refund = async () => {
-    if (usage) await supabase.from('ai_requests').delete().eq('id', usage.id);
-  };
+  const claim = await claimMuseUse(supabase, userId, kind);
+  if (!claim.ok) {
+    if (claim.reason === 'student') {
+      return fail(
+        429,
+        action === 'starter'
+          ? 'Your first avatar couldn’t be drawn. Try “Draw a new avatar” in your profile.'
+          : `You’ve used today’s nickname and avatar changes. Try again ${untilFree(claim.retry_at)}.`,
+      );
+    }
+    return claim.reason === 'everyone' ? fail(503, BUDGET_PAUSED) : fail(500, LIMIT_CHECK_FAILED);
+  }
+  const refund = () => refundMuseUse(supabase, claim);
 
   try {
     if (action === 'rename') {
@@ -262,7 +246,7 @@ Deno.serve(async (req) => {
       return reply(200, {
         nickname,
         avatarPath: me.avatar_path,
-        changesLeft: Math.max(0, DAILY_CHANGES - used - 1),
+        changesLeft: claim.left,
       });
     }
 
@@ -287,7 +271,7 @@ Deno.serve(async (req) => {
     return reply(200, {
       nickname,
       avatarPath: path,
-      changesLeft: action === 'starter' ? null : Math.max(0, DAILY_CHANGES - used - 1),
+      changesLeft: action === 'starter' ? null : claim.left,
     });
   } catch (err) {
     await refund();

@@ -1,6 +1,6 @@
 // generate-theme: turns a theme description into a theme (colors + optional background image).
 //
-// Flow: sign-in check -> prompt length -> daily limit (ai_requests) -> Muse Spark reviews the
+// Flow: sign-in check -> prompt length -> weekly limit + shared budget (claim_muse_use) -> Muse Spark reviews the
 //       description and writes a palette -> readability check (else the closest built-in palette)
 //       -> Muse Image draws the background -> Muse Spark checks it -> returns the theme as data.
 //
@@ -11,13 +11,12 @@
 // here can never put anything unsafe on screen.
 
 import { createClient } from 'jsr:@supabase/supabase-js@2';
+import { BUDGET_PAUSED, LIMIT_CHECK_FAILED, claimMuseUse, refundMuseUse, untilFree } from '../_shared/museBudget.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 const META_API_KEY = Deno.env.get('META_API_KEY');
 
-/** Themes each user can make per 24 hours */
-const DAILY_LIMIT = 10;
 const MIN_PROMPT = 5;
 const MAX_PROMPT = 300;
 const BACKGROUND_BUCKET = 'user-backgrounds';
@@ -313,23 +312,18 @@ Deno.serve(async (req) => {
     return json({ error: `Describe your theme in ${MIN_PROMPT} to ${MAX_PROMPT} characters.` }, 400);
   }
 
-  // Daily limit, counted in ai_requests (service role, so the count can't be dodged from the browser)
-  const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-  const { count, error: countError } = await admin
-    .from('ai_requests')
-    .select('id', { count: 'exact', head: true })
-    .eq('user_id', user.id)
-    .eq('kind', 'theme')
-    .gte('created_at', since);
-  if (countError) return json({ error: 'Couldn’t make a theme right now. Try again in a moment.' }, 500);
-  if ((count ?? 0) >= DAILY_LIMIT) {
-    return json({ error: 'You’ve made a lot of themes today. Try again tomorrow.' }, 429);
+  // Themes are a Home feature, so only students who finished the pre-survey can make them
+  const { data: account } = await admin.from('profiles').select('onboarding_status').eq('id', user.id).single();
+  if (account?.onboarding_status !== 'onboarded') return json({ error: 'Finish the pre-survey first.' }, 403);
+
+  // 3 a week per student (private.muse_limits), plus the daily budget shared by everyone
+  const claim = await claimMuseUse(admin, user.id, 'theme');
+  if (!claim.ok) {
+    if (claim.reason === 'student') {
+      return json({ error: `You’ve made this week’s 3 themes. You can make another ${untilFree(claim.retry_at)}.` }, 429);
+    }
+    return json({ error: claim.reason === 'everyone' ? BUDGET_PAUSED : LIMIT_CHECK_FAILED }, claim.reason === 'everyone' ? 503 : 500);
   }
-  const { data: usage } = await admin
-    .from('ai_requests')
-    .insert({ user_id: user.id, kind: 'theme' })
-    .select('id')
-    .single();
 
   // Review + colors. If Muse can't be reached, the try doesn't count.
   let review: Review;
@@ -337,7 +331,7 @@ Deno.serve(async (req) => {
     review = await reviewAndPalette(prompt);
   } catch (err) {
     console.error('theme review failed', err);
-    if (usage) await admin.from('ai_requests').delete().eq('id', usage.id);
+    await refundMuseUse(admin, claim);
     return json({ error: 'Couldn’t make a theme right now. This try didn’t count. Try again in a moment.' }, 502);
   }
   if (!review.allowed) return json({ error: review.reason || 'Try describing a different theme.' }, 400);
@@ -376,5 +370,5 @@ Deno.serve(async (req) => {
     note = 'Custom background images are coming soon. Your colors are ready.';
   }
 
-  return json({ theme, note });
+  return json({ theme, note, themesLeft: claim.left });
 });

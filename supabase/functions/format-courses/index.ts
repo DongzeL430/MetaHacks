@@ -6,11 +6,12 @@
 //      same majors saved, then the rest of the school's list.
 //   3. Muse Spark searches the school's own catalog for anything still unmatched.
 // A name it can't place comes back without a code, and the student keeps it under the name they
-// typed (private, not matched). Signed-in students only, DAILY_LIMIT calls a day that reach Muse.
+// typed (private, not matched). Signed-in students only, a limited number of calls a day that
+// reach Muse (private.muse_limits).
 
 import { createClient } from 'jsr:@supabase/supabase-js@2';
+import { BUDGET_PAUSED, LIMIT_CHECK_FAILED, claimMuseUse, refundMuseUse, untilFree } from '../_shared/museBudget.ts';
 
-const DAILY_LIMIT = 10;
 const MAX_NAMES = 25;
 const MAX_MAJORS = 3;
 // Catalog searches cost the most, so only this many names go to the web step per call
@@ -294,22 +295,11 @@ Deno.serve(async (req) => {
   if (open.length === 0) return reply(200, { courses: [...results.values()] });
 
   // Everything left needs Muse, which counts toward the daily limit
-  const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-  const { count, error: countError } = await supabase
-    .from('ai_requests')
-    .select('id', { count: 'exact', head: true })
-    .eq('user_id', userId)
-    .eq('kind', 'format_courses')
-    .gte('created_at', since);
-  if (countError) return fail(500, 'Could not check your daily limit. Try again.');
-  if ((count ?? 0) >= DAILY_LIMIT) {
-    return fail(429, `You've used today's ${DAILY_LIMIT} course checks. Your courses can still be saved as you typed them.`);
+  const claim = await claimMuseUse(supabase, userId, 'format_courses');
+  if (!claim.ok) {
+    if (claim.reason === 'student') return fail(429, `You've used today's course checks. Your courses can still be saved as you typed them, or try again ${untilFree(claim.retry_at)}.`);
+    return claim.reason === 'everyone' ? fail(503, BUDGET_PAUSED) : fail(500, LIMIT_CHECK_FAILED);
   }
-  const { data: usage } = await supabase
-    .from('ai_requests')
-    .insert({ user_id: userId, kind: 'format_courses' })
-    .select('id')
-    .single();
 
   let museWorked = false;
 
@@ -354,7 +344,7 @@ Deno.serve(async (req) => {
   }
 
   // Muse never answered: that's on us, so the try doesn't count
-  if (!museWorked && usage) await supabase.from('ai_requests').delete().eq('id', usage.id);
+  if (!museWorked) await refundMuseUse(supabase, claim);
 
   return reply(200, { courses: [...results.values()], checked: museWorked });
 });
