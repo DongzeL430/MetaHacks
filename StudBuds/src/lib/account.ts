@@ -21,12 +21,19 @@ export function useAccount() {
       }
       // Just signed in: don't let a guard act on the old "signed-out" while the profile loads
       setStatus((s) => (s === 'signed-out' ? 'loading' : s));
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('profiles')
         .select('onboarding_status')
         .eq('id', next.user.id)
         .maybeSingle();
-      if (!cancelled) setStatus(data?.onboarding_status === 'onboarded' ? 'onboarded' : 'new');
+      if (cancelled) return;
+      if (error) {
+        // Couldn't read the profile (a connection blip): try again rather than guess "new",
+        // which would send a finished student back into the pre-survey
+        setTimeout(() => void load(next), 2000);
+        return;
+      }
+      setStatus(data?.onboarding_status === 'onboarded' ? 'onboarded' : 'new');
     };
 
     // Fires right away with the saved session, then on every log in, log out and token refresh.

@@ -73,7 +73,7 @@ select lives_ok(
   'Saving again replaces the old answers'
 );
 select throws_ok(
-  $$select public.save_my_answers('[{"key": "petPick", "choice": 3}]'::jsonb)$$,
+  $$select public.save_my_answers('[{"key": "frequency", "choice": 4}]'::jsonb)$$,
   '42501', null,
   'An answer past the last option is rejected'
 );

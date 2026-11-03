@@ -589,7 +589,7 @@ export type Database = {
           approved: boolean
           category: string
           created_at: string
-          flexible_option: number | null
+          flexible_options: number[]
           id: number
           key: string
           kind: string
@@ -603,7 +603,7 @@ export type Database = {
           approved?: boolean
           category: string
           created_at?: string
-          flexible_option?: number | null
+          flexible_options?: number[]
           id?: never
           key: string
           kind: string
@@ -617,7 +617,7 @@ export type Database = {
           approved?: boolean
           category?: string
           created_at?: string
-          flexible_option?: number | null
+          flexible_options?: number[]
           id?: never
           key?: string
           kind?: string

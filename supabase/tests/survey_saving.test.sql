@@ -24,17 +24,17 @@ select is(
   8,
   'The 8 This or That questions are in'
 );
-select throws_ok(
-  $$insert into public.survey_questions (key, kind, category, position, prompt, options, approved)
-    values ('testThree', 'this_or_that', 'test', 99, 'test: three options?', array['One', 'Two', 'Three'], true)$$,
-  '23514', null,
-  'A This or That question has exactly two options'
+select is(
+  (select count(*)::integer from public.survey_questions
+   where kind = 'this_or_that' and options[3] = 'Both' and options[4] = 'No preference' and flexible_options = '{3,4}'),
+  8,
+  'Every This or That pick also offers Both and No preference, which fit any answer'
 );
 select throws_ok(
-  $$insert into public.survey_questions (key, kind, category, position, prompt, options, flexible_option, approved)
-    values ('testFlexible', 'habit', 'test', 99, 'test: flexible option past the end?', array['One', 'Two'], 3, true)$$,
+  $$insert into public.survey_questions (key, kind, category, position, prompt, options, flexible_options, approved)
+    values ('testFlexible', 'habit', 'test', 99, 'test: flexible option past the end?', array['One', 'Two'], '{3}', true)$$,
   '23514', null,
-  'The "fits any answer" option must be one of the options'
+  'A "fits any answer" option must be one of the options'
 );
 
 
