@@ -42,6 +42,9 @@ const LinkIcon = () => (
 
 const EMPTY_STUDY_STATE: StudyState = { lobbies: [], connections: {} };
 
+/** Windows opened from the nav bar */
+type NavApp = 'lobbies' | 'sessions' | 'connections' | 'profile';
+
 interface HomePageProps {
   /** The user's generated name, shown next to the avatar in the taskbar */
   userName?: string;
@@ -97,16 +100,20 @@ export default function HomePage({
   onLogOut,
   onDeleteAccount,
 }: HomePageProps) {
-  const [lobbiesOpen, setLobbiesOpen] = useState(false);
-  const [connectionsOpen, setConnectionsOpen] = useState(false);
-  const [sessionsOpen, setSessionsOpen] = useState(false);
+  // One nav bar app open at a time: opening one closes the other, instead of stacking windows
+  const [openApp, setOpenApp] = useState<NavApp | null>(null);
+  const toggleApp = (app: NavApp) => setOpenApp((current) => (current === app ? null : app));
+  const closeApp = (app: NavApp) => setOpenApp((current) => (current === app ? null : current));
+  const lobbiesOpen = openApp === 'lobbies';
+  const connectionsOpen = openApp === 'connections';
+  const sessionsOpen = openApp === 'sessions';
+  const profileOpen = openApp === 'profile';
   // Theme: 'default' (sun) or 'custom' (star). The star opens the prompt window.
   // The user's theme: loaded from Supabase, applied to the whole page, saved when it changes
   const theme = useUserTheme();
   const [themePromptOpen, setThemePromptOpen] = useState(false);
 
   // The user's own profile. Saving it updates the nav bar, lobby filters and host form right away.
-  const [profileOpen, setProfileOpen] = useState(false);
   const [profile, setProfile] = useState<MyProfile>(() => ({
     nickname: userName,
     animal: 'Penguin',
@@ -134,7 +141,7 @@ export default function HomePage({
       label: lobbiesOpen ? 'Close study lobbies' : 'Open study lobbies',
       icon: <LobbiesIcon />,
       open: lobbiesOpen,
-      onClick: () => setLobbiesOpen((o) => !o),
+      onClick: () => toggleApp('lobbies'),
     },
     {
       id: 'sessions',
@@ -144,7 +151,7 @@ export default function HomePage({
         (waitingToJoin > 0 ? ` (${waitingToJoin} waiting to join)` : ''),
       icon: <SessionsIcon />,
       open: sessionsOpen,
-      onClick: () => setSessionsOpen((o) => !o),
+      onClick: () => toggleApp('sessions'),
     },
     {
       id: 'connections',
@@ -154,7 +161,7 @@ export default function HomePage({
         (pendingRequests > 0 ? ` (${pendingRequests} new request${pendingRequests === 1 ? '' : 's'})` : ''),
       icon: <LinkIcon />,
       open: connectionsOpen,
-      onClick: () => setConnectionsOpen((o) => !o),
+      onClick: () => toggleApp('connections'),
     },
   ];
 
@@ -163,7 +170,7 @@ export default function HomePage({
     <div className="doodle w-full h-dvh flex flex-col overflow-clip">
       <Taskbar
         userName={profile.nickname}
-        profile={{ open: profileOpen, onClick: () => setProfileOpen((o) => !o) }}
+        profile={{ open: profileOpen, onClick: () => toggleApp('profile') }}
         avatar={avatar}
         right={taskbarRight}
         apps={taskbarApps}
@@ -200,18 +207,18 @@ export default function HomePage({
               state={study}
               dispatch={dispatch}
               lobbiesOpen={lobbiesOpen}
-              onLobbiesClose={() => setLobbiesOpen(false)}
+              onLobbiesClose={() => closeApp('lobbies')}
               connectionsOpen={connectionsOpen}
-              onConnectionsClose={() => setConnectionsOpen(false)}
+              onConnectionsClose={() => closeApp('connections')}
               sessionsOpen={sessionsOpen}
-              onSessionsClose={() => setSessionsOpen(false)}
+              onSessionsClose={() => closeApp('sessions')}
             />
 
             <WindowLayer>
               <ProfileEditorWindow
                 id="profile"
                 open={profileOpen}
-                onClose={() => setProfileOpen(false)}
+                onClose={() => closeApp('profile')}
                 profile={profile}
                 onSave={saveProfile}
                 avatarUrl={avatarUrl}
@@ -235,6 +242,7 @@ export default function HomePage({
               theme.switchToSaved();
               setThemePromptOpen(false);
             }}
+            themesLeft={theme.themesLeft}
           />
         </div>
       </main>

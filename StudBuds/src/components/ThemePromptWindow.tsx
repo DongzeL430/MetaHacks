@@ -25,6 +25,8 @@ interface ThemePromptWindowProps {
   savedThemeName?: string;
   /** Switches back to the saved custom theme */
   onUseSaved?: () => void;
+  /** Themes the user can still make this week (3 a week), or null if unknown */
+  themesLeft?: number | null;
 }
 
 /**
@@ -33,7 +35,14 @@ interface ThemePromptWindowProps {
  * Closes with its X, Cancel, Escape, or a click on the dimmed area.
  * Render it in the desk area (which needs `relative`), not inside a WindowLayer.
  */
-export default function ThemePromptWindow({ open, onClose, onGenerate, savedThemeName, onUseSaved }: ThemePromptWindowProps) {
+export default function ThemePromptWindow({
+  open,
+  onClose,
+  onGenerate,
+  savedThemeName,
+  onUseSaved,
+  themesLeft = null,
+}: ThemePromptWindowProps) {
   const titleId = useId();
   const fieldId = useId();
   const boxRef = useRef<HTMLTextAreaElement>(null);
@@ -54,7 +63,8 @@ export default function ThemePromptWindow({ open, onClose, onGenerate, savedThem
 
   const trimmed = prompt.trim();
   const tooShort = trimmed.length < MIN_THEME_PROMPT;
-  const canGenerate = !!onGenerate && !tooShort && !working;
+  const outOfThemes = themesLeft === 0;
+  const canGenerate = !!onGenerate && !tooShort && !working && !outOfThemes;
 
   const generate = async () => {
     if (!canGenerate || !onGenerate) return;
@@ -74,7 +84,14 @@ export default function ThemePromptWindow({ open, onClose, onGenerate, savedThem
     ? 'Custom themes aren’t connected yet.'
     : working
       ? 'Making your theme…'
-      : error || (tooShort ? 'Describe the look you want to get started.' : '');
+      : error ||
+        (outOfThemes
+          ? 'You’ve made this week’s 3 themes. Your saved theme stays, and you can make another later in the week.'
+          : tooShort
+            ? 'Describe the look you want to get started.'
+            : themesLeft !== null
+              ? `${themesLeft} of 3 themes left this week.`
+              : '');
 
   return (
     <>
