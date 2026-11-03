@@ -178,6 +178,48 @@ export type Database = {
           },
         ]
       }
+      connections: {
+        Row: {
+          addressee_id: string
+          connected_at: string | null
+          created_at: string
+          id: number
+          requester_id: string
+          status: string
+        }
+        Insert: {
+          addressee_id: string
+          connected_at?: string | null
+          created_at?: string
+          id?: never
+          requester_id: string
+          status?: string
+        }
+        Update: {
+          addressee_id?: string
+          connected_at?: string | null
+          created_at?: string
+          id?: never
+          requester_id?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "connections_addressee_id_fkey"
+            columns: ["addressee_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "connections_requester_id_fkey"
+            columns: ["requester_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       contact_shares: {
         Row: {
           decided_at: string
@@ -1070,13 +1112,22 @@ export type Database = {
         Args: { found: Json; school: string }
         Returns: undefined
       }
+      answer_connection: {
+        Args: { accept: boolean; person: string }
+        Returns: undefined
+      }
       answer_join: {
         Args: { accept: boolean; lobby_id: string; student: string }
+        Returns: undefined
+      }
+      cancel_connection_request: {
+        Args: { person: string }
         Returns: undefined
       }
       cancel_join: { Args: { lobby_id: string }; Returns: undefined }
       claim_muse_use: { Args: { student: string; what: string }; Returns: Json }
       close_lobby: { Args: { lobby_id: string }; Returns: undefined }
+      connect_with: { Args: { person: string }; Returns: undefined }
       delete_my_account: { Args: never; Returns: undefined }
       finish_onboarding: { Args: never; Returns: undefined }
       hook_before_user_created: { Args: { event: Json }; Returns: Json }

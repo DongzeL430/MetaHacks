@@ -3,7 +3,7 @@ import { avatarUrlOf } from './profile.ts';
 import { rangesToSlots, slotsToRange } from './slots.ts';
 import { supabase } from './supabase.ts';
 import { ME } from '../dataFiles/StudyData';
-import type { Lobby, Person } from '../dataFiles/StudyData';
+import type { ConnectionStatus, Lobby, Person } from '../dataFiles/StudyData';
 import type { StudyAction, StudyState } from '../utils/StudyState';
 
 /** After a burst of changes (a request, then an accept), reload once */
@@ -12,7 +12,8 @@ const RELOAD_DELAY_MS = 250;
 const EMPTY: StudyState = { lobbies: [], connections: {} };
 
 /**
- * Lobbies at the student's school, the people in them, and every lobby action, through Supabase.
+ * Lobbies at the student's school, the people in them, connections, and every lobby and
+ * connection action, through Supabase.
  * State comes from the database and stays live with Realtime; Home updates right away on a click
  * and then settles on what the database says. The signed-in student appears as ME in lists.
  */
@@ -29,18 +30,28 @@ export function useStudyData() {
     if (!me) return;
     const local = (id: string) => (id === me ? ME : id);
 
-    const [lobbies, members, cards] = await Promise.all([
+    const [lobbies, members, cards, links] = await Promise.all([
       supabase.from('lobbies').select('id, host_id, subject, max_size, location, weekday, starts_at, ends_at, locked'),
       supabase.from('lobby_members').select('lobby_id, user_id, role, joined_at').order('joined_at'),
       supabase.rpc('lobby_people'),
+      supabase.from('connections').select('requester_id, addressee_id, status'),
     ]);
-    if (lobbies.error || members.error || cards.error) {
+    if (lobbies.error || members.error || cards.error || links.error) {
       setError('Couldn’t load lobbies right now. Check your connection.');
       return;
     }
 
-    setState((prev) => ({
-      ...prev,
+    // Friend-request style statuses, from this student's side. A request they sent stays "sent"
+    // even if it was declined: the database never tells the sender.
+    const connections: Record<string, ConnectionStatus> = {};
+    for (const c of links.data) {
+      const sent = c.requester_id === me;
+      connections[sent ? c.addressee_id : c.requester_id] =
+        c.status === 'connected' ? 'connected' : sent ? 'sent' : 'received';
+    }
+
+    setState(() => ({
+      connections,
       lobbies: lobbies.data.map((l): Lobby => {
         const rows = members.data.filter((m) => m.lobby_id === l.id);
         const joined = rows.filter((m) => m.role === 'member' && m.user_id !== l.host_id).map((m) => local(m.user_id));
@@ -90,6 +101,7 @@ export function useStudyData() {
         .channel('study-lobbies')
         .on('postgres_changes', { event: '*', schema: 'public', table: 'lobbies' }, reloadSoon)
         .on('postgres_changes', { event: '*', schema: 'public', table: 'lobby_members' }, reloadSoon)
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'connections' }, reloadSoon)
         .subscribe((status) => {
           // Back after a dropped connection: catch up on anything missed
           if (status === 'SUBSCRIBED') reloadSoon();
@@ -151,9 +163,19 @@ export function useStudyData() {
             accept: action.type === 'accept-join',
           });
           break;
-        default:
-          // Connection requests arrive with Step 4
-          return;
+        case 'connect':
+          result = await supabase.rpc('connect_with', { person: toId(action.personId) });
+          break;
+        case 'cancel-connect':
+          result = await supabase.rpc('cancel_connection_request', { person: toId(action.personId) });
+          break;
+        case 'accept-connect':
+        case 'decline-connect':
+          result = await supabase.rpc('answer_connection', {
+            person: toId(action.personId),
+            accept: action.type === 'accept-connect',
+          });
+          break;
       }
 
       if (result?.error) {
