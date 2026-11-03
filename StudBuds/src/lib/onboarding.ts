@@ -64,7 +64,10 @@ export async function saveAnswers(answers: Record<string, string>, sections: Sur
       .filter((a) => a.choice > 0),
   );
   const { error } = await supabase.rpc('save_my_answers', { answers: rows });
-  if (error) throw new Error('Your answers didn’t save. Check your connection and try again.');
+  if (error) {
+    // P0001 ("You’ve changed your survey answers a lot today…") is written for students
+    throw new Error(error.code === 'P0001' ? error.message : 'Your answers didn’t save. Check your connection and try again.');
+  }
 }
 
 /**
