@@ -17,7 +17,7 @@ const initialsOf = (name: string) =>
     .toUpperCase();
 
 /**
- * A person's photo, or their initials on a colored circle.
+ * A person's avatar picture, or their initials on a colored circle.
  * Decorative: their name is always shown next to it, so screen readers skip it.
  * Size it with className, e.g. "w-12 h-12".
  */
@@ -30,8 +30,11 @@ export default function PersonAvatar({
 }) {
   const shared = `${className} shrink-0 rounded-full border-2 border-[#3c3c3c]`;
 
+  // A Muse avatar is its own square tile, so it shows as is: no circle, and none of doodle.css's image frame
   if (person.avatar) {
-    return <img src={person.avatar} alt="" className={`${shared} object-cover bg-[#FDF7F1]`} />;
+    return (
+      <img src={person.avatar} alt="" className={`${className} shrink-0 object-contain rounded-none border-0 [border-image:none]`} />
+    );
   }
 
   return (

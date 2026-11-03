@@ -332,7 +332,17 @@ export default function ProfileEditorWindow({
         {section === 'profile' && (
           <>
             <div className="flex items-center gap-3">
-              <PersonAvatar person={{ id: 'me', name: draft.nickname || '?', avatar: avatarUrl }} className="w-20 h-20" />
+              {/* The drawing is its own square tile, so it shows as is, without the round frame */}
+              {avatarUrl ? (
+                // doodle.css frames every image; the utilities turn that off here
+                <img
+                  src={avatarUrl}
+                  alt="Your avatar"
+                  className="w-24 h-24 shrink-0 object-contain rounded-none border-0 [border-image:none]"
+                />
+              ) : (
+                <PersonAvatar person={{ id: 'me', name: draft.nickname || '?' }} className="w-20 h-20" />
+              )}
               <div className="flex flex-col items-start gap-1.5">
                 <p className="m-0 text-sm opacity-70">This is how you appear in lobbies and in the nav bar.</p>
                 {onRedrawAvatar && (
