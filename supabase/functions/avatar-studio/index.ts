@@ -12,8 +12,9 @@ import { BUDGET_PAUSED, LIMIT_CHECK_FAILED, claimMuseUse, refundMuseUse, untilFr
 
 const NICK_MIN = 2;
 const NICK_MAX = 24;
-// Letters (any language), digits, and spaces, apostrophes, periods, dashes, underscores inside
-const NICK_PATTERN = /^[\p{L}\p{N}](?:[\p{L}\p{N} '._-]*[\p{L}\p{N}])?$/u;
+// Latin letters and digits, with spaces, apostrophes, periods, dashes, underscores inside. Only
+// Latin, so a name can't copy a classmate's with a lookalike letter from another alphabet.
+const NICK_PATTERN = /^[A-Za-z0-9](?:[A-Za-z0-9 '._-]*[A-Za-z0-9])?$/;
 const BUCKET = 'avatars';
 const MAX_IMAGE_BYTES = 2 * 1024 * 1024;
 
@@ -203,7 +204,7 @@ Deno.serve(async (req) => {
       return fail(400, `Use ${NICK_MIN} to ${NICK_MAX} characters.`);
     }
     if (!NICK_PATTERN.test(nickname)) {
-      return fail(400, 'Use letters and numbers, with spaces, periods, dashes or underscores in between.');
+      return fail(400, 'Use English letters and numbers, with spaces, periods, dashes or underscores in between.');
     }
     if (nickname === me.nickname) return fail(400, 'That’s already your nickname.');
     // Free check first, so a taken name doesn't cost a Muse call or a change
@@ -230,13 +231,15 @@ Deno.serve(async (req) => {
     }
     return claim.reason === 'everyone' ? fail(503, BUDGET_PAUSED) : fail(500, LIMIT_CHECK_FAILED);
   }
+  // Given back only when the failure is ours (Meta unreachable, storage or database errors). A
+  // nickname Muse turns down, or a drawing that fails its check twice, still counts: refunding
+  // those would let a script loop paid Muse calls forever without touching any limit.
   const refund = () => refundMuseUse(supabase, claim);
 
   try {
     if (action === 'rename') {
       const review = await reviewNickname(nickname);
       if (!review.allowed) {
-        await refund();
         return fail(400, review.reason || 'Pick a different nickname.');
       }
       const { error } = await supabase.from('public_profiles').update({ nickname }).eq('id', userId);
@@ -277,8 +280,9 @@ Deno.serve(async (req) => {
       changesLeft: action === 'starter' ? null : claim.left,
     });
   } catch (err) {
-    await refund();
+    // Muse refused or couldn't draw a good one: that used real Muse calls, so it counts
     if (err instanceof StudentError) return fail(400, err.message);
+    await refund();
     console.error('avatar-studio failed', action, String(err).slice(0, 400));
     return fail(502, 'Muse couldn’t do that right now. This try didn’t count. Try again in a minute.');
   }

@@ -246,16 +246,10 @@ Deno.serve(async (req) => {
     return fail(400, 'Pick your expected graduation year.');
   }
 
-  // Counted before searching; given back below if every major fails, since that's on us
-  const claim = await claimMuseUse(supabase, userId, 'suggest_courses');
-  if (!claim.ok) {
-    if (claim.reason === 'student') return fail(429, `You've used today's course searches. Add courses by hand, or try again ${untilFree(claim.retry_at)}.`);
-    return claim.reason === 'everyone' ? fail(503, BUDGET_PAUSED) : fail(500, LIMIT_CHECK_FAILED);
-  }
-
   const freshAfter = new Date(Date.now() - CACHE_DAYS * 24 * 60 * 60 * 1000).toISOString();
 
-  const results = await Promise.all(
+  // Cached majors first, for free: a search is only counted when some major needs Muse
+  const lookups = await Promise.all(
     majors.map(async (major) => {
       const key = {
         university_domain: domain,
@@ -270,8 +264,22 @@ Deno.serve(async (req) => {
         .match(key)
         .gte('searched_at', freshAfter)
         .maybeSingle();
-      if (cached) return { major, courses: cached.courses as Course[] };
+      return { major, key, cached: cached ? (cached.courses as Course[]) : null };
+    }),
+  );
 
+  const toSearch = lookups.filter((l) => l.cached === null);
+  const claim = toSearch.length > 0 ? await claimMuseUse(supabase, userId, 'suggest_courses') : null;
+  if (claim && !claim.ok) {
+    if (claim.reason === 'student') return fail(429, `You've used today's course searches. Add courses by hand, or try again ${untilFree(claim.retry_at)}.`);
+    return claim.reason === 'everyone' ? fail(503, BUDGET_PAUSED) : fail(500, LIMIT_CHECK_FAILED);
+  }
+
+  // Whether a failure was Meta's (unreachable, too slow, or a 5xx/429), not the answer's
+  let metaDown = 0;
+  const results = await Promise.all(
+    lookups.map(async ({ major, key, cached }) => {
+      if (cached) return { major, courses: cached };
       try {
         const courses = await searchMajor(school, domain, major, gradYear, classYear);
         const sources = [...new Set(courses.map((c) => c.source))];
@@ -280,7 +288,9 @@ Deno.serve(async (req) => {
           .upsert({ ...key, courses, sources, searched_at: new Date().toISOString() });
         return { major, courses };
       } catch (err) {
-        console.error('suggest-courses search failed', String(err).slice(0, 300));
+        const text = String(err);
+        if (/Meta API (5\d\d|429)|TimeoutError|AbortError|TypeError|network/i.test(text)) metaDown++;
+        console.error('suggest-courses search failed', text.slice(0, 300));
         return { major, courses: null };
       }
     }),
@@ -296,11 +306,16 @@ Deno.serve(async (req) => {
   const courses = [...merged.values()];
   const failed = results.filter((r) => r.courses === null).map((r) => r.major.name);
 
+  // Given back only when every search failed on Meta's side. An answer Muse couldn't turn into
+  // courses still counts: odd input can cause that, and refunding it would allow endless paid searches.
   if (courses.length === 0 && failed.length === majors.length) {
-    await refundMuseUse(supabase, claim);
+    const ours = claim !== null && metaDown === toSearch.length;
+    if (ours) await refundMuseUse(supabase, claim);
     return fail(
       502,
-      'Muse couldn’t search your school’s catalog right now. This try didn’t count toward your daily limit.',
+      ours
+        ? 'Muse couldn’t search your school’s catalog right now. This try didn’t count toward your daily limit.'
+        : 'Muse couldn’t find courses for that major. Check its name, or add your courses by hand.',
     );
   }
 

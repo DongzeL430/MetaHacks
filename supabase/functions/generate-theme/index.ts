@@ -559,15 +559,21 @@ async function composeForSavedTheme(admin: SupabaseClient, userId: string, theme
 
   const name = typeof theme.name === 'string' ? theme.name : 'My theme';
   const colors = (theme.colors ?? {}) as Record<string, string>;
+  // Given back only when Muse couldn't be reached; a tune that came back unusable still counts
+  let unreachable = false;
   const music = await piecesToAvoid(admin, userId, themeId)
     .then((avoid) => composeMusic(name, name, colors, avoid))
     .catch((err) => {
+      unreachable = true;
       console.error('music composing failed', String(err).slice(0, 300));
       return null;
     });
   if (!music) {
-    await refundMuseUse(admin, claim);
-    return json({ error: 'Muse couldn’t write this theme’s music right now. This try didn’t count.' }, 502);
+    if (unreachable) await refundMuseUse(admin, claim);
+    return json(
+      { error: unreachable ? 'Muse couldn’t write this theme’s music right now. This try didn’t count.' : 'Muse’s tune didn’t come out right. Try again later.' },
+      502,
+    );
   }
 
   const updated = { ...theme, music };

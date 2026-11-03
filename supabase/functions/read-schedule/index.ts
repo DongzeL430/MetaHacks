@@ -3,7 +3,7 @@
 // a few reads a day each (private.muse_limits). The image goes straight to Meta and is never stored.
 
 import { createClient } from 'jsr:@supabase/supabase-js@2';
-import { BUDGET_PAUSED, LIMIT_CHECK_FAILED, claimMuseUse, untilFree } from '../_shared/museBudget.ts';
+import { BUDGET_PAUSED, LIMIT_CHECK_FAILED, claimMuseUse, refundMuseUse, untilFree } from '../_shared/museBudget.ts';
 
 // Base64 of a ~6 MB image. The page shrinks screenshots to well under this before sending.
 const MAX_IMAGE_CHARS = 8_000_000;
@@ -94,8 +94,17 @@ Deno.serve(async (req) => {
     return claim.reason === 'everyone' ? fail(503, BUDGET_PAUSED) : fail(500, LIMIT_CHECK_FAILED);
   }
 
-  const meta = await fetch('https://api.meta.ai/v1/chat/completions', {
+  // Meta unreachable, too slow, or an error on its side: that's on us, so the read doesn't count.
+  // An answer that comes back unreadable still counts (an odd image can cause that).
+  const notOnYou = async () => {
+    await refundMuseUse(supabase, claim);
+    return fail(502, 'Muse couldn’t read that image right now. This try didn’t count. Try again in a minute.');
+  };
+  let meta: Response;
+  try {
+    meta = await fetch('https://api.meta.ai/v1/chat/completions', {
     method: 'POST',
+    signal: AbortSignal.timeout(60_000),
     headers: {
       Authorization: `Bearer ${Deno.env.get('META_API_KEY')}`,
       'Content-Type': 'application/json',
@@ -120,11 +129,15 @@ Deno.serve(async (req) => {
         json_schema: { name: 'weekly_schedule', strict: true, schema: SCHEMA },
       },
     }),
-  });
+    });
+  } catch (err) {
+    console.error('Meta API unreachable', String(err).slice(0, 300));
+    return notOnYou();
+  }
 
   if (!meta.ok) {
     console.error('Meta API error', meta.status, (await meta.text()).slice(0, 500));
-    return fail(502, 'Muse couldn’t read that image right now. Try again in a minute.');
+    return meta.status >= 500 || meta.status === 429 ? notOnYou() : fail(502, 'Muse couldn’t read that image. Try a clearer screenshot.');
   }
 
   const completion = await meta.json();
