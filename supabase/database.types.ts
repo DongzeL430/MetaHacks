@@ -55,6 +55,35 @@ export type Database = {
           },
         ]
       }
+      action_log: {
+        Row: {
+          created_at: string
+          id: number
+          kind: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: never
+          kind: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: never
+          kind?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "action_log_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ai_requests: {
         Row: {
           created_at: string
@@ -291,6 +320,141 @@ export type Database = {
           slug?: string
         }
         Relationships: []
+      }
+      lobbies: {
+        Row: {
+          created_at: string
+          ends_at: string
+          host_id: string
+          id: string
+          location: string
+          locked: boolean
+          max_size: number
+          starts_at: string
+          subject: string
+          university_domain: string
+          weekday: number
+        }
+        Insert: {
+          created_at?: string
+          ends_at: string
+          host_id: string
+          id?: string
+          location: string
+          locked?: boolean
+          max_size: number
+          starts_at: string
+          subject: string
+          university_domain: string
+          weekday: number
+        }
+        Update: {
+          created_at?: string
+          ends_at?: string
+          host_id?: string
+          id?: string
+          location?: string
+          locked?: boolean
+          max_size?: number
+          starts_at?: string
+          subject?: string
+          university_domain?: string
+          weekday?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lobbies_host_id_fkey"
+            columns: ["host_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lobbies_university_domain_fkey"
+            columns: ["university_domain"]
+            isOneToOne: false
+            referencedRelation: "universities"
+            referencedColumns: ["domain"]
+          },
+        ]
+      }
+      lobby_members: {
+        Row: {
+          id: number
+          joined_at: string
+          lobby_id: string
+          role: Database["public"]["Enums"]["lobby_role"]
+          user_id: string
+        }
+        Insert: {
+          id?: never
+          joined_at?: string
+          lobby_id: string
+          role: Database["public"]["Enums"]["lobby_role"]
+          user_id: string
+        }
+        Update: {
+          id?: never
+          joined_at?: string
+          lobby_id?: string
+          role?: Database["public"]["Enums"]["lobby_role"]
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lobby_members_lobby_id_fkey"
+            columns: ["lobby_id"]
+            isOneToOne: false
+            referencedRelation: "lobbies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lobby_members_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      lobby_messages: {
+        Row: {
+          body: string
+          created_at: string
+          id: number
+          lobby_id: string
+          sender_id: string
+        }
+        Insert: {
+          body: string
+          created_at?: string
+          id?: never
+          lobby_id: string
+          sender_id?: string
+        }
+        Update: {
+          body?: string
+          created_at?: string
+          id?: never
+          lobby_id?: string
+          sender_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lobby_messages_lobby_id_fkey"
+            columns: ["lobby_id"]
+            isOneToOne: false
+            referencedRelation: "lobbies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lobby_messages_sender_id_fkey"
+            columns: ["sender_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       pairings: {
         Row: {
@@ -867,9 +1031,27 @@ export type Database = {
         Args: { found: Json; school: string }
         Returns: undefined
       }
+      answer_join: {
+        Args: { accept: boolean; lobby_id: string; student: string }
+        Returns: undefined
+      }
+      cancel_join: { Args: { lobby_id: string }; Returns: undefined }
+      close_lobby: { Args: { lobby_id: string }; Returns: undefined }
       delete_my_account: { Args: never; Returns: undefined }
       finish_onboarding: { Args: never; Returns: undefined }
       hook_before_user_created: { Args: { event: Json }; Returns: Json }
+      host_lobby: {
+        Args: {
+          ends_at: string
+          lobby_id: string
+          location: string
+          max_size: number
+          starts_at: string
+          subject: string
+          weekday: number
+        }
+        Returns: string
+      }
       identity_changes_left: { Args: never; Returns: number }
       is_lobby_host: { Args: { p_lobby_id: string }; Returns: boolean }
       is_lobby_member: { Args: { p_lobby_id: string }; Returns: boolean }
@@ -881,12 +1063,29 @@ export type Database = {
           title: string
         }[]
       }
+      leave_lobby: { Args: { lobby_id: string }; Returns: undefined }
+      lobby_people: {
+        Args: never
+        Returns: {
+          avatar_path: string
+          courses_taken: string[]
+          id: string
+          nickname: string
+          seeking_help_with: string[]
+          shared_free: Json
+        }[]
+      }
       pair_on_cooldown: {
         Args: { student_a: string; student_b: string }
         Returns: boolean
       }
+      request_join: { Args: { lobby_id: string }; Returns: undefined }
       save_my_answers: { Args: { answers: Json }; Returns: undefined }
       save_my_courses: { Args: { courses: Json }; Returns: undefined }
+      set_lobby_locked: {
+        Args: { lobby_id: string; locked: boolean }
+        Returns: undefined
+      }
     }
     Enums: {
       accessory_slot: "head" | "face" | "neck" | "held"
@@ -919,6 +1118,7 @@ export type Database = {
         | "W"
         | "I"
         | "AU"
+      lobby_role: "member" | "requested"
       onboarding_status: "new" | "onboarded"
       program_kind: "major" | "minor"
       report_reason:
@@ -1088,6 +1288,7 @@ export const Constants = {
         "I",
         "AU",
       ],
+      lobby_role: ["member", "requested"],
       onboarding_status: ["new", "onboarded"],
       program_kind: ["major", "minor"],
       report_reason: ["harassment", "inappropriate", "spam", "safety", "other"],
