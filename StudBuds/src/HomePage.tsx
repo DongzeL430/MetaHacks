@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import type { ReactNode } from 'react';
 import { WindowLayer, WindowManagerProvider } from './components/AppWindow';
 import Taskbar, { TASKBAR_CLEARANCE } from './components/Taskbar';
@@ -9,6 +9,8 @@ import { useUserTheme } from './utils/UserTheme';
 import { DEFAULT_MUSIC, FALLBACK_MUSIC } from './utils/Music';
 import { useThemeMusic } from './utils/MusicPlayer';
 import ProfileEditorWindow from './components/ProfileEditorWindow';
+import CroftWindow from './components/croft/CroftWindow';
+import { CroftVisitContext } from './lib/croft';
 import type { MyProfile } from './dataFiles/StudyData';
 import { ME } from './dataFiles/StudyData';
 import type { Person } from './dataFiles/StudyData';
@@ -39,6 +41,15 @@ const LinkIcon = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <path d="M10 13a5 5 0 0 0 7.07 0l3-3a5 5 0 0 0-7.07-7.07l-1.5 1.5" />
     <path d="M14 11a5 5 0 0 0-7.07 0l-3 3a5 5 0 0 0 7.07 7.07l1.5-1.5" />
+  </svg>
+);
+
+/** A sprout in a furrow, for My Croft */
+const CroftIcon = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M12 20v-8" />
+    <path d="M12 13c0-3.5-2.5-5.5-6-5.5 0 3.5 2.5 5.5 6 5.5zM12 11c0-3 2-5 5.5-5 0 3-2 5-5.5 5z" />
+    <path d="M3 20h18" />
   </svg>
 );
 
@@ -110,6 +121,13 @@ export default function HomePage({
 }: HomePageProps) {
   const [lobbiesOpen, setLobbiesOpen] = useState(openLobbiesAtStart);
   const [connectionsOpen, setConnectionsOpen] = useState(false);
+  // My Croft: your own, and the one you're visiting from someone's profile card
+  const [croftOpen, setCroftOpen] = useState(false);
+  const [visitingId, setVisitingId] = useState<string | null>(null);
+  const visitCroft = useCallback((personId: string) => {
+    if (personId === ME) setCroftOpen(true);
+    else setVisitingId(personId);
+  }, []);
   const [sessionsOpen, setSessionsOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   // Theme: 'default' (sun) or 'custom' (star). The star opens the prompt window.
@@ -176,6 +194,14 @@ export default function HomePage({
       open: connectionsOpen,
       onClick: () => setConnectionsOpen((o) => !o),
     },
+    {
+      id: 'croft',
+      name: 'Croft',
+      label: croftOpen ? 'Close your croft' : 'Open your croft',
+      icon: <CroftIcon />,
+      open: croftOpen,
+      onClick: () => setCroftOpen((o) => !o),
+    },
   ];
 
   return (
@@ -217,38 +243,48 @@ export default function HomePage({
         <div className="relative flex-1 min-h-0 min-w-0">
           {/* All windows on the desk share one stack and one tiling layout */}
           <WindowManagerProvider>
-            <StudyLayout
-              me={{ name: profile.nickname, avatar: avatarUrl }}
-              people={people}
-              myAvailability={profile.availability}
-              // The "My subjects" lobby filter matches both lists
-              mySubjects={[...profile.seekingHelpWith, ...profile.coursesTaken]}
-              locationSuggestions={locationSuggestions}
-              state={study}
-              dispatch={dispatch}
-              lobbiesOpen={lobbiesOpen}
-              onLobbiesClose={() => setLobbiesOpen(false)}
-              connectionsOpen={connectionsOpen}
-              onConnectionsClose={() => setConnectionsOpen(false)}
-              sessionsOpen={sessionsOpen}
-              onSessionsClose={() => setSessionsOpen(false)}
-              onRefresh={onRefreshStudy}
-            />
-
-            <WindowLayer>
-              <ProfileEditorWindow
-                id="profile"
-                open={profileOpen}
-                onClose={() => setProfileOpen(false)}
-                profile={profile}
-                onSave={saveProfile}
-                avatarUrl={avatarUrl}
-                changesLeft={identityChangesLeft}
-                onRedrawAvatar={onRedrawAvatar}
-                onLogOut={onLogOut}
-                onDeleteAccount={onDeleteAccount}
+            {/* "Visit croft" on any profile card opens that person's croft */}
+            <CroftVisitContext.Provider value={visitCroft}>
+              <StudyLayout
+                me={{ name: profile.nickname, avatar: avatarUrl }}
+                people={people}
+                myAvailability={profile.availability}
+                // The "My subjects" lobby filter matches both lists
+                mySubjects={[...profile.seekingHelpWith, ...profile.coursesTaken]}
+                locationSuggestions={locationSuggestions}
+                state={study}
+                dispatch={dispatch}
+                lobbiesOpen={lobbiesOpen}
+                onLobbiesClose={() => setLobbiesOpen(false)}
+                connectionsOpen={connectionsOpen}
+                onConnectionsClose={() => setConnectionsOpen(false)}
+                sessionsOpen={sessionsOpen}
+                onSessionsClose={() => setSessionsOpen(false)}
+                onRefresh={onRefreshStudy}
               />
-            </WindowLayer>
+
+              <WindowLayer>
+                <ProfileEditorWindow
+                  id="profile"
+                  open={profileOpen}
+                  onClose={() => setProfileOpen(false)}
+                  profile={profile}
+                  onSave={saveProfile}
+                  avatarUrl={avatarUrl}
+                  changesLeft={identityChangesLeft}
+                  onRedrawAvatar={onRedrawAvatar}
+                  onLogOut={onLogOut}
+                  onDeleteAccount={onDeleteAccount}
+                />
+                <CroftWindow id="croft" open={croftOpen} onClose={() => setCroftOpen(false)} ownerId={null} />
+                <CroftWindow
+                  id="croft-visit"
+                  open={visitingId !== null}
+                  onClose={() => setVisitingId(null)}
+                  ownerId={visitingId}
+                />
+              </WindowLayer>
+            </CroftVisitContext.Provider>
           </WindowManagerProvider>
 
           {/* Popup from the star in the theme menu */}

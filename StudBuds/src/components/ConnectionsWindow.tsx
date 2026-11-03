@@ -1,7 +1,7 @@
 import { useId, useState } from 'react';
 import AppWindow, { WINDOW_ACCENTS } from './AppWindow';
 import PersonAvatar from './PersonAvatar';
-import { ConnectControl } from './PersonCard';
+import { ConnectControl, VisitCroftButton } from './PersonCard';
 import ViewTabs, { viewPanelId, viewTabId } from './ViewTabs';
 import type { ConnectionStatus, Person } from '../dataFiles/StudyData';
 import type { StudyDispatch } from '../utils/StudyState';
@@ -77,6 +77,7 @@ export default function ConnectionsWindow({ id, open, onClose, people, connectio
               >
                 <PersonAvatar person={p} className="w-10 h-10" />
                 <span className="flex-1 min-w-0 truncate text-lg">{p.name}</span>
+                <VisitCroftButton person={p} />
                 <ConnectControl person={p} status={connections[p.id] ?? 'none'} dispatch={dispatch} />
               </li>
             ))}

@@ -345,6 +345,109 @@ export type Database = {
           },
         ]
       }
+      croft_help: {
+        Row: {
+          created_at: string
+          crop: string
+          helped_on: string
+          helper_id: string
+          id: number
+          owner_id: string
+        }
+        Insert: {
+          created_at?: string
+          crop: string
+          helped_on?: string
+          helper_id: string
+          id?: never
+          owner_id: string
+        }
+        Update: {
+          created_at?: string
+          crop?: string
+          helped_on?: string
+          helper_id?: string
+          id?: never
+          owner_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "croft_help_helper_id_fkey"
+            columns: ["helper_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "croft_help_owner_id_fkey"
+            columns: ["owner_id"]
+            isOneToOne: false
+            referencedRelation: "crofts"
+            referencedColumns: ["user_id"]
+          },
+        ]
+      }
+      croft_tiles: {
+        Row: {
+          crop: string | null
+          decoration: string | null
+          ground: string
+          idx: number
+          ready_at: string | null
+          user_id: string
+        }
+        Insert: {
+          crop?: string | null
+          decoration?: string | null
+          ground: string
+          idx: number
+          ready_at?: string | null
+          user_id: string
+        }
+        Update: {
+          crop?: string | null
+          decoration?: string | null
+          ground?: string
+          idx?: number
+          ready_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "croft_tiles_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "crofts"
+            referencedColumns: ["user_id"]
+          },
+        ]
+      }
+      crofts: {
+        Row: {
+          created_at: string
+          pennies: number
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          pennies?: number
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          pennies?: number
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "crofts_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       interests: {
         Row: {
           category: string | null
@@ -1164,6 +1267,12 @@ export type Database = {
       claim_muse_use: { Args: { student: string; what: string }; Returns: Json }
       close_lobby: { Args: { lobby_id: string }; Returns: undefined }
       connect_with: { Args: { person: string }; Returns: undefined }
+      croft_act: {
+        Args: { action: string; item?: string; tile: number }
+        Returns: Json
+      }
+      croft_help: { Args: { owner: string; tile: number }; Returns: Json }
+      croft_view: { Args: { owner?: string }; Returns: Json }
       delete_my_account: { Args: never; Returns: undefined }
       finish_onboarding: { Args: never; Returns: undefined }
       hook_before_user_created: { Args: { event: Json }; Returns: Json }

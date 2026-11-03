@@ -1,5 +1,5 @@
 import PersonAvatar from './PersonAvatar';
-import PersonCard from './PersonCard';
+import PersonCard, { VisitCroftButton } from './PersonCard';
 import { ME } from '../dataFiles/StudyData';
 import type { ConnectionStatus, Lobby, Person } from '../dataFiles/StudyData';
 import { roleIn } from '../utils/StudyState';
@@ -38,6 +38,8 @@ export function JoinRequestRow({
     <li className="list-none flex items-center gap-3 p-2 rounded-md border-2 border-ink/25 bg-paper">
       <PersonAvatar person={person} className="w-8 h-8" />
       <span className="flex-1 min-w-0 truncate">{person.name}</span>
+      {/* A look at their croft before letting them in */}
+      <VisitCroftButton person={person} />
       <button
         type="button"
         onClick={() => dispatch({ type: 'accept-join', lobbyId: lobby.id, personId: person.id })}

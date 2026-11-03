@@ -1,10 +1,29 @@
 import PersonAvatar from './PersonAvatar';
+import { ME } from '../dataFiles/StudyData';
 import type { ConnectionStatus, Person } from '../dataFiles/StudyData';
+import { useVisitCroft } from '../lib/croft';
 import type { StudyDispatch } from '../utils/StudyState';
 import { toDayBlocks } from '../utils/ScheduleBlocks';
 
 const CHIP = 'px-1.5 py-0.5 rounded border-2 border-ink/25 text-xs';
 const SMALL_BUTTON = 'px-2.5 py-0.5 text-sm';
+
+/** Opens this person's croft (My Croft). Nothing shows where Home doesn't offer crofts. */
+export function VisitCroftButton({ person }: { person: Person }) {
+  const visit = useVisitCroft();
+  if (!visit) return null;
+  const mine = person.id === ME;
+  return (
+    <button
+      type="button"
+      onClick={() => visit(person.id)}
+      aria-label={mine ? 'Open your croft' : `Visit ${person.name}’s croft`}
+      className={SMALL_BUTTON}
+    >
+      {mine ? 'Your croft' : 'Visit croft'}
+    </button>
+  );
+}
 
 /** Friend-request style connect button. Shows what's possible for the current status. */
 export function ConnectControl({
@@ -141,6 +160,10 @@ export default function PersonCard({ person, isHost = false, isMe = false, statu
           </div>
         </>
       )}
+
+      <div className="flex justify-end">
+        <VisitCroftButton person={person} />
+      </div>
     </article>
   );
 }
