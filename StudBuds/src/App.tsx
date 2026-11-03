@@ -151,6 +151,7 @@ function Home() {
         welcomeTour={tour.status === 'open' ? { onDone: tour.close } : undefined}
         onStudyAction={(action) => void study.act(action)}
         initialProfile={{
+          nickname: me.nickname,
           availability: me.availability,
           contact: me.contact,
           coursesTaken: me.coursesTaken,

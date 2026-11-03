@@ -174,6 +174,17 @@ export default function HomePage({
     setProfile(saved);
     return saved;
   };
+  // A save that stopped partway (the nickname went through, then courses didn't) still changed
+  // what's saved. The backend's copy comes back through initialProfile, so follow it: the nav bar
+  // shows the new name, and Undo in the profile window doesn't go back past what was saved.
+  // (Checked during render, React's way to adjust state when a prop changes; initialProfile is a
+  // new object every render, so its contents are compared.)
+  const savedKey = JSON.stringify(initialProfile ?? null);
+  const [seenSavedKey, setSeenSavedKey] = useState(savedKey);
+  if (savedKey !== seenSavedKey) {
+    setSeenSavedKey(savedKey);
+    if (initialProfile) setProfile((prev) => ({ ...prev, ...initialProfile }));
+  }
   const [study, dispatch] = useStudyState(initialStudyState, onStudyAction, studyState);
   // The live activity feed at the bottom right: sessions that fit you, and visits and help on your croft
   const peopleById = useMemo(() => new Map(people.map((p) => [p.id, p])), [people]);
