@@ -264,18 +264,6 @@ export default function HomePage({
               />
 
               <WindowLayer>
-                <ProfileEditorWindow
-                  id="profile"
-                  open={profileOpen}
-                  onClose={() => setProfileOpen(false)}
-                  profile={profile}
-                  onSave={saveProfile}
-                  avatarUrl={avatarUrl}
-                  changesLeft={identityChangesLeft}
-                  onRedrawAvatar={onRedrawAvatar}
-                  onLogOut={onLogOut}
-                  onDeleteAccount={onDeleteAccount}
-                />
                 <CroftWindow id="croft" open={croftOpen} onClose={() => setCroftOpen(false)} ownerId={null} />
                 <CroftWindow
                   id="croft-visit"
@@ -286,6 +274,19 @@ export default function HomePage({
               </WindowLayer>
             </CroftVisitContext.Provider>
           </WindowManagerProvider>
+
+          {/* Popup from the avatar and name in the nav bar */}
+          <ProfileEditorWindow
+            open={profileOpen}
+            onClose={() => setProfileOpen(false)}
+            profile={profile}
+            onSave={saveProfile}
+            avatarUrl={avatarUrl}
+            changesLeft={identityChangesLeft}
+            onRedrawAvatar={onRedrawAvatar}
+            onLogOut={onLogOut}
+            onDeleteAccount={onDeleteAccount}
+          />
 
           {/* Popup from the star in the theme menu */}
           <ThemePromptWindow

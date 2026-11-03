@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import PersonAvatar from './PersonAvatar';
 import { ME } from '../dataFiles/StudyData';
 import type { ConnectionStatus, Person } from '../dataFiles/StudyData';
@@ -9,14 +10,17 @@ const CHIP = 'px-1.5 py-0.5 rounded border-2 border-ink/25 text-xs';
 const SMALL_BUTTON = 'px-2.5 py-0.5 text-sm';
 
 /** Opens this person's croft (My Croft). Nothing shows where Home doesn't offer crofts. */
-export function VisitCroftButton({ person }: { person: Person }) {
+export function VisitCroftButton({ person, onVisit }: { person: Person; onVisit?: () => void }) {
   const visit = useVisitCroft();
   if (!visit) return null;
   const mine = person.id === ME;
   return (
     <button
       type="button"
-      onClick={() => visit(person.id)}
+      onClick={() => {
+        onVisit?.();
+        visit(person.id);
+      }}
       aria-label={mine ? 'Open your croft' : `Visit ${person.name}’s croft`}
       className={SMALL_BUTTON}
     >
@@ -91,10 +95,42 @@ interface PersonCardProps {
   isMe?: boolean;
   status: ConnectionStatus;
   dispatch: StudyDispatch;
+  /** Shown to the host on everyone else's card: removes them from the session */
+  onKick?: () => void;
+  /** Runs before "Visit croft" opens their croft, e.g. to close the popup the card is in */
+  onVisitCroft?: () => void;
+}
+
+/** The host's Remove button, which asks once before removing someone for good */
+function KickControl({ name, onKick }: { name: string; onKick: () => void }) {
+  const [confirming, setConfirming] = useState(false);
+  if (!confirming) {
+    return (
+      <button
+        type="button"
+        onClick={() => setConfirming(true)}
+        aria-label={`Remove ${name} from this session`}
+        className={`${SMALL_BUTTON} self-start`}
+      >
+        Remove
+      </button>
+    );
+  }
+  return (
+    <div role="group" aria-label={`Remove ${name}?`} className="flex flex-wrap items-center gap-2 text-sm">
+      <span>Remove {name}? They can’t ask to join this session again.</span>
+      <button type="button" onClick={onKick} className={SMALL_BUTTON}>
+        Remove
+      </button>
+      <button type="button" onClick={() => setConfirming(false)} className={SMALL_BUTTON} autoFocus>
+        Keep
+      </button>
+    </div>
+  );
 }
 
 /** A filled lobby slot: who they are, what they need help with, when you're both free, what they've taken */
-export default function PersonCard({ person, isHost = false, isMe = false, status, dispatch }: PersonCardProps) {
+export default function PersonCard({ person, isHost = false, isMe = false, status, dispatch, onKick, onVisitCroft }: PersonCardProps) {
   const blocks = toDayBlocks(person.sharedSlots);
 
   return (
@@ -161,8 +197,9 @@ export default function PersonCard({ person, isHost = false, isMe = false, statu
         </>
       )}
 
-      <div className="flex justify-end">
-        <VisitCroftButton person={person} />
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        {onKick && !isMe ? <KickControl name={person.name} onKick={onKick} /> : <span />}
+        <VisitCroftButton person={person} onVisit={onVisitCroft} />
       </div>
     </article>
   );

@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { WindowLayer, useWindowManager } from './AppWindow';
 import BrowserWindow from './BrowserWindow';
 import ConnectionsWindow from './ConnectionsWindow';
+import PersonProfilePopup from './PersonProfilePopup';
 import HostSessionWindow from './HostSessionWindow';
 import type { NewLobbyDetails } from './HostSessionWindow';
 import LobbyBrowserWindow from './LobbyBrowserWindow';
@@ -85,6 +86,8 @@ export default function StudyLayout({
   const [chatLobbyId, setChatLobbyId] = useState<string | null>(null);
   /** Lobby whose "View all" join requests popup is open */
   const [requestsLobbyId, setRequestsLobbyId] = useState<string | null>(null);
+  /** Person whose profile popup is open (from Connections) */
+  const [profilePersonId, setProfilePersonId] = useState<string | null>(null);
 
   const peopleById = useMemo(() => {
     const map = new Map(people.map((p) => [p.id, p]));
@@ -102,6 +105,8 @@ export default function StudyLayout({
   const chatLobby = chatLobbyId ? lobbiesById.get(chatLobbyId) : undefined;
   const chatAllowed = !!chatLobby && (roleIn(chatLobby) === 'host' || roleIn(chatLobby) === 'member');
   const requestsLobby = requestsLobbyId ? lobbiesById.get(requestsLobbyId) ?? null : null;
+  // Looked up live, so it updates with the lists and closes if they're no longer visible (a block)
+  const profilePerson = profilePersonId ? peopleById.get(profilePersonId) ?? null : null;
 
   const openChat = (lobbyId: string) => {
     setChatLobbyId(lobbyId);
@@ -219,6 +224,7 @@ export default function StudyLayout({
           people={people}
           connections={state.connections}
           dispatch={dispatch}
+          onViewProfile={setProfilePersonId}
         />
       </WindowLayer>
 
@@ -237,6 +243,13 @@ export default function StudyLayout({
         people={peopleById}
         dispatch={dispatch}
         onClose={() => setRequestsLobbyId(null)}
+      />
+
+      <PersonProfilePopup
+        person={profilePerson}
+        status={profilePerson ? state.connections[profilePerson.id] ?? 'none' : 'none'}
+        dispatch={dispatch}
+        onClose={() => setProfilePersonId(null)}
       />
 
       <HostSessionWindow
