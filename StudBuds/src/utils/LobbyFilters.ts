@@ -57,7 +57,10 @@ export interface MatchContext {
 /** Whether a lobby passes every criterion that's switched on (and has the data it needs) */
 export function passesFilters(lobby: Lobby, filters: LobbyFilters, ctx: MatchContext): boolean {
   if (filters.schedule && ctx.freeSet.size > 0 && !fitsSchedule(lobby, ctx.freeSet)) return false;
-  if (filters.subjects && ctx.subjects.length > 0 && !matchesSubjects(lobby, ctx.subjects)) return false;
+  // "My subjects": the subject names one of your courses, or the ranking linked it to one
+  // (public.lobby_matches also catches free-form subjects like "orgo midterm cram")
+  const coversYourCourse = !!lobby.match?.reasons.some((r) => r.startsWith('Covers a course'));
+  if (filters.subjects && ctx.subjects.length > 0 && !coversYourCourse && !matchesSubjects(lobby, ctx.subjects)) return false;
   if (filters.size && !filters.sizes.includes(lobby.maxSize)) return false;
   if (filters.openSpots && (lobby.memberIds.length >= lobby.maxSize || lobby.locked)) return false;
   if (filters.mySchool && lobby.atMySchool === false) return false;

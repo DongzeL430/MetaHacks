@@ -296,8 +296,12 @@ export default function HomePage({
                 me={{ name: profile.nickname, avatar: avatarUrl }}
                 people={people}
                 myAvailability={profile.availability}
-                // The "My subjects" lobby filter matches both lists
-                mySubjects={[...profile.seekingHelpWith, ...profile.coursesTaken]}
+                // The "My subjects" lobby filter: courses you want help with, have taken, and are taking now
+                mySubjects={[
+                  ...profile.seekingHelpWith,
+                  ...profile.coursesTaken,
+                  ...profile.courses.filter((c) => c.status === 'taking').map((c) => c.name),
+                ]}
                 // Hosting offers only the courses they're taking right now
                 currentCourses={profile.courses.filter((c) => c.status === 'taking' && c.name.trim()).map((c) => c.name)}
                 locationSuggestions={locationSuggestions}
