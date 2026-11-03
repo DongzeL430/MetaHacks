@@ -55,6 +55,35 @@ export type Database = {
           },
         ]
       }
+      action_log: {
+        Row: {
+          created_at: string
+          id: number
+          kind: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: never
+          kind: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: never
+          kind?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "action_log_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ai_requests: {
         Row: {
           created_at: string
@@ -292,6 +321,141 @@ export type Database = {
         }
         Relationships: []
       }
+      lobbies: {
+        Row: {
+          created_at: string
+          ends_at: string
+          host_id: string
+          id: string
+          location: string
+          locked: boolean
+          max_size: number
+          starts_at: string
+          subject: string
+          university_domain: string
+          weekday: number
+        }
+        Insert: {
+          created_at?: string
+          ends_at: string
+          host_id: string
+          id?: string
+          location: string
+          locked?: boolean
+          max_size: number
+          starts_at: string
+          subject: string
+          university_domain: string
+          weekday: number
+        }
+        Update: {
+          created_at?: string
+          ends_at?: string
+          host_id?: string
+          id?: string
+          location?: string
+          locked?: boolean
+          max_size?: number
+          starts_at?: string
+          subject?: string
+          university_domain?: string
+          weekday?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lobbies_host_id_fkey"
+            columns: ["host_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lobbies_university_domain_fkey"
+            columns: ["university_domain"]
+            isOneToOne: false
+            referencedRelation: "universities"
+            referencedColumns: ["domain"]
+          },
+        ]
+      }
+      lobby_members: {
+        Row: {
+          id: number
+          joined_at: string
+          lobby_id: string
+          role: Database["public"]["Enums"]["lobby_role"]
+          user_id: string
+        }
+        Insert: {
+          id?: never
+          joined_at?: string
+          lobby_id: string
+          role: Database["public"]["Enums"]["lobby_role"]
+          user_id: string
+        }
+        Update: {
+          id?: never
+          joined_at?: string
+          lobby_id?: string
+          role?: Database["public"]["Enums"]["lobby_role"]
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lobby_members_lobby_id_fkey"
+            columns: ["lobby_id"]
+            isOneToOne: false
+            referencedRelation: "lobbies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lobby_members_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      lobby_messages: {
+        Row: {
+          body: string
+          created_at: string
+          id: number
+          lobby_id: string
+          sender_id: string
+        }
+        Insert: {
+          body: string
+          created_at?: string
+          id?: never
+          lobby_id: string
+          sender_id?: string
+        }
+        Update: {
+          body?: string
+          created_at?: string
+          id?: never
+          lobby_id?: string
+          sender_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lobby_messages_lobby_id_fkey"
+            columns: ["lobby_id"]
+            isOneToOne: false
+            referencedRelation: "lobbies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lobby_messages_sender_id_fkey"
+            columns: ["sender_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       pairings: {
         Row: {
           agreements: number | null
@@ -384,6 +548,7 @@ export type Database = {
       public_profiles: {
         Row: {
           animal: string
+          avatar_path: string | null
           created_at: string
           equipped_accessories: Json
           id: string
@@ -392,6 +557,7 @@ export type Database = {
         }
         Insert: {
           animal?: string
+          avatar_path?: string | null
           created_at?: string
           equipped_accessories?: Json
           id: string
@@ -400,6 +566,7 @@ export type Database = {
         }
         Update: {
           animal?: string
+          avatar_path?: string | null
           created_at?: string
           equipped_accessories?: Json
           id?: string
@@ -551,19 +718,19 @@ export type Database = {
       survey_answers: {
         Row: {
           answered_at: string
-          choice: string
+          choice: number
           question_id: number
           user_id: string
         }
         Insert: {
           answered_at?: string
-          choice: string
+          choice: number
           question_id: number
           user_id?: string
         }
         Update: {
           answered_at?: string
-          choice?: string
+          choice?: number
           question_id?: number
           user_id?: string
         }
@@ -589,30 +756,42 @@ export type Database = {
           approved: boolean
           category: string
           created_at: string
+          flexible_options: number[]
           id: number
-          option_a: string
-          option_b: string
+          key: string
+          kind: string
+          options: string[]
+          position: number
           prompt: string
+          scale: string
           source: Database["public"]["Enums"]["content_source"]
         }
         Insert: {
           approved?: boolean
           category: string
           created_at?: string
+          flexible_options?: number[]
           id?: never
-          option_a: string
-          option_b: string
+          key: string
+          kind: string
+          options: string[]
+          position: number
           prompt: string
+          scale?: string
           source?: Database["public"]["Enums"]["content_source"]
         }
         Update: {
           approved?: boolean
           category?: string
           created_at?: string
+          flexible_options?: number[]
           id?: never
-          option_a?: string
-          option_b?: string
+          key?: string
+          kind?: string
+          options?: string[]
+          position?: number
           prompt?: string
+          scale?: string
           source?: Database["public"]["Enums"]["content_source"]
         }
         Relationships: []
@@ -670,23 +849,32 @@ export type Database = {
       }
       user_courses: {
         Row: {
-          course_id: number
+          confidence: number
+          course_id: number | null
           created_at: string
+          custom_name: string | null
           grade: Database["public"]["Enums"]["letter_grade"] | null
+          id: number
           status: Database["public"]["Enums"]["course_status"]
           user_id: string
         }
         Insert: {
-          course_id: number
+          confidence: number
+          course_id?: number | null
           created_at?: string
+          custom_name?: string | null
           grade?: Database["public"]["Enums"]["letter_grade"] | null
+          id?: never
           status?: Database["public"]["Enums"]["course_status"]
           user_id?: string
         }
         Update: {
-          course_id?: number
+          confidence?: number
+          course_id?: number | null
           created_at?: string
+          custom_name?: string | null
           grade?: Database["public"]["Enums"]["letter_grade"] | null
+          id?: never
           status?: Database["public"]["Enums"]["course_status"]
           user_id?: string
         }
@@ -769,6 +957,35 @@ export type Database = {
           },
         ]
       }
+      user_themes: {
+        Row: {
+          theme: Json
+          updated_at: string
+          use_custom: boolean
+          user_id: string
+        }
+        Insert: {
+          theme: Json
+          updated_at?: string
+          use_custom?: boolean
+          user_id?: string
+        }
+        Update: {
+          theme?: Json
+          updated_at?: string
+          use_custom?: boolean
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_themes_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       vibe_decisions: {
         Row: {
           choice: Database["public"]["Enums"]["vibe_choice"]
@@ -814,11 +1031,62 @@ export type Database = {
         Args: { found: Json; school: string }
         Returns: undefined
       }
+      answer_join: {
+        Args: { accept: boolean; lobby_id: string; student: string }
+        Returns: undefined
+      }
+      cancel_join: { Args: { lobby_id: string }; Returns: undefined }
+      claim_muse_use: { Args: { student: string; what: string }; Returns: Json }
+      close_lobby: { Args: { lobby_id: string }; Returns: undefined }
       delete_my_account: { Args: never; Returns: undefined }
+      finish_onboarding: { Args: never; Returns: undefined }
       hook_before_user_created: { Args: { event: Json }; Returns: Json }
+      host_lobby: {
+        Args: {
+          ends_at: string
+          lobby_id: string
+          location: string
+          max_size: number
+          starts_at: string
+          subject: string
+          weekday: number
+        }
+        Returns: string
+      }
+      identity_changes_left: { Args: never; Returns: number }
+      is_lobby_host: { Args: { p_lobby_id: string }; Returns: boolean }
+      is_lobby_member: { Args: { p_lobby_id: string }; Returns: boolean }
+      known_courses_for: {
+        Args: { majors: string[]; school: string }
+        Returns: {
+          classmates: number
+          code: string
+          title: string
+        }[]
+      }
+      leave_lobby: { Args: { lobby_id: string }; Returns: undefined }
+      lobby_people: {
+        Args: never
+        Returns: {
+          avatar_path: string
+          courses_taken: string[]
+          id: string
+          nickname: string
+          seeking_help_with: string[]
+          shared_free: Json
+        }[]
+      }
+      muse_uses_left: { Args: { what: string }; Returns: number }
       pair_on_cooldown: {
         Args: { student_a: string; student_b: string }
         Returns: boolean
+      }
+      request_join: { Args: { lobby_id: string }; Returns: undefined }
+      save_my_answers: { Args: { answers: Json }; Returns: undefined }
+      save_my_courses: { Args: { courses: Json }; Returns: undefined }
+      set_lobby_locked: {
+        Args: { lobby_id: string; locked: boolean }
+        Returns: undefined
       }
     }
     Enums: {
@@ -826,6 +1094,7 @@ export type Database = {
       content_source: "team" | "ai"
       course_status: "taking" | "completed"
       letter_grade:
+        | "A+"
         | "A"
         | "A-"
         | "B+"
@@ -838,7 +1107,20 @@ export type Database = {
         | "D"
         | "D-"
         | "F"
+        | "E"
         | "P"
+        | "NP"
+        | "S"
+        | "U"
+        | "CR"
+        | "NC"
+        | "H"
+        | "HP"
+        | "LP"
+        | "W"
+        | "I"
+        | "AU"
+      lobby_role: "member" | "requested"
       onboarding_status: "new" | "onboarded"
       program_kind: "major" | "minor"
       report_reason:
@@ -981,6 +1263,7 @@ export const Constants = {
       content_source: ["team", "ai"],
       course_status: ["taking", "completed"],
       letter_grade: [
+        "A+",
         "A",
         "A-",
         "B+",
@@ -993,8 +1276,21 @@ export const Constants = {
         "D",
         "D-",
         "F",
+        "E",
         "P",
+        "NP",
+        "S",
+        "U",
+        "CR",
+        "NC",
+        "H",
+        "HP",
+        "LP",
+        "W",
+        "I",
+        "AU",
       ],
+      lobby_role: ["member", "requested"],
       onboarding_status: ["new", "onboarded"],
       program_kind: ["major", "minor"],
       report_reason: ["harassment", "inappropriate", "spam", "safety", "other"],

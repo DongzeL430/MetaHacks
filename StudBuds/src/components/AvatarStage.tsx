@@ -1,7 +1,7 @@
 import { Component, Suspense } from 'react';
 import type { ReactNode } from 'react';
 import { Canvas } from '@react-three/fiber';
-import { Bounds, Center, Html, OrbitControls } from '@react-three/drei';
+import { Bounds, Center, Html } from '@react-three/drei';
 import { Penguin } from './Penguin.tsx';
 
 /** If the model fails to load, show a message instead of taking down the whole auth page */

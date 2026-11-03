@@ -66,8 +66,8 @@ select ok(
 
 select matches(
   (select nickname from public.public_profiles where id = 'a0000000-0000-4000-8000-000000000001'),
-  '^[A-Z][a-z]+ Penguin [0-9]+$',
-  'A nickname like "Sleepy Penguin 42" is generated'
+  '^[A-Z][a-z]+ [A-Z][a-z]+( [0-9]+)?$',
+  'A nickname like "Sleepy Otter" is generated'
 );
 
 select is(

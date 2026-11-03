@@ -1,20 +1,18 @@
-import { useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
 import { Navigate } from 'react-router';
-import type { Session } from '@supabase/supabase-js';
-import { supabase } from './lib/supabase.ts';
+import { useAccount } from './lib/account.ts';
 
-/** Shows its children only to a signed-in student. Everyone else goes to the log-in page. */
-export default function RequireAuth({ children }: { children: ReactNode }) {
-  // undefined until the saved session has been read
-  const [session, setSession] = useState<Session | null | undefined>(undefined);
+/**
+ * Shows its children only to a signed-in student. Everyone else goes to the log-in page.
+ * need="onboarded" (Home) sends students who haven't finished the pre-survey to it first;
+ * need="new" (the pre-survey) sends students who already finished it to Home.
+ */
+export default function RequireAuth({ children, need }: { children: ReactNode; need?: 'onboarded' | 'new' }) {
+  const { status } = useAccount();
 
-  useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => setSession(data.session));
-    const { data } = supabase.auth.onAuthStateChange((_event, next) => setSession(next));
-    return () => data.subscription.unsubscribe();
-  }, []);
-
-  if (session === undefined) return null;
-  return session ? children : <Navigate to="/a" replace />;
+  if (status === 'loading') return null;
+  if (status === 'signed-out') return <Navigate to="/login" replace />;
+  if (need === 'onboarded' && status === 'new') return <Navigate to="/survey" replace />;
+  if (need === 'new' && status === 'onboarded') return <Navigate to="/" replace />;
+  return children;
 }

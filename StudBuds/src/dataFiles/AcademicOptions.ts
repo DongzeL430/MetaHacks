@@ -21,11 +21,47 @@ export const CONFIDENCE_LEVELS = [
   { value: 5, label: 'Could teach it' },
 ] as const;
 
-/** Grade is optional, so the dropdown also gets a blank "No grade" choice */
-export const GRADE_OPTIONS = [
-  'A+', 'A', 'A-',
-  'B+', 'B', 'B-',
-  'C+', 'C', 'C-',
-  'D+', 'D', 'D-',
-  'F', 'Pass', 'Fail',
+/**
+ * Grades from the grading systems schools use, grouped in the dropdown. Grade is optional, so
+ * the dropdown also gets a blank "No grade" choice. A `value` is what's saved (the database's
+ * letter_grade list), so change labels freely but keep values as they are.
+ */
+export const GRADE_GROUPS = [
+  {
+    label: 'Letter grades',
+    grades: [
+      'A+', 'A', 'A-',
+      'B+', 'B', 'B-',
+      'C+', 'C', 'C-',
+      'D+', 'D', 'D-',
+      'F', 'E',
+    ].map((g) => ({ value: g, label: g === 'E' ? 'E (fail, at some schools)' : g })),
+  },
+  {
+    label: 'Pass / fail style',
+    grades: [
+      { value: 'P', label: 'P (Pass)' },
+      { value: 'NP', label: 'NP (No pass)' },
+      { value: 'S', label: 'S (Satisfactory)' },
+      { value: 'U', label: 'U (Unsatisfactory)' },
+      { value: 'CR', label: 'CR (Credit)' },
+      { value: 'NC', label: 'NC (No credit)' },
+    ],
+  },
+  {
+    label: 'Honors scale',
+    grades: [
+      { value: 'H', label: 'H (Honors)' },
+      { value: 'HP', label: 'HP (High pass)' },
+      { value: 'LP', label: 'LP (Low pass)' },
+    ],
+  },
+  {
+    label: 'Other marks',
+    grades: [
+      { value: 'W', label: 'W (Withdrew)' },
+      { value: 'I', label: 'I (Incomplete)' },
+      { value: 'AU', label: 'AU (Audit)' },
+    ],
+  },
 ];

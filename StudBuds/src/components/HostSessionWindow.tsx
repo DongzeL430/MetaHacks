@@ -37,6 +37,8 @@ interface HostSessionWindowProps {
   availability?: string[];
   /** Places offered in the location box (public cafes, libraries…). Users can also type their own. */
   locationSuggestions?: string[];
+  /** Subjects offered while typing. Leave out for the defaults. */
+  subjectSuggestions?: string[];
   /** Hours shown on the schedule. Defaults to the availability calendar's 9 AM to 5 PM in 30-minute slots. */
   grid?: ScheduleGrid;
   onCreate: (details: NewLobbyDetails) => void;
@@ -121,6 +123,7 @@ export default function HostSessionWindow({
   onClose,
   availability,
   locationSuggestions = LOCATION_SUGGESTIONS,
+  subjectSuggestions = SUBJECT_SUGGESTIONS,
   grid = DEFAULT_GRID,
   onCreate,
 }: HostSessionWindowProps) {
@@ -275,7 +278,7 @@ export default function HostSessionWindow({
               inputRef={subjectRef}
               value={subject}
               onChange={setSubject}
-              suggestions={SUBJECT_SUGGESTIONS}
+              suggestions={subjectSuggestions}
               placeholder="e.g. Linear Algebra"
               maxLength={60}
               invalid={warn.subject}

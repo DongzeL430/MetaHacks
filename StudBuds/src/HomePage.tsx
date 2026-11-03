@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import type { ReactNode } from 'react';
 import { WindowLayer, WindowManagerProvider } from './components/AppWindow';
-import Taskbar, { TASKBAR_CLEARANCE } from './components/TaskBar';
-import type { TaskbarApp } from './components/TaskBar';
+import Taskbar, { TASKBAR_CLEARANCE } from './components/Taskbar';
+import type { TaskbarApp } from './components/Taskbar';
 import StudyLayout from './components/StudyLayout';
 import ThemePromptWindow from './components/ThemePromptWindow';
 import { useUserTheme } from './utils/UserTheme';
@@ -42,6 +42,9 @@ const LinkIcon = () => (
 
 const EMPTY_STUDY_STATE: StudyState = { lobbies: [], connections: {} };
 
+/** Windows opened from the nav bar */
+type NavApp = 'lobbies' | 'sessions' | 'connections' | 'profile';
+
 interface HomePageProps {
   /** The user's generated name, shown next to the avatar in the taskbar */
   userName?: string;
@@ -61,12 +64,21 @@ interface HomePageProps {
   locationSuggestions?: string[];
   /** Lobbies and connection statuses to start with */
   initialStudyState?: StudyState;
+  /** The backend's live copy of lobbies and connections. Each new copy replaces what's shown. */
+  studyState?: StudyState;
   /** Every lobby / connection action the user takes, e.g. to send to your backend */
   onStudyAction?: (action: StudyAction) => void;
   /** Starting values for the profile editor beyond the props above (animal, courses, contact…) */
   initialProfile?: Partial<MyProfile>;
   /** Saves the edited profile, e.g. to your backend. Throw to show an error in the window. */
   onSaveProfile?: (profile: MyProfile) => void | Promise<void>;
+  /** Muse draws a new avatar from the nickname (the profile window's "Draw a new avatar") */
+  onRedrawAvatar?: () => Promise<void>;
+  /** Nickname and avatar changes left today, shown in the profile window */
+  identityChangesLeft?: number | null;
+  /** The profile window's Account section */
+  onLogOut?: () => void;
+  onDeleteAccount?: () => Promise<void>;
 }
 
 export default function HomePage({
@@ -79,20 +91,29 @@ export default function HomePage({
   mySubjects,
   locationSuggestions,
   initialStudyState = EMPTY_STUDY_STATE,
+  studyState,
   onStudyAction,
   initialProfile,
   onSaveProfile,
+  onRedrawAvatar,
+  identityChangesLeft,
+  onLogOut,
+  onDeleteAccount,
 }: HomePageProps) {
-  const [lobbiesOpen, setLobbiesOpen] = useState(false);
-  const [connectionsOpen, setConnectionsOpen] = useState(false);
-  const [sessionsOpen, setSessionsOpen] = useState(false);
+  // One nav bar app open at a time: opening one closes the other, instead of stacking windows
+  const [openApp, setOpenApp] = useState<NavApp | null>(null);
+  const toggleApp = (app: NavApp) => setOpenApp((current) => (current === app ? null : app));
+  const closeApp = (app: NavApp) => setOpenApp((current) => (current === app ? null : current));
+  const lobbiesOpen = openApp === 'lobbies';
+  const connectionsOpen = openApp === 'connections';
+  const sessionsOpen = openApp === 'sessions';
+  const profileOpen = openApp === 'profile';
   // Theme: 'default' (sun) or 'custom' (star). The star opens the prompt window.
   // The user's theme: loaded from Supabase, applied to the whole page, saved when it changes
   const theme = useUserTheme();
   const [themePromptOpen, setThemePromptOpen] = useState(false);
 
   // The user's own profile. Saving it updates the nav bar, lobby filters and host form right away.
-  const [profileOpen, setProfileOpen] = useState(false);
   const [profile, setProfile] = useState<MyProfile>(() => ({
     nickname: userName,
     animal: 'Penguin',
@@ -106,7 +127,7 @@ export default function HomePage({
     await onSaveProfile?.(next); // if this throws, the window shows the error and keeps the draft
     setProfile(next);
   };
-  const [study, dispatch] = useStudyState(initialStudyState, onStudyAction);
+  const [study, dispatch] = useStudyState(initialStudyState, onStudyAction, studyState);
 
   const pendingRequests = Object.values(study.connections).filter((s) => s === 'received').length;
   // People waiting to join the lobby you host
@@ -120,7 +141,7 @@ export default function HomePage({
       label: lobbiesOpen ? 'Close study lobbies' : 'Open study lobbies',
       icon: <LobbiesIcon />,
       open: lobbiesOpen,
-      onClick: () => setLobbiesOpen((o) => !o),
+      onClick: () => toggleApp('lobbies'),
     },
     {
       id: 'sessions',
@@ -130,7 +151,7 @@ export default function HomePage({
         (waitingToJoin > 0 ? ` (${waitingToJoin} waiting to join)` : ''),
       icon: <SessionsIcon />,
       open: sessionsOpen,
-      onClick: () => setSessionsOpen((o) => !o),
+      onClick: () => toggleApp('sessions'),
     },
     {
       id: 'connections',
@@ -140,7 +161,7 @@ export default function HomePage({
         (pendingRequests > 0 ? ` (${pendingRequests} new request${pendingRequests === 1 ? '' : 's'})` : ''),
       icon: <LinkIcon />,
       open: connectionsOpen,
-      onClick: () => setConnectionsOpen((o) => !o),
+      onClick: () => toggleApp('connections'),
     },
   ];
 
@@ -149,7 +170,7 @@ export default function HomePage({
     <div className="doodle w-full h-dvh flex flex-col overflow-clip">
       <Taskbar
         userName={profile.nickname}
-        profile={{ open: profileOpen, onClick: () => setProfileOpen((o) => !o) }}
+        profile={{ open: profileOpen, onClick: () => toggleApp('profile') }}
         avatar={avatar}
         right={taskbarRight}
         apps={taskbarApps}
@@ -186,20 +207,25 @@ export default function HomePage({
               state={study}
               dispatch={dispatch}
               lobbiesOpen={lobbiesOpen}
-              onLobbiesClose={() => setLobbiesOpen(false)}
+              onLobbiesClose={() => closeApp('lobbies')}
               connectionsOpen={connectionsOpen}
-              onConnectionsClose={() => setConnectionsOpen(false)}
+              onConnectionsClose={() => closeApp('connections')}
               sessionsOpen={sessionsOpen}
-              onSessionsClose={() => setSessionsOpen(false)}
+              onSessionsClose={() => closeApp('sessions')}
             />
 
             <WindowLayer>
               <ProfileEditorWindow
                 id="profile"
                 open={profileOpen}
-                onClose={() => setProfileOpen(false)}
+                onClose={() => closeApp('profile')}
                 profile={profile}
                 onSave={saveProfile}
+                avatarUrl={avatarUrl}
+                changesLeft={identityChangesLeft}
+                onRedrawAvatar={onRedrawAvatar}
+                onLogOut={onLogOut}
+                onDeleteAccount={onDeleteAccount}
               />
             </WindowLayer>
           </WindowManagerProvider>
@@ -216,6 +242,7 @@ export default function HomePage({
               theme.switchToSaved();
               setThemePromptOpen(false);
             }}
+            themesLeft={theme.themesLeft}
           />
         </div>
       </main>

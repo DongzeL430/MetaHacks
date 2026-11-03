@@ -1,19 +1,20 @@
 import { useEffect, useId, useState } from 'react';
 import AppWindow, { WINDOW_ACCENTS } from './AppWindow';
 import AvailabilityCalendar from './AvailabilityCalendar';
-import { DoodleCombobox, DoodleSelect } from './DoodleSelect';
+import { DoodleCombobox } from './DoodleSelect';
 import PersonAvatar from './PersonAvatar';
 import ViewTabs, { viewPanelId, viewTabId } from './ViewTabs';
-import { AVATAR_ANIMALS, PROFILE_LIMITS, SUBJECT_SUGGESTIONS } from '../dataFiles/StudyData';
+import { PROFILE_LIMITS, SUBJECT_SUGGESTIONS } from '../dataFiles/StudyData';
 import type { MyProfile } from '../dataFiles/StudyData';
 
-type Section = 'profile' | 'study' | 'schedule' | 'contact';
+type Section = 'profile' | 'study' | 'schedule' | 'contact' | 'account';
 
 const SECTIONS: { id: Section; label: string }[] = [
   { id: 'profile', label: 'Profile' },
   { id: 'study', label: 'Study' },
   { id: 'schedule', label: 'Schedule' },
   { id: 'contact', label: 'Contact' },
+  { id: 'account', label: 'Account' },
 ];
 
 interface ProfileEditorWindowProps {
@@ -24,6 +25,15 @@ interface ProfileEditorWindowProps {
   profile: MyProfile;
   /** Saves the profile. Throw to show an error; the draft is kept so nothing is lost. */
   onSave: (profile: MyProfile) => void | Promise<void>;
+  /** The avatar Muse drew from the nickname. Initials show without one. */
+  avatarUrl?: string;
+  /** Nickname and avatar changes left today (they share a daily limit), or null if unknown */
+  changesLeft?: number | null;
+  /** Muse draws a new avatar from the saved nickname. Throw to show an error. */
+  onRedrawAvatar?: () => Promise<void>;
+  onLogOut?: () => void;
+  /** Deletes the account. Throw to show an error. */
+  onDeleteAccount?: () => Promise<void>;
 }
 
 const LABEL = 'flex flex-col gap-1';
@@ -160,13 +170,31 @@ function TagEditor({
  * Edit your own profile, in sections like the Sessions window: Profile, Study, Schedule, Contact.
  * Changes are a draft until Save; Undo changes goes back to what's saved. Reopening starts fresh.
  */
-export default function ProfileEditorWindow({ id, open, onClose, profile, onSave }: ProfileEditorWindowProps) {
+export default function ProfileEditorWindow({
+  id,
+  open,
+  onClose,
+  profile,
+  onSave,
+  avatarUrl,
+  changesLeft = null,
+  onRedrawAvatar,
+  onLogOut,
+  onDeleteAccount,
+}: ProfileEditorWindowProps) {
   const baseId = useId();
   const [section, setSection] = useState<Section>('profile');
   const [draft, setDraft] = useState<MyProfile>(profile);
   const [showProblems, setShowProblems] = useState(false);
   const [saving, setSaving] = useState(false);
   const [status, setStatus] = useState<{ kind: 'saved' | 'error'; text: string } | null>(null);
+  const [drawing, setDrawing] = useState(false);
+  const [drawNote, setDrawNote] = useState<{ kind: 'ok' | 'error'; text: string } | null>(null);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [deleteText, setDeleteText] = useState('');
+  const [deleteError, setDeleteError] = useState('');
+  const [deleting, setDeleting] = useState(false);
+  const outOfChanges = changesLeft === 0;
   // Remounts the calendar when the draft is reset, so it shows the right slots
   const [calendarKey, setCalendarKey] = useState(0);
 
@@ -218,6 +246,37 @@ export default function ProfileEditorWindow({ id, open, onClose, profile, onSave
     setStatus(null);
     setCalendarKey((k) => k + 1);
   };
+
+  const redraw = async () => {
+    if (!onRedrawAvatar) return;
+    setDrawing(true);
+    setDrawNote({ kind: 'ok', text: 'Muse is drawing your avatar. This takes about half a minute.' });
+    try {
+      await onRedrawAvatar();
+      setDrawNote({ kind: 'ok', text: 'Here’s your new avatar.' });
+    } catch (err) {
+      setDrawNote({ kind: 'error', text: err instanceof Error ? err.message : 'Muse couldn’t draw one right now.' });
+    } finally {
+      setDrawing(false);
+    }
+  };
+
+  const deleteAccount = async () => {
+    if (!onDeleteAccount) return;
+    setDeleting(true);
+    setDeleteError('');
+    try {
+      await onDeleteAccount();
+    } catch (err) {
+      setDeleteError(err instanceof Error ? err.message : 'Your account wasn’t deleted. Try again.');
+      setDeleting(false);
+    }
+  };
+
+  const changesNote =
+    changesLeft === null
+      ? 'Nickname and avatar changes share a limit of 3 a day.'
+      : `${changesLeft} of 3 nickname or avatar changes left today.`;
 
   const errorId = (field: string) => `${baseId}-${field}-error`;
   const sectionCounts: Partial<Record<Section, number>> = {
@@ -273,9 +332,27 @@ export default function ProfileEditorWindow({ id, open, onClose, profile, onSave
         {section === 'profile' && (
           <>
             <div className="flex items-center gap-3">
-              <PersonAvatar person={{ id: 'me', name: draft.nickname || '?' }} className="w-16 h-16" />
-              <p className="m-0 text-sm opacity-70">This is how you appear in lobbies and in the nav bar.</p>
+              <PersonAvatar person={{ id: 'me', name: draft.nickname || '?', avatar: avatarUrl }} className="w-20 h-20" />
+              <div className="flex flex-col items-start gap-1.5">
+                <p className="m-0 text-sm opacity-70">This is how you appear in lobbies and in the nav bar.</p>
+                {onRedrawAvatar && (
+                  <button
+                    type="button"
+                    onClick={() => void redraw()}
+                    disabled={drawing || outOfChanges}
+                    title="Muse draws a new avatar from your saved nickname"
+                    className="px-3 py-0.5 text-sm"
+                  >
+                    {drawing ? 'Drawing…' : 'Draw a new avatar'}
+                  </button>
+                )}
+              </div>
             </div>
+            {drawNote && (
+              <p role="status" className={`m-0 text-sm ${drawNote.kind === 'error' ? 'text-danger' : 'opacity-70'}`}>
+                {drawNote.text}
+              </p>
+            )}
 
             <div className={LABEL}>
               <label htmlFor={`${baseId}-nickname`} className="text-sm">
@@ -295,20 +372,13 @@ export default function ProfileEditorWindow({ id, open, onClose, profile, onSave
                 className={INPUT}
               />
               {shown.nickname && <FieldError id={errorId('nickname')}>{shown.nickname}</FieldError>}
+              <span className="text-xs opacity-70">
+                Classmates see this, so skip your real name. Saving a new one uses a daily change; then “Draw a
+                new avatar” to match it.
+              </span>
             </div>
 
-            <div className={`${LABEL} self-start`}>
-              <label htmlFor={`${baseId}-animal`} className="text-sm">
-                Avatar animal
-              </label>
-              <DoodleSelect
-                id={`${baseId}-animal`}
-                value={draft.animal}
-                onChange={(animal) => update({ animal })}
-                options={AVATAR_ANIMALS.map((a) => ({ value: a, label: a }))}
-                className="w-48 max-w-full"
-              />
-            </div>
+            <p className="m-0 text-sm opacity-70">{changesNote}</p>
           </>
         )}
 
@@ -376,6 +446,69 @@ export default function ProfileEditorWindow({ id, open, onClose, profile, onSave
                 {shown[f.key] && <FieldError id={errorId(f.key)}>{shown[f.key]!}</FieldError>}
               </div>
             ))}
+          </>
+        )}
+
+        {section === 'account' && (
+          <>
+            {onLogOut && (
+              <div className="flex flex-col items-start gap-1">
+                <button type="button" onClick={onLogOut} className="px-4 py-1">
+                  Log out
+                </button>
+              </div>
+            )}
+
+            {onDeleteAccount && (
+              <div className="flex flex-col gap-2 pt-3 border-t-2 border-ink/15">
+                {confirmingDelete ? (
+                  <>
+                    <p className="m-0 text-sm">This deletes your account and everything tied to you. It can’t be undone.</p>
+                    <label className="flex flex-col gap-1 text-sm">
+                      Type DELETE to confirm:
+                      <input
+                        type="text"
+                        value={deleteText}
+                        onChange={(e) => setDeleteText(e.target.value)}
+                        onKeyDown={(e) => e.key === 'Enter' && e.preventDefault()}
+                        autoComplete="off"
+                        className={INPUT}
+                      />
+                    </label>
+                    {deleteError && (
+                      <p role="alert" className="m-0 text-sm text-danger">
+                        {deleteError}
+                      </p>
+                    )}
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => void deleteAccount()}
+                        disabled={deleteText !== 'DELETE' || deleting}
+                        className="px-3 py-0.5 text-sm"
+                      >
+                        {deleting ? 'Deleting…' : 'Delete my account'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setConfirmingDelete(false);
+                          setDeleteText('');
+                          setDeleteError('');
+                        }}
+                        className="px-3 py-0.5 text-sm"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  <button type="button" onClick={() => setConfirmingDelete(true)} className="self-start px-3 py-0.5 text-sm">
+                    Delete my account
+                  </button>
+                )}
+              </div>
+            )}
           </>
         )}
       </div>

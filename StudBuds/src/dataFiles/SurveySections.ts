@@ -15,6 +15,11 @@ export interface SurveySection {
   questions: SurveyQuestion[];
 }
 
+/**
+ * The database keeps a copy of every question for matching (survey_questions, seeded in
+ * supabase/migrations/…_survey_saving.sql). Answers are saved by question id and option number,
+ * so keep each id and the order of its options the same in both places. Wording can change here.
+ */
 export const SURVEY_SECTIONS: SurveySection[] = [
   {
     id: 'study-style',
@@ -91,6 +96,26 @@ export const SURVEY_SECTIONS: SurveySection[] = [
         prompt: 'How much does showing up on time matter to you?',
         options: ['A lot, I plan around it', 'Somewhat, a heads-up is enough', 'Not much, I’m flexible'],
       },
+    ],
+  },
+  {
+    id: 'this-or-that',
+    title: 'This or That',
+    heading: 'Quick picks',
+    bio: 'Go with your first instinct. Both and No preference are fine answers too.',
+    questions: [
+      { id: 'deadlineStyle', prompt: 'Night before or a week ahead?', options: ['Night before', 'A week ahead', 'Both', 'No preference'] },
+      { id: 'dayRhythm', prompt: 'Early bird or night owl?', options: ['Early bird', 'Night owl', 'Both', 'No preference'] },
+      { id: 'practiceStyle', prompt: 'Flashcards or practice problems?', options: ['Flashcards', 'Practice problems', 'Both', 'No preference'] },
+      { id: 'noteStyle', prompt: 'Handwritten or typed notes?', options: ['Handwritten', 'Typed', 'Both', 'No preference'] },
+      {
+        id: 'breakStyle',
+        prompt: 'Lots of short breaks or one long break?',
+        options: ['Lots of short breaks', 'One long break', 'Both', 'No preference'],
+      },
+      { id: 'planStyle', prompt: 'Plan everything or wing it?', options: ['Plan everything', 'Wing it', 'Both', 'No preference'] },
+      { id: 'petPick', prompt: 'Cats or dogs?', options: ['Cats', 'Dogs', 'Both', 'No preference'] },
+      { id: 'seatPick', prompt: 'Window seat or aisle seat?', options: ['Window seat', 'Aisle seat', 'Both', 'No preference'] },
     ],
   },
 ];

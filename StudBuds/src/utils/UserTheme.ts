@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
+import type { Json } from '../../../supabase/database.types.ts';
 import { applyThemeColors, backgroundStyle, sanitizeTheme } from './Theme';
 import type { UserTheme } from './Theme';
 
@@ -19,6 +20,8 @@ export function useUserTheme() {
   const [saved, setSaved] = useState<UserTheme | null>(null);
   const [useCustom, setUseCustom] = useState(false);
   const [imageUrl, setImageUrl] = useState<string | null>(null);
+  // Themes left this week (3 a week, counted on the server)
+  const [themesLeft, setThemesLeft] = useState<number | null>(null);
 
   // Load the saved theme for whoever is signed in
   useEffect(() => {
@@ -30,6 +33,9 @@ export function useUserTheme() {
         setUseCustom(false);
         return;
       }
+      void supabase.rpc('muse_uses_left', { what: 'theme' }).then(({ data }) => {
+        if (!cancelled && typeof data === 'number') setThemesLeft(data);
+      });
       const { data, error } = await supabase
         .from('user_themes')
         .select('theme, use_custom')
@@ -78,7 +84,8 @@ export function useUserTheme() {
   const persist = useCallback(
     async (theme: UserTheme, custom: boolean) => {
       if (!userId) return;
-      await supabase.from('user_themes').upsert({ user_id: userId, theme, use_custom: custom });
+      // A theme is plain data (sanitizeTheme checked it), so it fits the jsonb column as is
+      await supabase.from('user_themes').upsert({ user_id: userId, theme: theme as unknown as Json, use_custom: custom });
     },
     [userId],
   );
@@ -111,6 +118,7 @@ export function useUserTheme() {
         }
         throw new Error(message);
       }
+      if (typeof data?.themesLeft === 'number') setThemesLeft(data.themesLeft);
       const checked = sanitizeTheme(data?.theme, userId ?? undefined);
       if (!checked) throw new Error('That theme didn’t come out right. Try describing it a little differently.');
       setSaved(checked.theme);
@@ -126,6 +134,8 @@ export function useUserTheme() {
     choice: active ? ('custom' as const) : ('default' as const),
     /** The saved custom theme, even while the default look is in use */
     savedTheme: saved,
+    /** Themes left this week, or null until known */
+    themesLeft,
     switchToDefault,
     switchToSaved,
     generate,

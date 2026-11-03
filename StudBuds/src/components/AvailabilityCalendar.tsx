@@ -1,6 +1,7 @@
 import { Fragment, useMemo, useRef, useState } from 'react';
 import type { ChangeEvent, KeyboardEvent, PointerEvent } from 'react';
 import { icsToAvailability } from '../utils/IcsAvailability';
+import { readScheduleScreenshot, scheduleToAvailability } from '../utils/ScheduleScreenshot';
 
 export type DayKey = 'sun' | 'mon' | 'tue' | 'wed' | 'thu' | 'fri' | 'sat';
 
@@ -57,6 +58,10 @@ interface AvailabilityCalendarProps {
   onChange?: (slots: string[]) => void;
   /** Shows the "Import .ics" button */
   allowIcsImport?: boolean;
+  /** Shows the "Import screenshot" button: Muse Spark reads a schedule image. Needs a signed-in student. */
+  allowScreenshotImport?: boolean;
+  /** Called with course codes Muse found in the screenshot, like "CS 2500" */
+  onCoursesFound?: (codes: string[]) => void;
   /** 'busy' (default): event times become unavailable. 'free': event times become available. */
   icsEventsMean?: 'busy' | 'free';
 }
@@ -98,6 +103,8 @@ export default function AvailabilityCalendar({
   defaultValue = [],
   onChange,
   allowIcsImport = true,
+  allowScreenshotImport = true,
+  onCoursesFound,
   icsEventsMean = 'busy',
 }: AvailabilityCalendarProps) {
   const columns = useMemo(() => {
@@ -120,6 +127,8 @@ export default function AvailabilityCalendar({
   const dragMode = useRef<'add' | 'remove' | null>(null);
   const gridRef = useRef<HTMLDivElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const screenshotRef = useRef<HTMLInputElement>(null);
+  const [reading, setReading] = useState(false);
   const [importStatus, setImportStatus] = useState<ImportStatus>(null);
   // Selection from before the last import, so it can be undone
   const [beforeImport, setBeforeImport] = useState<Set<string> | null>(null);
@@ -167,6 +176,47 @@ export default function AvailabilityCalendar({
         kind: 'error',
         text: err instanceof Error ? err.message : 'Couldn’t read that file.',
       });
+    }
+  };
+
+  const handleScreenshotFile = async (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = ''; // lets the same file be picked again
+    if (!file) return;
+
+    setReading(true);
+    setBeforeImport(null);
+    setImportStatus({ kind: 'ok', text: 'Muse is reading your schedule…' });
+    try {
+      const { blocks, courseCodes } = await readScheduleScreenshot(file);
+      const slots = scheduleToAvailability(blocks, {
+        dayKeys: columns.map((d) => d.key),
+        startHour,
+        endHour,
+        slotMinutes,
+      });
+
+      setBeforeImport(selectedRef.current);
+      replaceSelection(new Set(slots));
+      if (courseCodes.length > 0) onCoursesFound?.(courseCodes);
+
+      const n = blocks.length;
+      const k = courseCodes.length;
+      const courses =
+        onCoursesFound && k > 0
+          ? ` It also found ${k} course code${k === 1 ? '' : 's'}, added to the Courses page for you to rate.`
+          : '';
+      setImportStatus({
+        kind: 'ok',
+        text: `Filled in from ${n} time block${n === 1 ? '' : 's'} Muse found. Times outside them are marked available. Adjust anything that’s off.${courses}`,
+      });
+    } catch (err) {
+      setImportStatus({
+        kind: 'error',
+        text: err instanceof Error ? err.message : 'Couldn’t read that screenshot.',
+      });
+    } finally {
+      setReading(false);
     }
   };
 
@@ -329,12 +379,46 @@ export default function AvailabilityCalendar({
           </>
         )}
 
+        {allowScreenshotImport && !isBlock && (
+          <>
+            <button
+              type="button"
+              onClick={() => screenshotRef.current?.click()}
+              disabled={reading}
+              className="ml-auto px-3 py-0.5 text-sm flex items-center gap-2"
+              title="Fill the calendar from a screenshot of your class schedule or calendar. Muse Spark reads it."
+            >
+              <svg viewBox="0 0 20 20" className="w-4 h-4" aria-hidden="true">
+                <rect x="3" y="4" width="14" height="12" rx="1.5" fill="none" stroke="currentColor" strokeWidth="2" />
+                <path
+                  d="M5 14l4-4 3 3 2-2 2 2"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+              {reading ? 'Reading…' : 'Import screenshot'}
+            </button>
+            {/* The image is shrunk and sent to Muse, never added to the form's data */}
+            <input
+              ref={screenshotRef}
+              type="file"
+              accept="image/png,image/jpeg,image/webp"
+              onChange={handleScreenshotFile}
+              className="hidden"
+              tabIndex={-1}
+            />
+          </>
+        )}
+
         {allowIcsImport && !isBlock && (
           <>
             <button
               type="button"
               onClick={() => fileRef.current?.click()}
-              className="ml-auto px-3 py-0.5 text-sm flex items-center gap-2"
+              className={`${allowScreenshotImport ? '' : 'ml-auto '}px-3 py-0.5 text-sm flex items-center gap-2`}
               title="Fill the calendar from an .ics file (Google Calendar, Outlook, Apple Calendar)"
             >
               <svg viewBox="0 0 20 20" className="w-4 h-4" aria-hidden="true">
