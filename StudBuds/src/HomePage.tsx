@@ -6,9 +6,11 @@ import type { TaskbarApp } from './components/Taskbar';
 import StudyLayout from './components/StudyLayout';
 import ThemePromptWindow from './components/ThemePromptWindow';
 import { useUserTheme } from './utils/UserTheme';
-import { DEFAULT_MUSIC, FALLBACK_MUSIC } from './utils/Music';
+import { FALLBACK_MUSIC, defaultMusicFor } from './utils/Music';
 import { useThemeMusic } from './utils/MusicPlayer';
 import ProfileEditorWindow from './components/ProfileEditorWindow';
+import Tour from './components/Tour';
+import { welcomeTourSteps } from './components/WelcomeTourSteps';
 import CroftWindow from './components/croft/CroftWindow';
 import WorldChat from './components/WorldChat';
 import { useWorldChat } from './lib/worldChat';
@@ -16,11 +18,11 @@ import { CroftVisitContext } from './lib/croft';
 import type { MyProfile } from './dataFiles/StudyData';
 import { ME } from './dataFiles/StudyData';
 import type { Person } from './dataFiles/StudyData';
-import { useStudyState } from './utils/StudyState';
+import { pendingInvites, useStudyState } from './utils/StudyState';
 import type { StudyAction, StudyState } from './utils/StudyState';
-// Same background picture as the auth page.
+// Same background picture as the auth page: picked at random once per session.
 // The default background picture. A custom theme can swap it, tint it, or move its focus point.
-import defaultbg from './assets/defaultbg.png';
+import { defaultBackground as defaultbg, defaultBackgroundName } from './utils/DefaultBackground.ts';
 
 /* Taskbar icons (drawn at 24x24, sized by the taskbar) */
 const SessionsIcon = () => (
@@ -54,7 +56,7 @@ const UpcomingIcon = () => (
   </svg>
 );
 
-const EMPTY_STUDY_STATE: StudyState = { lobbies: [], connections: {} };
+const EMPTY_STUDY_STATE: StudyState = { lobbies: [], connections: {}, invites: [] };
 
 interface HomePageProps {
   /** The user's generated name, shown next to the avatar in the taskbar */
@@ -81,6 +83,11 @@ interface HomePageProps {
   onRefreshStudy?: () => Promise<void>;
   /** Opens the Study Lobbies window right away, e.g. on arriving from the pre-survey */
   openLobbiesAtStart?: boolean;
+  /**
+   * Shows the welcome tour of Home (new accounts). openLobbiesAtStart then waits until it's done.
+   * onDone runs when the tour finishes or is closed.
+   */
+  welcomeTour?: { onDone: () => void };
   /** Every lobby / connection action the user takes, e.g. to send to your backend */
   onStudyAction?: (action: StudyAction) => void;
   /** Starting values for the profile editor beyond the props above (animal, courses, contact…) */
@@ -112,6 +119,7 @@ export default function HomePage({
   studyState,
   onRefreshStudy,
   openLobbiesAtStart = false,
+  welcomeTour,
   onStudyAction,
   initialProfile,
   onSaveProfile,
@@ -120,7 +128,14 @@ export default function HomePage({
   onLogOut,
   onDeleteAccount,
 }: HomePageProps) {
-  const [lobbiesOpen, setLobbiesOpen] = useState(openLobbiesAtStart);
+  // The welcome tour comes first; the lobbies open once it's done
+  const [lobbiesOpen, setLobbiesOpen] = useState(openLobbiesAtStart && !welcomeTour);
+  const [tourOpen, setTourOpen] = useState(!!welcomeTour);
+  const finishTour = () => {
+    setTourOpen(false);
+    welcomeTour?.onDone();
+    if (openLobbiesAtStart) setLobbiesOpen(true);
+  };
   const [connectionsOpen, setConnectionsOpen] = useState(false);
   // My Croft: your own, and the one you're visiting from someone's profile card
   const [croftOpen, setCroftOpen] = useState(false);
@@ -138,7 +153,7 @@ export default function HomePage({
   // Every theme has its own piece: the default theme's meadow tune, or the custom theme's. A custom
   // theme without one yet plays the stand-in while Muse writes it (useUserTheme asks for it).
   const music = useThemeMusic(
-    theme.choice === 'custom' ? (theme.savedTheme?.music ?? FALLBACK_MUSIC) : DEFAULT_MUSIC,
+    theme.choice === 'custom' ? (theme.savedTheme?.music ?? FALLBACK_MUSIC) : defaultMusicFor(defaultBackgroundName),
   );
 
   // The user's own profile. Saving it updates the nav bar, lobby filters and host form right away.
@@ -166,7 +181,11 @@ export default function HomePage({
 
   const pendingRequests = Object.values(study.connections).filter((s) => s === 'received').length;
   // People waiting to join the lobby you host
-  const waitingToJoin = study.lobbies.find((l) => l.hostId === ME)?.requestIds.length ?? 0;
+  const waitingToJoin = study.lobbies
+    .filter((l) => l.hostId === ME)
+    .reduce((sum, l) => sum + l.requestIds.length, 0);
+  // Invites from connections waiting for an answer: a red dot on Sessions
+  const invitesWaiting = pendingInvites(study).length;
 
 
   const taskbarApps: TaskbarApp[] = [
@@ -183,9 +202,11 @@ export default function HomePage({
       name: 'Sessions',
       label:
         (sessionsOpen ? 'Close sessions' : 'Open sessions') +
-        (waitingToJoin > 0 ? ` (${waitingToJoin} waiting to join)` : ''),
+        (waitingToJoin > 0 ? ` (${waitingToJoin} waiting to join)` : '') +
+        (invitesWaiting > 0 ? ` (${invitesWaiting} new invite${invitesWaiting === 1 ? '' : 's'})` : ''),
       icon: <SessionsIcon />,
       open: sessionsOpen,
+      alert: invitesWaiting > 0,
       onClick: () => setSessionsOpen((o) => !o),
     },
     {
@@ -198,6 +219,10 @@ export default function HomePage({
       open: connectionsOpen,
       onClick: () => setConnectionsOpen((o) => !o),
     },
+  ];
+
+  // In the gear menu at the right of the bar, next to music and theme
+  const gearApps: TaskbarApp[] = [
     {
       // Features on the way, in a drop-down; My Croft is the first
       id: 'upcoming',
@@ -216,6 +241,9 @@ export default function HomePage({
     },
   ];
 
+  // Recreated only when the name changes; the tour reads the newest copy
+  const tourSteps = useMemo(() => welcomeTourSteps(profile.nickname), [profile.nickname]);
+
   return (
     // overflow-clip: a window dragged past the edge (or springing back) never adds page scrollbars
     <div className="doodle w-full h-dvh flex flex-col overflow-clip">
@@ -225,6 +253,7 @@ export default function HomePage({
         avatar={avatar}
         right={taskbarRight}
         apps={taskbarApps}
+        gearApps={gearApps}
         music={{
           title: music.title,
           volume: music.volume,
@@ -243,17 +272,22 @@ export default function HomePage({
         }}
       />
 
+      {tourOpen && <Tour steps={tourSteps} onClose={finishTour} />}
+
       {/* The picture is this container's own background, so only the area under the taskbar gets it
           and children keep their own backgrounds on top. */}
       <main
-        className={`flex-1 min-h-0 flex flex-col px-2 pb-2 md:px-3 md:pb-3 ${TASKBAR_CLEARANCE}`}
+        className={`relative flex-1 min-h-0 flex flex-col px-2 pb-2 md:px-3 md:pb-3 ${TASKBAR_CLEARANCE}`}
         // Built only from checked theme values: the default picture, or the user's own generated one
         style={theme.backgroundStyle(defaultbg)}
       >
+        {/* Out of the desk, so it stays in the screen's corner while the desk is shortened on phones */}
+        <WorldChat lines={chat.lines} history={chat.history} unread={chat.unread} onOpen={chat.markRead} />
         {/* Desk area: windows rest inside this box. `relative` so window layers can cover it.
-            It starts empty; windows open from the nav bar. */}
-        <div className="relative flex-1 min-h-0 min-w-0">
-          <WorldChat lines={chat.lines} history={chat.history} unread={chat.unread} onOpen={chat.markRead} />
+            It starts empty; windows open from the nav bar. On phones it stops short of the bottom,
+            leaving a strip for the gear (bottom left) and the chat button (bottom right):
+            16px corner gap + 40px button + 8px = 64px; main's pb-2 gives 8px, mb-14 the other 56px. */}
+        <div className="relative flex-1 min-h-0 min-w-0 mb-14 sm:mb-0">
           {/* All windows on the desk share one stack and one tiling layout */}
           <WindowManagerProvider>
             {/* "Visit croft" on any profile card opens that person's croft */}
@@ -264,6 +298,8 @@ export default function HomePage({
                 myAvailability={profile.availability}
                 // The "My subjects" lobby filter matches both lists
                 mySubjects={[...profile.seekingHelpWith, ...profile.coursesTaken]}
+                // Hosting offers only the courses they're taking right now
+                currentCourses={profile.courses.filter((c) => c.status === 'taking' && c.name.trim()).map((c) => c.name)}
                 locationSuggestions={locationSuggestions}
                 state={study}
                 dispatch={dispatch}

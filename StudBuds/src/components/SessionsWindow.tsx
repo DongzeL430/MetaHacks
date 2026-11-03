@@ -3,8 +3,9 @@ import AppWindow, { WINDOW_ACCENTS } from './AppWindow';
 import type { InitialSize } from './AppWindow';
 import LobbyRow from './LobbyRow';
 import ViewTabs, { viewPanelId, viewTabId } from './ViewTabs';
-import type { Lobby, Person } from '../dataFiles/StudyData';
+import type { Lobby, LobbyInvite, Person } from '../dataFiles/StudyData';
 import { roleIn } from '../utils/StudyState';
+import type { StudyDispatch } from '../utils/StudyState';
 
 interface SessionsWindowProps {
   id: string;
@@ -15,6 +16,9 @@ interface SessionsWindowProps {
   openTabIds: string[];
   /** Opens the lobby in the lobby tabs window (the same page as from Study Lobbies) */
   onOpenLobby: (lobbyId: string) => void;
+  /** Invites waiting for the user's answer (see pendingInvites) */
+  invites?: { invite: LobbyInvite; lobby: Lobby }[];
+  dispatch?: StudyDispatch;
 }
 
 /** Opening size for smaller side windows (e.g. Chat), as a share of the desk */
@@ -25,24 +29,46 @@ export const LIST_WINDOW_SIZE: InitialSize = ({ width, height }) => {
   return { width: width * 0.96, height: height * 0.92 };
 };
 
-type View = 'hosting' | 'joined' | 'requested';
+type View = 'hosting' | 'joined' | 'requested' | 'invites';
 
-const VIEWS: { id: View; label: string; role: 'host' | 'member' | 'requested'; empty: string }[] = [
-  { id: 'hosting', label: 'Hosting', role: 'host', empty: 'You’re not hosting a session. You can host one from Study Lobbies.' },
-  { id: 'joined', label: 'Joined', role: 'member', empty: 'You haven’t joined any sessions yet.' },
-  { id: 'requested', label: 'Requested', role: 'requested', empty: 'No requests waiting on a host.' },
+const VIEWS: { id: View; label: string; empty: string }[] = [
+  { id: 'hosting', label: 'Hosting', empty: 'You’re not hosting a session. You can host one from Study Lobbies.' },
+  { id: 'joined', label: 'Joined', empty: 'You haven’t joined any sessions yet.' },
+  { id: 'requested', label: 'Requested', empty: 'No requests waiting on a host.' },
+  { id: 'invites', label: 'Invites', empty: 'No invites right now. When a connection invites you to a session, it shows up here.' },
 ];
 
+const ROLE_OF: Record<Exclude<View, 'invites'>, 'host' | 'member' | 'requested'> = {
+  hosting: 'host',
+  joined: 'member',
+  requested: 'requested',
+};
+
 /**
- * Your own sessions, split into views like a nav bar: Hosting, Joined, Requested.
+ * Your own sessions, split into views like a nav bar: Hosting, Joined, Requested, and Invites
+ * (sessions your connections invited you to, with a red dot while any wait for an answer).
  * Click a session to open its full page in the lobby tabs window.
  */
-export default function SessionsWindow({ id, open, onClose, lobbies, people, openTabIds, onOpenLobby }: SessionsWindowProps) {
+export default function SessionsWindow({
+  id,
+  open,
+  onClose,
+  lobbies,
+  people,
+  openTabIds,
+  onOpenLobby,
+  invites = [],
+  dispatch,
+}: SessionsWindowProps) {
   const baseId = useId();
-  const listFor = (view: View) => lobbies.filter((l) => roleIn(l) === VIEWS.find((v) => v.id === view)!.role);
+  const listFor = (view: View) =>
+    view === 'invites' ? invites.map((i) => i.lobby) : lobbies.filter((l) => roleIn(l) === ROLE_OF[view]);
+  const inviteFor = (lobbyId: string) => invites.find((i) => i.lobby.id === lobbyId)?.invite;
 
-  // Starts on the first view that has something in it
-  const [view, setView] = useState<View>(() => VIEWS.find((v) => listFor(v.id).length > 0)?.id ?? 'hosting');
+  // Starts on invites waiting for an answer, or else the first view that has something in it
+  const [view, setView] = useState<View>(() =>
+    invites.length > 0 ? 'invites' : (VIEWS.find((v) => listFor(v.id).length > 0)?.id ?? 'hosting'),
+  );
   const current = VIEWS.find((v) => v.id === view)!;
   const list = listFor(view);
 
@@ -54,7 +80,42 @@ export default function SessionsWindow({ id, open, onClose, lobbies, people, ope
       return waiting || undefined;
     }
     if (view === 'requested') return 'Waiting for the host to let you in';
+    if (view === 'invites') {
+      const invite = inviteFor(lobby.id);
+      const who = invite ? people.get(invite.inviterId)?.name ?? 'Someone' : 'Someone';
+      return invite?.inviterId === lobby.hostId ? `${who} (the host) invited you` : `${who} invited you`;
+    }
     return undefined;
+  };
+
+  // Accept: a host's invite joins straight away; a member's sends the host a join request
+  const actionsFor = (lobby: Lobby) => {
+    if (view !== 'invites' || !dispatch) return undefined;
+    const fromHost = inviteFor(lobby.id)?.inviterId === lobby.hostId;
+    const isFull = lobby.memberIds.length >= lobby.maxSize;
+    const blocked = isFull || (!fromHost && lobby.locked);
+    return (
+      <>
+        <button
+          type="button"
+          onClick={() => dispatch({ type: 'decline-invite', lobbyId: lobby.id })}
+          aria-label={`Decline the invite to ${lobby.subject}`}
+          className="px-3 py-0.5 text-sm"
+        >
+          Decline
+        </button>
+        <button
+          type="button"
+          onClick={() => dispatch({ type: 'accept-invite', lobbyId: lobby.id })}
+          disabled={blocked}
+          title={isFull ? 'This session is full' : blocked ? 'The host isn’t taking new requests' : undefined}
+          aria-label={`${fromHost ? 'Join' : 'Ask to join'} ${lobby.subject}`}
+          className="px-3 py-0.5 text-sm"
+        >
+          {fromHost ? 'Join' : 'Ask to join'}
+        </button>
+      </>
+    );
   };
 
   return (
@@ -62,7 +123,7 @@ export default function SessionsWindow({ id, open, onClose, lobbies, people, ope
       id={id}
       title="Sessions"
       accent={WINDOW_ACCENTS.peach}
-      info="Every session you’re part of: ones you host, ones you’ve joined, and ones waiting for a host to let you in. Click one to open its page."
+      info="Every session you’re part of: ones you host, ones you’ve joined, ones waiting for a host to let you in, and invites from your connections. Click one to open its page."
       open={open}
       onClose={onClose}
       controls={{ close: 'enabled', fullscreen: 'enabled' }}
@@ -74,7 +135,12 @@ export default function SessionsWindow({ id, open, onClose, lobbies, people, ope
       <ViewTabs
         baseId={baseId}
         label="Your sessions"
-        tabs={VIEWS.map((v) => ({ id: v.id, label: v.label, count: listFor(v.id).length }))}
+        tabs={VIEWS.map((v) => ({
+          id: v.id,
+          label: v.label,
+          count: listFor(v.id).length,
+          dot: v.id === 'invites' && invites.length > 0,
+        }))}
         value={view}
         onChange={setView}
       />
@@ -99,6 +165,7 @@ export default function SessionsWindow({ id, open, onClose, lobbies, people, ope
                 isOpenTab={openTabIds.includes(lobby.id)}
                 onOpen={onOpenLobby}
                 note={noteFor(lobby)}
+                actions={actionsFor(lobby)}
               />
             ))}
           </ul>

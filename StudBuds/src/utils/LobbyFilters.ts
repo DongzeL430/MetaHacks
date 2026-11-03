@@ -15,6 +15,8 @@ export interface LobbyFilters {
   openSpots: boolean;
   /** Hide lobbies you host, joined or asked to join (they're always in Sessions too) */
   hideMine: boolean;
+  /** Only lobbies at your own school (or schools linked to it) */
+  mySchool: boolean;
 }
 
 export const ALL_SIZES = Array.from({ length: MAX_GROUP_SIZE - MIN_GROUP_SIZE + 1 }, (_, i) => MIN_GROUP_SIZE + i);
@@ -27,6 +29,7 @@ export const DEFAULT_FILTERS: LobbyFilters = {
   sizes: ALL_SIZES,
   openSpots: false,
   hideMine: false,
+  mySchool: true,
 };
 
 const normalize = (text: string) => text.trim().toLowerCase();
@@ -57,6 +60,7 @@ export function passesFilters(lobby: Lobby, filters: LobbyFilters, ctx: MatchCon
   if (filters.subjects && ctx.subjects.length > 0 && !matchesSubjects(lobby, ctx.subjects)) return false;
   if (filters.size && !filters.sizes.includes(lobby.maxSize)) return false;
   if (filters.openSpots && (lobby.memberIds.length >= lobby.maxSize || lobby.locked)) return false;
+  if (filters.mySchool && lobby.atMySchool === false) return false;
   return true;
 }
 
@@ -68,5 +72,6 @@ export function activeFilterCount(filters: LobbyFilters, ctx: MatchContext): num
     filters.size && filters.sizes.length < ALL_SIZES.length,
     filters.openSpots,
     filters.hideMine,
+    filters.mySchool,
   ].filter(Boolean).length;
 }

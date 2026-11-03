@@ -24,8 +24,8 @@ interface LobbyBrowserWindowProps {
   onOpenLobby: (lobbyId: string) => void;
   /** Opens the host form */
   onHost: () => void;
-  /** Already hosting a lobby (only one at a time): the host button is disabled */
-  isHosting: boolean;
+  /** Can't host another session right now (hosting the most allowed): the host button is disabled */
+  hostLimitReached?: boolean;
   /** The user's free slots, for the "fits my free time" criterion */
   freeSlots?: string[];
   /** The user's subjects (e.g. their courses), for the "my subjects" criterion */
@@ -56,7 +56,7 @@ export default function LobbyBrowserWindow({
   openTabIds,
   onOpenLobby,
   onHost,
-  isHosting,
+  hostLimitReached = false,
   freeSlots = [],
   subjects = [],
   onRefresh,
@@ -106,7 +106,15 @@ export default function LobbyBrowserWindow({
   // Lobbies the search would show but the filters hide
   const hiddenByFilters = lobbies.filter((l) => !q || l.subject.toLowerCase().includes(q)).length - shown.length;
   const showAll = () =>
-    setFilters({ ...DEFAULT_FILTERS, schedule: false, subjects: false, size: false, openSpots: false, hideMine: false });
+    setFilters({
+      ...DEFAULT_FILTERS,
+      schedule: false,
+      subjects: false,
+      size: false,
+      openSpots: false,
+      hideMine: false,
+      mySchool: false,
+    });
 
   const tagsFor = (lobby: Lobby) => {
     const reasons = lobby.match?.reasons ?? [];
@@ -116,6 +124,7 @@ export default function LobbyBrowserWindow({
       ...reasons,
       ...(scheduleKnown && fitsSchedule(lobby, ctx.freeSet) ? ['Fits your free time'] : []),
       ...(!coversCourse && subjectsKnown && matchesSubjects(lobby, subjects) ? ['Your subject'] : []),
+      ...(lobby.atMySchool === false && lobby.school ? [`At ${lobby.school}`] : []),
     ];
   };
 
@@ -137,27 +146,30 @@ export default function LobbyBrowserWindow({
     >
       {/* SEARCH + FILTERS + HOST */}
       <div className="flex flex-wrap items-center gap-2">
-        <label className="flex-1 min-w-[10rem]">
-          <span className="sr-only">Search lobbies by subject</span>
-          <input
-            type="search"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && e.preventDefault()}
-            placeholder="Search by subject"
-            autoComplete="off"
-            className="w-full px-2 py-1"
-          />
-        </label>
-        <button
-          type="button"
-          onClick={() => setShowFilters((s) => !s)}
-          aria-expanded={showFilters}
-          aria-controls={panelId}
-          className="px-3 py-1"
-        >
-          Filters{activeCount > 0 ? ` (${activeCount})` : ''}
-        </button>
+        {/* Search and filters together, so the welcome tour can point at both */}
+        <div data-tour="lobby-search" className="flex-1 min-w-[14rem] flex items-center gap-2">
+          <label className="flex-1 min-w-[10rem]">
+            <span className="sr-only">Search lobbies by subject</span>
+            <input
+              type="search"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && e.preventDefault()}
+              placeholder="Search by subject"
+              autoComplete="off"
+              className="w-full px-2 py-1"
+            />
+          </label>
+          <button
+            type="button"
+            onClick={() => setShowFilters((s) => !s)}
+            aria-expanded={showFilters}
+            aria-controls={panelId}
+            className="px-3 py-1"
+          >
+            Filters{activeCount > 0 ? ` (${activeCount})` : ''}
+          </button>
+        </div>
         {onRefresh && (
           <button
             type="button"
@@ -186,8 +198,9 @@ export default function LobbyBrowserWindow({
         <button
           type="button"
           onClick={onHost}
-          disabled={isHosting}
-          title={isHosting ? 'You already host a session. Find it under Sessions.' : undefined}
+          disabled={hostLimitReached}
+          data-tour="host-button"
+          title={hostLimitReached ? 'You’re hosting as many sessions as you can. Close one under Sessions to host another.' : undefined}
           className="px-3 py-1"
         >
           + Host a session
@@ -201,6 +214,16 @@ export default function LobbyBrowserWindow({
           className="m-0 min-w-0 px-3 pb-3 pt-1 flex flex-col gap-2 motion-safe:transition motion-safe:duration-200 starting:opacity-0 starting:-translate-y-1"
         >
           <legend className="px-1 text-sm">Match lobbies to me</legend>
+
+          <label className={checkboxRow}>
+            <input type="checkbox" checked={filters.mySchool} onChange={(e) => set({ mySchool: e.target.checked })} />
+            <span>
+              Only my school
+              <span className="block text-xs opacity-70">
+                Turn off to see sessions hosted at other schools too.
+              </span>
+            </span>
+          </label>
 
           <label className={checkboxRow}>
             <input type="checkbox" checked={filters.schedule} onChange={(e) => set({ schedule: e.target.checked })} />
@@ -269,41 +292,44 @@ export default function LobbyBrowserWindow({
         </fieldset>
       )}
 
-      <p role="status" className="m-0 text-xs opacity-70 flex flex-wrap items-center gap-x-2">
-        Showing {shown.length} of {lobbies.length} {lobbies.length === 1 ? 'lobby' : 'lobbies'}.
-        {/* Filters are on by default, so say what they're hiding and offer a way past them */}
-        {hiddenByFilters > 0 && (
-          <>
-            <span>
-              {hiddenByFilters} hidden by your filters.
-            </span>
-            <button type="button" onClick={showAll} className="px-2 py-0 text-xs">
-              Show all
-            </button>
-          </>
-        )}
-      </p>
-
-      {shown.length === 0 ? (
-        <p className="m-auto text-center text-sm opacity-70">
-          {lobbies.length === 0
-            ? 'No open lobbies right now. Host one!'
-            : 'No lobbies match. Try turning off a filter or changing your search.'}
+      {/* The list and its count: what the welcome tour calls the window's body */}
+      <div data-tour="lobby-list" className="flex-1 flex flex-col gap-3">
+        <p role="status" className="m-0 text-xs opacity-70 flex flex-wrap items-center gap-x-2">
+          Showing {shown.length} of {lobbies.length} {lobbies.length === 1 ? 'lobby' : 'lobbies'}.
+          {/* Filters are on by default, so say what they're hiding and offer a way past them */}
+          {hiddenByFilters > 0 && (
+            <>
+              <span>
+                {hiddenByFilters} hidden by your filters.
+              </span>
+              <button type="button" onClick={showAll} className="px-2 py-0 text-xs">
+                Show all
+              </button>
+            </>
+          )}
         </p>
-      ) : (
-        <ul className="m-0 p-0 list-none flex flex-col gap-2">
-          {shown.map((lobby) => (
-            <LobbyRow
-              key={lobby.id}
-              lobby={lobby}
-              people={people}
-              isOpenTab={openTabIds.includes(lobby.id)}
-              onOpen={onOpenLobby}
-              tags={tagsFor(lobby)}
-            />
-          ))}
-        </ul>
-      )}
+
+        {shown.length === 0 ? (
+          <p className="m-auto text-center text-sm opacity-70">
+            {lobbies.length === 0
+              ? 'No open lobbies right now. Host one!'
+              : 'No lobbies match. Try turning off a filter or changing your search.'}
+          </p>
+        ) : (
+          <ul className="m-0 p-0 list-none flex flex-col gap-2">
+            {shown.map((lobby) => (
+              <LobbyRow
+                key={lobby.id}
+                lobby={lobby}
+                people={people}
+                isOpenTab={openTabIds.includes(lobby.id)}
+                onOpen={onOpenLobby}
+                tags={tagsFor(lobby)}
+              />
+            ))}
+          </ul>
+        )}
+      </div>
     </AppWindow>
   );
 }

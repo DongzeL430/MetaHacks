@@ -71,12 +71,22 @@ interface LobbyViewProps {
   onOpenChat?: (lobbyId: string) => void;
   /** Opens the popup with every join request, once there are more than MAX_INLINE_REQUESTS */
   onViewAllRequests?: (lobbyId: string) => void;
+  /** Opens the popup for inviting your connections (shown to the host and members) */
+  onInvite?: (lobbyId: string) => void;
 }
 
 const ACTION_BUTTON = 'px-4 py-1';
 
 /** One lobby's page: header, your actions, join requests (host only), and the member slots */
-export default function LobbyView({ lobby, people, connections, dispatch, onOpenChat, onViewAllRequests }: LobbyViewProps) {
+export default function LobbyView({
+  lobby,
+  people,
+  connections,
+  dispatch,
+  onOpenChat,
+  onViewAllRequests,
+  onInvite,
+}: LobbyViewProps) {
   const role = roleIn(lobby);
   const host = people.get(lobby.hostId);
   const members = lobby.memberIds.map((id) => people.get(id)).filter((p): p is Person => !!p);
@@ -87,7 +97,7 @@ export default function LobbyView({ lobby, people, connections, dispatch, onOpen
   return (
     <>
       {/* HEADER */}
-      <header className="flex flex-wrap items-end justify-between gap-3">
+      <header data-tour="lobby-details" className="flex flex-wrap items-end justify-between gap-3">
         <div className="min-w-0">
           <h2 className="m-0 text-2xl leading-tight flex flex-wrap items-center gap-2">
             {lobby.subject}
@@ -128,7 +138,12 @@ export default function LobbyView({ lobby, people, connections, dispatch, onOpen
           <span className="text-sm opacity-70">The host locked this session and isn’t taking new requests.</span>
         )}
         {(role === 'host' || role === 'member') && onOpenChat && (
-          <button type="button" onClick={() => onOpenChat(lobby.id)} className={`${ACTION_BUTTON} flex items-center gap-2`}>
+          <button
+            type="button"
+            onClick={() => onOpenChat(lobby.id)}
+            data-tour="lobby-chat"
+            className={`${ACTION_BUTTON} flex items-center gap-2`}
+          >
             <svg viewBox="0 0 20 20" className="w-4 h-4" aria-hidden="true">
               <path
                 d="M3.5 4.5h13v8h-7l-4 3v-3h-2z"
@@ -141,6 +156,28 @@ export default function LobbyView({ lobby, people, connections, dispatch, onOpen
             Chat
           </button>
         )}
+        {(role === 'host' || role === 'member') && onInvite && (
+          <button
+            type="button"
+            onClick={() => onInvite(lobby.id)}
+            disabled={isFull}
+            title={isFull ? 'The lobby is full' : 'Invite your connections to this session'}
+            data-tour="lobby-invite"
+            className={`${ACTION_BUTTON} flex items-center gap-2`}
+          >
+            <svg viewBox="0 0 20 20" className="w-4 h-4" aria-hidden="true">
+              <circle cx="8" cy="7" r="3" fill="none" stroke="currentColor" strokeWidth="1.8" />
+              <path
+                d="M2.5 16.5c.6-3 2.7-4.5 5.5-4.5s4.9 1.5 5.5 4.5M15.5 6v5M13 8.5h5"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+              />
+            </svg>
+            Invite
+          </button>
+        )}
         {role === 'member' && (
           <button type="button" onClick={() => dispatch({ type: 'leave', lobbyId: lobby.id })} className={ACTION_BUTTON}>
             Leave lobby
@@ -151,6 +188,7 @@ export default function LobbyView({ lobby, people, connections, dispatch, onOpen
             type="button"
             onClick={() => dispatch({ type: lobby.locked ? 'unlock-lobby' : 'lock-lobby', lobbyId: lobby.id })}
             aria-pressed={!!lobby.locked}
+            data-tour="lobby-lock"
             title={lobby.locked ? 'Start taking join requests again' : 'Stop new join requests'}
             className={`${ACTION_BUTTON} flex items-center gap-2`}
           >
@@ -168,7 +206,12 @@ export default function LobbyView({ lobby, people, connections, dispatch, onOpen
           </button>
         )}
         {role === 'host' && (
-          <button type="button" onClick={() => dispatch({ type: 'close-lobby', lobbyId: lobby.id })} className={ACTION_BUTTON}>
+          <button
+            type="button"
+            onClick={() => dispatch({ type: 'close-lobby', lobbyId: lobby.id })}
+            data-tour="lobby-close"
+            className={ACTION_BUTTON}
+          >
             Close lobby
           </button>
         )}
@@ -176,7 +219,7 @@ export default function LobbyView({ lobby, people, connections, dispatch, onOpen
 
       {/* JOIN REQUESTS (host only) */}
       {role === 'host' && (
-        <section className="flex flex-col gap-2">
+        <section className="flex flex-col gap-2" data-tour="lobby-requests">
           <h3 className="m-0 text-base opacity-80">Join requests {requests.length > 0 && `(${requests.length})`}</h3>
           {lobby.locked && (
             <p className="m-0 text-sm opacity-70">

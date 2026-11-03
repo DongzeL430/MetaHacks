@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useReducer, useRef } from 'react';
 import { ME } from '../dataFiles/StudyData';
-import type { ConnectionStatus, Lobby } from '../dataFiles/StudyData';
+import type { ConnectionStatus, Lobby, LobbyInvite } from '../dataFiles/StudyData';
 
 export interface StudyState {
   lobbies: Lobby[];
   /** Connection status per person id. Anyone missing counts as 'none'. */
   connections: Record<string, ConnectionStatus>;
+  /** Lobby invites the user sent (inviterId ME) or got (inviteeId ME) */
+  invites: LobbyInvite[];
 }
 
 /** Everything the user can do. Each one is also passed to onAction, so a backend can mirror it. */
@@ -20,6 +22,10 @@ export type StudyAction =
   | { type: 'accept-join'; lobbyId: string; personId: string }
   | { type: 'decline-join'; lobbyId: string; personId: string }
   | { type: 'kick'; lobbyId: string; personId: string }
+  /** Invites one of your connections to a lobby you're in */
+  | { type: 'invite'; lobbyId: string; personId: string }
+  | { type: 'accept-invite'; lobbyId: string }
+  | { type: 'decline-invite'; lobbyId: string }
   | { type: 'connect'; personId: string }
   | { type: 'cancel-connect'; personId: string }
   | { type: 'accept-connect'; personId: string }
@@ -43,8 +49,9 @@ export function roleIn(lobby: Lobby): LobbyRole {
 }
 
 export function studyReducer(state: StudyState, action: StudyAction): StudyState {
-  const editLobby = (id: string, edit: (lobby: Lobby) => Lobby): StudyState => ({
+  const editLobby = (id: string, edit: (lobby: Lobby) => Lobby, invites = state.invites): StudyState => ({
     ...state,
+    invites,
     lobbies: state.lobbies.map((l) => (l.id === id ? edit(l) : l)),
   });
   const setConnection = (personId: string, status: ConnectionStatus): StudyState => ({
@@ -55,8 +62,6 @@ export function studyReducer(state: StudyState, action: StudyAction): StudyState
 
   switch (action.type) {
     case 'host':
-      // One hosted lobby at a time
-      if (state.lobbies.some((l) => l.hostId === ME)) return state;
       return { ...state, lobbies: [action.lobby, ...state.lobbies] };
     case 'close-lobby':
       return { ...state, lobbies: state.lobbies.filter((l) => l.id !== action.lobbyId) };
@@ -93,6 +98,24 @@ export function studyReducer(state: StudyState, action: StudyAction): StudyState
       return editLobby(action.lobbyId, (l) =>
         l.hostId === ME && action.personId !== ME ? { ...l, memberIds: without(l.memberIds, action.personId) } : l,
       );
+    case 'invite':
+      if (state.invites.some((i) => i.lobbyId === action.lobbyId && i.inviteeId === action.personId)) return state;
+      return { ...state, invites: [...state.invites, { lobbyId: action.lobbyId, inviterId: ME, inviteeId: action.personId }] };
+    case 'accept-invite': {
+      const invite = receivedInvite(state, action.lobbyId);
+      if (!invite) return state;
+      const invites = state.invites.filter((i) => i !== invite);
+      // The host's invite lets you straight in; a member's becomes a join request
+      return editLobby(action.lobbyId, (l) => {
+        const role = roleIn(l);
+        if (role === 'host' || role === 'member' || role === 'requested') return l;
+        return invite.inviterId === l.hostId
+          ? { ...l, memberIds: [...l.memberIds, ME] }
+          : { ...l, requestIds: [...l.requestIds, ME] };
+      }, invites);
+    }
+    case 'decline-invite':
+      return { ...state, invites: state.invites.filter((i) => !(i.lobbyId === action.lobbyId && i.inviteeId === ME)) };
     case 'connect':
       return setConnection(action.personId, 'sent');
     case 'cancel-connect':
@@ -102,6 +125,24 @@ export function studyReducer(state: StudyState, action: StudyAction): StudyState
     case 'accept-connect':
       return setConnection(action.personId, 'connected');
   }
+}
+
+/** The invite the user got to this lobby, if any */
+export const receivedInvite = (state: StudyState, lobbyId: string) =>
+  state.invites.find((i) => i.lobbyId === lobbyId && i.inviteeId === ME);
+
+/**
+ * Invites the user got and can still answer: the lobby is visible, and they aren't already in it
+ * or waiting on it
+ */
+export function pendingInvites(state: StudyState): { invite: LobbyInvite; lobby: Lobby }[] {
+  const byId = new Map(state.lobbies.map((l) => [l.id, l]));
+  return state.invites.flatMap((invite) => {
+    const lobby = invite.inviteeId === ME ? byId.get(invite.lobbyId) : undefined;
+    if (!lobby) return [];
+    const role = roleIn(lobby);
+    return role === 'host' || role === 'member' || role === 'requested' ? [] : [{ invite, lobby }];
+  });
 }
 
 /** The reducer plus one internal action: replacing everything with the backend's copy */

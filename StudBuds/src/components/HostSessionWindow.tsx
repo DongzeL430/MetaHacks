@@ -252,6 +252,7 @@ export default function HostSessionWindow({
           onClose={onClose}
           // A popup: never tiled, and it doesn't push the other windows around
           excludeFromLayout
+          tourTarget="host-window"
           controls={{ close: 'enabled', fullscreen: 'hidden', pin: 'hidden' }}
           initialSize={HOST_SIZE}
           minWidth={300}
@@ -262,14 +263,14 @@ export default function HostSessionWindow({
               <button type="button" onClick={onClose} className="px-3 py-0.5 text-sm">
                 Cancel
               </button>
-              <button type="button" onClick={create} className="px-3 py-0.5 text-sm">
+              <button type="button" onClick={create} data-tour="host-create" className="px-3 py-0.5 text-sm">
                 Create lobby
               </button>
             </div>
           }
         >
           {/* SUBJECT */}
-          <div className={LABEL}>
+          <div className={LABEL} data-tour="host-subject">
             <label htmlFor={`${fieldId}-subject`} className="text-sm">
               What are you studying?
             </label>
@@ -288,7 +289,7 @@ export default function HostSessionWindow({
           </div>
 
           {/* LOCATION: suggestions plus anything the user types */}
-          <div className={LABEL}>
+          <div className={LABEL} data-tour="host-place">
             <label htmlFor={`${fieldId}-place`} className="text-sm">
               Where will you meet?
             </label>
@@ -309,7 +310,7 @@ export default function HostSessionWindow({
           </div>
 
           {/* GROUP SIZE */}
-          <div className={`${LABEL} self-start`}>
+          <div className={`${LABEL} self-start`} data-tour="host-size">
             <label htmlFor={`${fieldId}-size`} className="text-sm">
               Group size
             </label>
@@ -324,7 +325,7 @@ export default function HostSessionWindow({
           </div>
 
           {/* TIME */}
-          <section className="flex flex-col gap-2">
+          <section className="flex flex-col gap-2" data-tour="host-time">
             <h3 className="m-0 text-base">When does it meet?</h3>
             {warn.time && <FieldError id={`${fieldId}-time-error`}>Pick when the session meets.</FieldError>}
 

@@ -462,6 +462,8 @@ interface AppWindowProps {
   onFullscreenChange?: (isFullscreen: boolean) => void;
   /** Extra classes for the outer frame */
   className?: string;
+  /** `data-tour` name for the whole window, so the welcome tour can point at it */
+  tourTarget?: string;
   /** Extra classes for the scrolling body (padding, gap, layout) */
   bodyClassName?: string;
   /** Extra classes for the footer strip (padding, background) */
@@ -575,6 +577,7 @@ export default function AppWindow({
   minHeight = 200,
   controls,
   initialSize,
+  tourTarget,
   inactive = false,
   excludeFromLayout = false,
   titleId,
@@ -1058,6 +1061,7 @@ export default function AppWindow({
     <div
       ref={frameRef}
       style={frameStyle}
+      data-tour={tourTarget}
       // Clicking anywhere on a window brings it to the front (its size stays the same)
       onPointerDownCapture={() => manager?.focus(windowId)}
       // Pops in when it first appears (or reopens)

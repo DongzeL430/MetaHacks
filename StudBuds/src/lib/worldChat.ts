@@ -186,7 +186,8 @@ export function useWorldChat(lobbies: Lobby[], people: Map<string, Person>) {
       return;
     }
     for (const lobby of lobbies) {
-      if (lobby.hostId === ME) continue;
+      // Your own, and sessions at other schools (the lobby browser hides those by default too)
+      if (lobby.hostId === ME || lobby.atMySchool === false) continue;
       let entry = seen.current.get(lobby.id);
       if (!entry) {
         entry = { at: now, told: false };

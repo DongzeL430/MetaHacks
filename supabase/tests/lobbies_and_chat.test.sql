@@ -5,7 +5,7 @@
 begin;
 create extension if not exists pgtap with schema extensions;
 
-select plan(31);
+select plan(32);
 
 insert into auth.users (id, email, raw_user_meta_data) values
   ('a1000000-0000-4000-8000-00000000000a', 'a@northeastern.edu', '{"adult_confirmed": true}'),
@@ -40,10 +40,13 @@ select lives_ok(
   $$select public.host_lobby('10000000-0000-4000-8000-000000000001', 'TEST 2500', 3, 'Snell Library', 2, '14:00', '16:00')$$,
   'A student can host a session'
 );
-select throws_ok(
+select lives_ok(
   $$select public.host_lobby('10000000-0000-4000-8000-000000000002', 'Other', 2, 'Library', 3, '10:00', '11:00')$$,
-  'P0001', 'You already host a session. Close it to host another.',
-  'One hosted session at a time'
+  'A student can host more than one session'
+);
+select lives_ok(
+  $$select public.close_lobby('10000000-0000-4000-8000-000000000002')$$,
+  'And close one while keeping the other'
 );
 select throws_ok(
   $$insert into public.lobbies (university_domain, host_id, subject, max_size, location, weekday, starts_at, ends_at)
@@ -73,11 +76,11 @@ select is(
 select lives_ok($$select public.request_join('10000000-0000-4000-8000-000000000001')$$, 'A second classmate asks to join');
 
 set local request.jwt.claims to '{"sub": "d4000000-0000-4000-8000-00000000000d", "role": "authenticated"}';
-select is((select count(*)::integer from public.lobbies), 0, 'Students at another school don''t see the session');
-select throws_ok(
-  $$select public.request_join('10000000-0000-4000-8000-000000000001')$$,
-  'P0001', 'That session isn’t available anymore.',
-  'Or join it, even knowing its id'
+select is((select count(*)::integer from public.lobbies), 1, 'Students at another school see the session too');
+select is(
+  (select count(*)::integer from public.lobby_members),
+  1,
+  'They see who''s in it (the host), but not who asked to join'
 );
 
 set local request.jwt.claims to '{"sub": "a7000000-0000-4000-8000-000000000007", "role": "authenticated"}';
@@ -126,14 +129,13 @@ select lives_ok(
   'A member can post'
 );
 select is((select body from public.lobby_messages limit 1), 'hi all', 'Messages are trimmed');
-select throws_ok(
+select lives_ok(
   $$insert into public.lobby_messages (lobby_id, body) values ('10000000-0000-4000-8000-000000000001', 'hi all')$$,
-  'P0001', 'duplicate_message',
-  'Sending the same message twice in a row is refused'
+  'Sending the same message twice in a row is allowed'
 );
 select lives_ok(
   $$insert into public.lobby_messages (lobby_id, body)
-    select '10000000-0000-4000-8000-000000000001', 'message ' || g from generate_series(2, 5) as g$$,
+    select '10000000-0000-4000-8000-000000000001', 'message ' || g from generate_series(3, 5) as g$$,
   'Five messages in a burst are fine'
 );
 select throws_ok(

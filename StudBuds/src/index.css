@@ -175,3 +175,88 @@
     animation: none;
   }
 }
+
+/*
+ * Guided tour (components/Tour.tsx). The ring sits around what a popup points at: its huge shadow
+ * dims the rest of the page, its border glows, and a second ring keeps pulsing outward from it.
+ */
+.tour-ring {
+  border: 3px solid var(--color-accent);
+  box-shadow:
+    0 0 0 9999px rgb(0 0 0 / 0.45),
+    0 0 18px 4px color-mix(in srgb, var(--color-accent) 70%, transparent);
+  animation: tour-glow 1.6s ease-in-out infinite;
+}
+
+.tour-ring::after {
+  content: '';
+  position: absolute;
+  inset: -3px;
+  border-radius: inherit;
+  border: 3px solid var(--color-accent);
+  animation: tour-ripple 1.6s ease-out infinite;
+}
+
+/* The same pulse on a button inside the popup, e.g. the ✕ to close it */
+.tour-ring-pulse {
+  position: relative;
+  box-shadow: 0 0 0 3px var(--color-accent);
+  animation: tour-button-glow 1.6s ease-in-out infinite;
+}
+
+@keyframes tour-glow {
+  50% {
+    box-shadow:
+      0 0 0 9999px rgb(0 0 0 / 0.45),
+      0 0 28px 10px color-mix(in srgb, var(--color-accent) 85%, transparent);
+  }
+}
+
+@keyframes tour-ripple {
+  0% {
+    opacity: 0.9;
+    transform: scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.18, 1.5);
+  }
+}
+
+@keyframes tour-button-glow {
+  0%,
+  100% {
+    box-shadow:
+      0 0 0 3px var(--color-accent),
+      0 0 0 3px color-mix(in srgb, var(--color-accent) 60%, transparent);
+  }
+  50% {
+    box-shadow:
+      0 0 0 3px var(--color-accent),
+      0 0 0 10px color-mix(in srgb, var(--color-accent) 0%, transparent);
+  }
+}
+
+@keyframes tour-pop {
+  from {
+    opacity: 0;
+    scale: 0.92;
+  }
+}
+
+@keyframes tour-fade {
+  from {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tour-ring,
+  .tour-ring::after,
+  .tour-ring-pulse {
+    animation: none;
+  }
+  .tour-ring::after {
+    display: none;
+  }
+}

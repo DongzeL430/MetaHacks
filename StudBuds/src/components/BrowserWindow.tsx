@@ -102,6 +102,7 @@ export default function BrowserWindow({
       <div
         role="tablist"
         aria-label="Open tabs"
+        data-tour="lobby-tabs"
         className="shrink-0 flex items-end gap-1 px-2 pt-2 bg-sand-soft border-b-2 border-ink/40 overflow-x-auto"
       >
         {tabs.map((tab, index) => {

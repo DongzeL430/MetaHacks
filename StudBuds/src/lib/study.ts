@@ -10,7 +10,7 @@ import type { StudyAction, StudyState } from '../utils/StudyState';
 /** After a burst of changes (a request, then an accept), reload once */
 const RELOAD_DELAY_MS = 250;
 
-const EMPTY: StudyState = { lobbies: [], connections: {} };
+const EMPTY: StudyState = { lobbies: [], connections: {}, invites: [] };
 
 /**
  * Lobbies at the student's school, the people in them, connections, and every lobby and
@@ -31,19 +31,26 @@ export function useStudyData() {
     if (!me) return;
     const local = (id: string) => (id === me ? ME : id);
 
-    const [lobbies, members, cards, links, matches] = await Promise.all([
-      supabase.from('lobbies').select('id, host_id, subject, max_size, location, weekday, starts_at, ends_at, locked'),
+    const [lobbies, members, cards, links, matches, invites, community] = await Promise.all([
+      supabase
+        .from('lobbies')
+        .select('id, host_id, subject, max_size, location, weekday, starts_at, ends_at, locked, university_domain'),
       supabase.from('lobby_members').select('lobby_id, user_id, role, joined_at').order('joined_at'),
       supabase.rpc('lobby_people'),
       supabase.from('connections').select('requester_id, addressee_id, status'),
       // Best fit first: the host's courses, habits and quick picks next to this student's
       supabase.rpc('lobby_matches'),
+      supabase.from('lobby_invites').select('lobby_id, inviter_id, invitee_id'),
+      // The student's school and the ones linked to it, for the "Only my school" filter
+      supabase.rpc('my_community'),
     ]);
     if (lobbies.error || members.error || cards.error || links.error) {
       setError('Couldn’t load lobbies right now. Check your connection.');
       return;
     }
     // Without the ranking, lobbies still load, just unranked
+    // Without the school list, every lobby counts as the student's own school (nothing hidden)
+    const mySchools = community.error ? null : new Set<string>(community.data ?? []);
     const matchOf = new Map((matches.data ?? []).map((m) => [m.lobby_id, { place: m.place, reasons: m.reasons ?? [] }]));
 
     // Friend-request style statuses, from this student's side. A request they sent stays "sent"
@@ -57,6 +64,11 @@ export function useStudyData() {
 
     setState(() => ({
       connections,
+      invites: (invites.data ?? []).map((i) => ({
+        lobbyId: i.lobby_id,
+        inviterId: local(i.inviter_id),
+        inviteeId: local(i.invitee_id),
+      })),
       lobbies: lobbies.data.map((l): Lobby => {
         const rows = members.data.filter((m) => m.lobby_id === l.id);
         const joined = rows.filter((m) => m.role === 'member' && m.user_id !== l.host_id).map((m) => local(m.user_id));
@@ -71,6 +83,8 @@ export function useStudyData() {
           location: l.location,
           locked: l.locked,
           match: matchOf.get(l.id),
+          school: l.university_domain,
+          atMySchool: !mySchools || mySchools.has(l.university_domain),
         };
       }),
     }));
@@ -108,6 +122,7 @@ export function useStudyData() {
         .on('postgres_changes', { event: '*', schema: 'public', table: 'lobbies' }, reloadSoon)
         .on('postgres_changes', { event: '*', schema: 'public', table: 'lobby_members' }, reloadSoon)
         .on('postgres_changes', { event: '*', schema: 'public', table: 'connections' }, reloadSoon)
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'lobby_invites' }, reloadSoon)
         .subscribe((status) => {
           // Back after a dropped connection: catch up on anything missed
           if (status === 'SUBSCRIBED') reloadSoon();
@@ -178,6 +193,16 @@ export function useStudyData() {
           break;
         case 'kick':
           result = await supabase.rpc('kick_from_lobby', { lobby_id: action.lobbyId, student: toId(action.personId) });
+          break;
+        case 'invite':
+          result = await supabase.rpc('invite_to_lobby', { lobby_id: action.lobbyId, person: toId(action.personId) });
+          break;
+        case 'accept-invite':
+        case 'decline-invite':
+          result = await supabase.rpc('answer_invite', {
+            lobby_id: action.lobbyId,
+            accept: action.type === 'accept-invite',
+          });
           break;
         case 'connect':
           result = await supabase.rpc('connect_with', { person: toId(action.personId) });

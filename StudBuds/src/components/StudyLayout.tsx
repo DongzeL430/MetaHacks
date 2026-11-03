@@ -9,12 +9,16 @@ import LobbyBrowserWindow from './LobbyBrowserWindow';
 import LobbyView from './LobbyView';
 import ChatWindow from './ChatWindow';
 import JoinRequestsPopup from './JoinRequestPopup';
+import InviteConnectionsPopup from './InviteConnectionsPopup';
 import SessionsWindow from './SessionsWindow';
 import PersonAvatar from './PersonAvatar';
 import { ME } from '../dataFiles/StudyData';
 import type { Lobby, Person } from '../dataFiles/StudyData';
-import { roleIn } from '../utils/StudyState';
+import { pendingInvites, roleIn } from '../utils/StudyState';
 import type { StudyDispatch, StudyState } from '../utils/StudyState';
+
+/** Sessions one student can host at once (public.host_lobby checks the same) */
+export const MAX_HOSTED = 5;
 
 const WINDOWS = {
   browser: 'lobby-browser',
@@ -34,6 +38,8 @@ interface StudyLayoutProps {
   myAvailability?: string[];
   /** The user's subjects (e.g. their courses), used by the lobby browser's "My subjects" filter */
   mySubjects?: string[];
+  /** Courses the user is taking right now: the only subjects offered when hosting */
+  currentCourses?: string[];
   /** Places offered when hosting (public cafes, libraries…). Leave out for the defaults. */
   locationSuggestions?: string[];
   state: StudyState;
@@ -67,6 +73,7 @@ export default function StudyLayout({
   people,
   myAvailability,
   mySubjects,
+  currentCourses = [],
   locationSuggestions,
   state,
   dispatch,
@@ -86,6 +93,8 @@ export default function StudyLayout({
   const [chatLobbyId, setChatLobbyId] = useState<string | null>(null);
   /** Lobby whose "View all" join requests popup is open */
   const [requestsLobbyId, setRequestsLobbyId] = useState<string | null>(null);
+  /** Lobby whose "Invite" popup is open */
+  const [inviteLobbyId, setInviteLobbyId] = useState<string | null>(null);
   /** Person whose profile popup is open (from Connections) */
   const [profilePersonId, setProfilePersonId] = useState<string | null>(null);
 
@@ -99,12 +108,15 @@ export default function StudyLayout({
   // Tabs for lobbies that were closed disappear on their own
   const tabs = tabIds.map((id) => lobbiesById.get(id)).filter((l): l is Lobby => !!l);
   const active = tabs.find((l) => l.id === activeId) ?? tabs[0];
-  const myLobby = state.lobbies.find((l) => l.hostId === ME);
+  const hostingCount = state.lobbies.filter((l) => l.hostId === ME).length;
 
   // Chat is only for people in the lobby: leaving it (or it closing) closes the chat too
   const chatLobby = chatLobbyId ? lobbiesById.get(chatLobbyId) : undefined;
   const chatAllowed = !!chatLobby && (roleIn(chatLobby) === 'host' || roleIn(chatLobby) === 'member');
   const requestsLobby = requestsLobbyId ? lobbiesById.get(requestsLobbyId) ?? null : null;
+  // Only while the user is still in it (left or closed: the popup closes)
+  const inviteLobby = inviteLobbyId ? lobbiesById.get(inviteLobbyId) ?? null : null;
+  const canInvite = !!inviteLobby && (roleIn(inviteLobby) === 'host' || roleIn(inviteLobby) === 'member');
   // Looked up live, so it updates with the lists and closes if they're no longer visible (a block)
   const profilePerson = profilePersonId ? peopleById.get(profilePersonId) ?? null : null;
 
@@ -128,7 +140,7 @@ export default function StudyLayout({
   };
 
   const host = () => {
-    if (myLobby) return openLobby(myLobby.id); // one hosted lobby at a time
+    if (hostingCount >= MAX_HOSTED) return;
     setHostOpen(true);
   };
 
@@ -161,7 +173,7 @@ export default function StudyLayout({
           openTabIds={tabIds}
           onOpenLobby={openLobby}
           onHost={host}
-          isHosting={!!myLobby}
+          hostLimitReached={hostingCount >= MAX_HOSTED}
           freeSlots={myAvailability}
           subjects={mySubjects}
           onRefresh={onRefresh}
@@ -171,6 +183,7 @@ export default function StudyLayout({
       <WindowLayer>
         <BrowserWindow
           id={WINDOWS.lobbies}
+          title="Lobby Browser"
           open={tabs.length > 0}
           tabs={tabs.map((l) => {
             const lobbyHost = peopleById.get(l.hostId);
@@ -197,6 +210,7 @@ export default function StudyLayout({
               dispatch={dispatch}
               onOpenChat={openChat}
               onViewAllRequests={setRequestsLobbyId}
+              onInvite={setInviteLobbyId}
             />
           )}
         </BrowserWindow>
@@ -213,6 +227,8 @@ export default function StudyLayout({
           people={peopleById}
           openTabIds={tabIds}
           onOpenLobby={openLobby}
+          invites={pendingInvites(state)}
+          dispatch={dispatch}
         />
       </WindowLayer>
 
@@ -245,6 +261,15 @@ export default function StudyLayout({
         onClose={() => setRequestsLobbyId(null)}
       />
 
+      <InviteConnectionsPopup
+        lobby={canInvite ? inviteLobby : null}
+        people={peopleById}
+        connections={state.connections}
+        invites={state.invites}
+        dispatch={dispatch}
+        onClose={() => setInviteLobbyId(null)}
+      />
+
       <PersonProfilePopup
         person={profilePerson}
         status={profilePerson ? state.connections[profilePerson.id] ?? 'none' : 'none'}
@@ -258,8 +283,8 @@ export default function StudyLayout({
         onClose={() => setHostOpen(false)}
         availability={myAvailability}
         locationSuggestions={locationSuggestions}
-        // The student's own courses, when known, instead of the generic list
-        subjectSuggestions={mySubjects && mySubjects.length > 0 ? mySubjects : undefined}
+        // Only the courses the student is taking right now (they can still type anything)
+        subjectSuggestions={currentCourses}
         onCreate={create}
       />
     </>

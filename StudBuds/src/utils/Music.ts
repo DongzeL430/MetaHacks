@@ -113,7 +113,7 @@ const bar = (chord: number, ...notes: [number | null, number][]): MusicBar => ({
 });
 
 /*
- * The app's own two pieces, written by hand. Every theme has its own music, so these never repeat
+ * The app's own two hand-written pieces. Every theme has its own music, so these never repeat
  * a theme's. The generate-theme Edge Function lists both (BUILT_IN_PIECES) so Muse writes
  * something different.
  */
@@ -175,3 +175,170 @@ export const FALLBACK_MUSIC: ThemeMusic = {
     bar(1, [0, 2], [null, 1]),
   ],
 };
+
+/*
+ * One piece for each default background picture (src/assets/default*bg.png), composed once by Muse
+ * Spark from a design for each picture (mood, mode, key, tempo and meter) and saved here, so the
+ * default theme plays the piece that goes with this session’s picture. The generate-theme Edge
+ * Function lists them too (BUILT_IN_PIECES) so a custom theme’s music sounds different.
+ */
+
+/** Stormy amber sky over a lake: wistful but warm, light breaking through */
+const DEFAULT2_MUSIC: ThemeMusic = {
+  title: 'Amber Light Through Storm',
+  mode: 'dorian',
+  tonic: 'D',
+  tempo: 56,
+  beatsPerBar: 3,
+  a: [
+    bar(1, [0, 1], [1, 1], [2, 1]),
+    bar(5, [4, 2], [2, 1]),
+    bar(7, [1, 1], [2, 1], [1, 1]),
+    bar(1, [0, 3]),
+    bar(4, [0, 1], [1, 1], [4, 1]),
+    bar(5, [5, 2], [4, 1]),
+    bar(7, [2, 1], [1, 1], [2, 1]),
+    bar(1, [0, 3]),
+  ],
+  b: [
+    bar(1, [4, 1], [5, 1], [7, 1]),
+    bar(7, [8, 2], [7, 1]),
+    bar(4, [5, 1], [7, 1], [5, 1]),
+    bar(4, [4, 3]),
+    bar(5, [5, 1], [7, 1], [8, 1]),
+    bar(7, [7, 2], [5, 1]),
+    bar(5, [4, 1], [2, 1], [1, 1]),
+    bar(1, [0, 3]),
+  ],
+};
+
+/** Pines under towering summer clouds: open and airy */
+const DEFAULT3_MUSIC: ThemeMusic = {
+  title: 'Pines Under Summer Sky',
+  mode: 'mixolydian',
+  tonic: 'A',
+  tempo: 74,
+  beatsPerBar: 4,
+  a: [
+    bar(1, [0, 1], [2, 1], [4, 2]),
+    bar(5, [5, 2], [4, 1], [2, 1]),
+    bar(4, [2, 2], [4, 1], [5, 1]),
+    bar(1, [4, 3], [2, 1]),
+    bar(1, [0, 1], [2, 1], [4, 1], [5, 1]),
+    bar(4, [7, 2], [5, 1], [4, 1]),
+    bar(5, [2, 1], [4, 2], [2, 1]),
+    bar(1, [0, 4]),
+  ],
+  b: [
+    bar(1, [4, 1], [5, 1], [7, 2]),
+    bar(3, [7, 2], [5, 1], [4, 1]),
+    bar(5, [8, 2], [7, 1], [5, 1]),
+    bar(1, [5, 3], [4, 1]),
+    bar(4, [7, 2], [8, 1], [7, 1]),
+    bar(7, [5, 2], [4, 1], [2, 1]),
+    bar(5, [4, 2], [2, 1], [1, 1]),
+    bar(1, [2, 4]),
+  ],
+};
+
+/** Birch path toward a big grey rock: an easy stroll */
+const DEFAULT4_MUSIC: ThemeMusic = {
+  title: 'Birch Path to Greyrock',
+  mode: 'ionian',
+  tonic: 'F',
+  tempo: 66,
+  beatsPerBar: 3,
+  a: [
+    bar(1, [0, 1], [1, 1], [2, 1]),
+    bar(5, [4, 2], [2, 1]),
+    bar(1, [2, 1.5], [1, 1], [0, 0.5]),
+    bar(5, [1, 3]),
+    bar(1, [2, 1], [4, 1], [5, 1]),
+    bar(4, [5, 2], [4, 1]),
+    bar(5, [4, 1], [2, 1], [1, 1]),
+    bar(1, [0, 3]),
+  ],
+  b: [
+    bar(1, [4, 1], [5, 1], [7, 1]),
+    bar(5, [7, 2], [5, 1]),
+    bar(4, [5, 1.5], [4, 1], [2, 0.5]),
+    bar(1, [4, 3]),
+    bar(3, [5, 1], [6, 1], [5, 1]),
+    bar(4, [7, 2], [5, 1]),
+    bar(5, [5, 1], [4, 1], [2, 1]),
+    bar(1, [1, 3]),
+  ],
+};
+
+/** Farmland with a far-off cottage: homey, like a village tune */
+const DEFAULT5_MUSIC: ThemeMusic = {
+  title: 'Cottage Past the Hedgerows',
+  mode: 'mixolydian',
+  tonic: 'D',
+  tempo: 72,
+  beatsPerBar: 4,
+  a: [
+    bar(1, [0, 2], [1, 1], [2, 1]),
+    bar(1, [4, 2], [2, 2]),
+    bar(5, [4, 2], [5, 2]),
+    bar(5, [4, 3], [2, 1]),
+    bar(5, [4, 2], [5, 1], [4, 1]),
+    bar(4, [5, 2], [4, 2]),
+    bar(1, [2, 2], [1, 2]),
+    bar(1, [0, 4]),
+  ],
+  b: [
+    bar(1, [5, 2], [7, 2]),
+    bar(7, [8, 2], [7, 2]),
+    bar(4, [7, 2], [5, 2]),
+    bar(1, [4, 3], [2, 1]),
+    bar(4, [5, 2], [7, 2]),
+    bar(7, [8, 2], [7, 1], [5, 1]),
+    bar(5, [4, 2], [2, 2]),
+    bar(1, [2, 3], [1, 1]),
+  ],
+};
+
+/** Dusk clouds and a crescent moon: a soft lullaby */
+const DEFAULT6_MUSIC: ThemeMusic = {
+  title: 'Peach Clouds, Pale Moon',
+  mode: 'aeolian',
+  tonic: 'E',
+  tempo: 52,
+  beatsPerBar: 3,
+  a: [
+    bar(1, [0, 1], [1, 1], [2, 1]),
+    bar(7, [2, 2], [1, 1]),
+    bar(3, [0, 2], [-1, 1]),
+    bar(1, [0, 3]),
+    bar(4, [2, 1], [3, 1], [4, 1]),
+    bar(5, [4, 2], [3, 1]),
+    bar(4, [2, 1], [1, 1], [0, 1]),
+    bar(1, [0, 3]),
+  ],
+  b: [
+    bar(1, [4, 1], [5, 1], [7, 1]),
+    bar(4, [7, 2], [5, 1]),
+    bar(5, [4, 1], [5, 1], [4, 1]),
+    bar(3, [2, 3]),
+    bar(4, [4, 1], [5, 1], [4, 1]),
+    bar(1, [7, 2], [5, 1]),
+    bar(5, [4, 2], [2, 1]),
+    bar(1, [0, 3]),
+  ],
+};
+
+/** Each default picture's piece, by its file name without the extension */
+const DEFAULT_MUSIC_BY_BACKGROUND: Record<string, ThemeMusic> = {
+  defaultbg: DEFAULT_MUSIC,
+  default2bg: DEFAULT2_MUSIC,
+  default3bg: DEFAULT3_MUSIC,
+  default4bg: DEFAULT4_MUSIC,
+  default5bg: DEFAULT5_MUSIC,
+  default6bg: DEFAULT6_MUSIC,
+};
+
+/** The default theme's piece for a default background picture (see utils/DefaultBackground.ts) */
+export function defaultMusicFor(background: string): ThemeMusic {
+  return DEFAULT_MUSIC_BY_BACKGROUND[background] ?? DEFAULT_MUSIC;
+}

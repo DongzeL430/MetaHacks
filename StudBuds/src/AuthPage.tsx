@@ -5,12 +5,25 @@ import type { AuthError, Session } from '@supabase/supabase-js';
 import { prefetchStudySpots } from './lib/spots.ts';
 import { supabase } from './lib/supabase.ts';
 import Turnstile from './Turnstile.tsx';
-// Background picture. Swap this import for any image in ./assets.
-import defaultbg from './assets/defaultbg.png';
+// This session's default background picture, shared with Home
+import { defaultBackground as defaultbg } from './utils/DefaultBackground.ts';
 
 // Which part of the picture stays in view when it has to be cropped (CSS background-position).
 // 'center bottom' keeps the ground visible and trims the sky or sides first.
 const BG_FOCUS = 'center bottom';
+
+/*
+ * Button sizes, fluid with the screen's width (clamp): small on narrow phones, growing up to the
+ * full size on wide screens, so a row of two never overflows the card.
+ */
+/** The main action of each form (Log in, Confirm, ...): fills its row up to 14rem */
+const PRIMARY_BUTTON =
+  'w-full min-w-0 max-w-[14rem] px-[clamp(1rem,5vw,2.5rem)] py-[clamp(0.4rem,1.5vw,0.5rem)] text-[clamp(1rem,0.9rem+0.5vw,1.15rem)] whitespace-nowrap';
+/** Smaller side actions (Send a new code, Back to log in, ...) */
+const SECONDARY_BUTTON =
+  'px-[clamp(0.6rem,2.5vw,0.9rem)] py-[clamp(0.2rem,1vw,0.3rem)] text-[clamp(0.875rem,0.8rem+0.4vw,1rem)] whitespace-nowrap';
+/** The ‹ › mode-switching arrows beside Log in / Sign up */
+const ARROW_BUTTON = 'shrink-0 px-[clamp(0.35rem,1.5vw,0.5rem)] text-[clamp(1.1rem,1rem+0.6vw,1.35rem)]';
 
 type Mode = 'signup' | 'login';
 type ResetStep = 'none' | 'email' | 'code';
@@ -359,10 +372,10 @@ export default function AuthPage() {
               <div className="flex flex-col gap-4">
                 <p>You are signed in as {session.user.email}.</p>
                 {notice && <p>{notice}</p>}
-                <button type="button" onClick={goIn} className="self-center px-10 py-2">
+                <button type="button" onClick={goIn} className={`self-center ${PRIMARY_BUTTON}`}>
                   Continue
                 </button>
-                <button type="button" onClick={onLogOut} className="self-center px-10 py-2">
+                <button type="button" onClick={onLogOut} className={`self-center ${PRIMARY_BUTTON}`}>
                   Log out
                 </button>
 
@@ -383,12 +396,12 @@ export default function AuthPage() {
                     <p className="text-red-600 min-h-[1.5rem]" role="alert">
                       {error}
                     </p>
-                    <div className="flex justify-center gap-3">
+                    <div className="flex flex-wrap justify-center gap-3">
                       <button
                         type="button"
                         onClick={onDeleteAccount}
                         disabled={deleteText !== 'DELETE' || sending}
-                        className="px-3 py-1"
+                        className={SECONDARY_BUTTON}
                       >
                         Delete my account
                       </button>
@@ -399,14 +412,14 @@ export default function AuthPage() {
                           setDeleteText('');
                           setError('');
                         }}
-                        className="px-3 py-1"
+                        className={SECONDARY_BUTTON}
                       >
                         Cancel
                       </button>
                     </div>
                   </div>
                 ) : (
-                  <button type="button" onClick={() => setConfirmingDelete(true)} className="self-center px-3 py-1">
+                  <button type="button" onClick={() => setConfirmingDelete(true)} className={`self-center ${SECONDARY_BUTTON}`}>
                     Delete my account
                   </button>
                 )}
@@ -436,14 +449,14 @@ export default function AuthPage() {
               </p>
 
               <div className="mt-2 flex flex-col items-center gap-3">
-                <button type="submit" disabled={sending} className="w-full max-w-[14rem] px-10 py-2">
+                <button type="submit" disabled={sending} className={PRIMARY_BUTTON}>
                   Confirm
                 </button>
-                <div className="flex gap-3">
-                  <button type="button" onClick={onResend} disabled={sending} className="px-3 py-1">
+                <div className="flex flex-wrap justify-center gap-3">
+                  <button type="button" onClick={onResend} disabled={sending} className={SECONDARY_BUTTON}>
                     Send a new code
                   </button>
-                  <button type="button" onClick={backToLogin} className="px-3 py-1">
+                  <button type="button" onClick={backToLogin} className={SECONDARY_BUTTON}>
                     Back to log in
                   </button>
                 </div>
@@ -479,10 +492,10 @@ export default function AuthPage() {
               </p>
 
               <div className="mt-2 flex flex-col items-center gap-3">
-                <button type="submit" disabled={sending} className="w-full max-w-[14rem] px-10 py-2">
+                <button type="submit" disabled={sending} className={PRIMARY_BUTTON}>
                   Send code
                 </button>
-                <button type="button" onClick={backToLogin} className="px-3 py-1">
+                <button type="button" onClick={backToLogin} className={SECONDARY_BUTTON}>
                   Back to log in
                 </button>
               </div>
@@ -536,14 +549,14 @@ export default function AuthPage() {
               </p>
 
               <div className="mt-2 flex flex-col items-center gap-3">
-                <button type="submit" disabled={sending} className="w-full max-w-[14rem] px-10 py-2">
+                <button type="submit" disabled={sending} className={PRIMARY_BUTTON}>
                   Change password
                 </button>
-                <div className="flex gap-3">
-                  <button type="button" onClick={sendResetCode} disabled={sending} className="px-3 py-1">
+                <div className="flex flex-wrap justify-center gap-3">
+                  <button type="button" onClick={sendResetCode} disabled={sending} className={SECONDARY_BUTTON}>
                     Send a new code
                   </button>
-                  <button type="button" onClick={backToLogin} className="px-3 py-1">
+                  <button type="button" onClick={backToLogin} className={SECONDARY_BUTTON}>
                     Back to log in
                   </button>
                 </div>
@@ -610,17 +623,17 @@ export default function AuthPage() {
               </p>
 
               {/* Big action button with small mode-switching arrows on either side */}
-              <div className="mt-2 flex items-center justify-center gap-3">
+              <div className="mt-2 flex items-center justify-center gap-[clamp(0.4rem,2vw,0.75rem)]">
                 <button
                   type="button"
                   onClick={toggleMode}
                   aria-label={signup ? 'Switch to log in' : 'Switch to sign up'}
-                  className="px-2 text-xl"
+                  className={ARROW_BUTTON}
                 >
                   ‹
                 </button>
 
-                <button type="submit" disabled={sending} className="flex-1 max-w-[14rem] px-10 py-2">
+                <button type="submit" disabled={sending} className={`flex-1 ${PRIMARY_BUTTON}`}>
                   {signup ? 'Sign up' : 'Log in'}
                 </button>
 
@@ -628,14 +641,14 @@ export default function AuthPage() {
                   type="button"
                   onClick={toggleMode}
                   aria-label={signup ? 'Switch to log in' : 'Switch to sign up'}
-                  className="px-2 text-xl"
+                  className={ARROW_BUTTON}
                 >
                   ›
                 </button>
               </div>
 
               {!signup && (
-                <button type="button" onClick={openForgotPassword} className="self-center px-3 py-1">
+                <button type="button" onClick={openForgotPassword} className={`self-center ${SECONDARY_BUTTON}`}>
                   Forgot password?
                 </button>
               )}

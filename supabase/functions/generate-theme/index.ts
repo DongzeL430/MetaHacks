@@ -410,9 +410,17 @@ interface PieceSummary {
   beatsPerBar: number;
 }
 
-/** The app's own two pieces (StudBuds/src/utils/Music.ts): the default theme's, and the one that plays while a theme's own is written */
+/**
+ * The app's own pieces (StudBuds/src/utils/Music.ts): the default theme's, one for each default
+ * background picture, and the one that plays while a theme's own is written
+ */
 const BUILT_IN_PIECES: PieceSummary[] = [
   { title: 'Little Mountain Meadow', mode: 'ionian', tonic: 'G', tempo: 70, beatsPerBar: 4 },
+  { title: 'Amber Light Through Storm', mode: 'dorian', tonic: 'D', tempo: 56, beatsPerBar: 3 },
+  { title: 'Pines Under Summer Sky', mode: 'mixolydian', tonic: 'A', tempo: 74, beatsPerBar: 4 },
+  { title: 'Birch Path to Greyrock', mode: 'ionian', tonic: 'F', tempo: 66, beatsPerBar: 3 },
+  { title: 'Cottage Past the Hedgerows', mode: 'mixolydian', tonic: 'D', tempo: 72, beatsPerBar: 4 },
+  { title: 'Peach Clouds, Pale Moon', mode: 'aeolian', tonic: 'E', tempo: 52, beatsPerBar: 3 },
   { title: 'Hearth and Oak', mode: 'dorian', tonic: 'D', tempo: 63, beatsPerBar: 3 },
 ];
 

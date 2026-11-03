@@ -46,7 +46,6 @@ function describeChatError(error: PostgrestError): { text: string; retryAfter?: 
     const seconds = /retry_after=(\d+)/.exec(error.details ?? '');
     return { text: 'Slow down a little.', retryAfter: seconds ? Number(seconds[1]) : 10 };
   }
-  if (message.startsWith('duplicate_message')) return { text: 'You just sent that message.' };
   if (error.code === '42501') return { text: 'Only people in this lobby can use its chat.' };
   // Not a real lobby id in the database (e.g. sample lobbies), or the lobby was closed
   if (error.code === '22P02' || error.code === '23503') return { text: 'Chat isn’t available for this lobby yet.' };

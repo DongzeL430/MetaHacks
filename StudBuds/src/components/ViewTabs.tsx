@@ -5,6 +5,8 @@ export interface ViewTab<T extends string> {
   label: string;
   /** Small number badge, hidden when 0 or left out */
   count?: number;
+  /** A small red dot, for something waiting on the user (e.g. an invite to answer) */
+  dot?: boolean;
 }
 
 /** DOM ids, so a panel can point back at its tab (aria-labelledby) and tabs at the panel (aria-controls) */
@@ -61,7 +63,7 @@ export default function ViewTabs<T extends string>({ baseId, label, tabs, value,
             onClick={() => onChange(tab.id)}
             onKeyDown={(e) => onKey(e, index)}
             className={[
-              'shrink-0 flex items-center gap-2 rounded-full px-4 py-1.5 text-sm md:text-base',
+              'relative shrink-0 flex items-center gap-2 rounded-full px-4 py-1.5 text-sm md:text-base',
               'border-0 [border-image:none] transition-colors duration-150',
               selected ? 'bg-paper text-ink-strong' : 'bg-transparent text-nav-ink hover:bg-nav-ink/15',
             ].join(' ')}
@@ -75,6 +77,12 @@ export default function ViewTabs<T extends string>({ baseId, label, tabs, value,
               >
                 {tab.count}
               </span>
+            )}
+            {tab.dot && (
+              <span
+                aria-hidden="true"
+                className="absolute top-0.5 right-1 w-2.5 h-2.5 rounded-full bg-[#e5484d] ring-2 ring-nav motion-safe:transition-transform motion-safe:duration-200 starting:scale-0"
+              />
             )}
           </button>
         );

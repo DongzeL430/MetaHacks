@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import PersonAvatar from './PersonAvatar';
 import { SpotPips } from './LobbyView';
 import type { Lobby, Person } from '../dataFiles/StudyData';
@@ -24,16 +25,18 @@ interface LobbyRowProps {
   tags?: string[];
   /** Extra line, e.g. "2 people waiting" for a lobby you host */
   note?: string;
+  /** Buttons under the row, e.g. Accept / Decline for an invite */
+  actions?: ReactNode;
 }
 
 /** One lobby in a list: host, subject, when it meets, spots, and your status. Click to open it. */
-export default function LobbyRow({ lobby, people, isOpenTab, onOpen, tags = [], note }: LobbyRowProps) {
+export default function LobbyRow({ lobby, people, isOpenTab, onOpen, tags = [], note, actions }: LobbyRowProps) {
   const status = LOBBY_STATUS[roleIn(lobby)];
   const host = people.get(lobby.hostId);
   const when = describeSlots(lobby.timeSlots, { short: true });
 
   return (
-    <li className="list-none">
+    <li className="list-none flex flex-col gap-1.5">
       <button
         type="button"
         onClick={() => onOpen(lobby.id)}
@@ -69,6 +72,7 @@ export default function LobbyRow({ lobby, people, isOpenTab, onOpen, tags = [], 
           <span className={`px-2 rounded text-xs ${status.className}`}>{status.label}</span>
         </span>
       </button>
+      {actions && <div className="flex flex-wrap justify-end gap-2">{actions}</div>}
     </li>
   );
 }

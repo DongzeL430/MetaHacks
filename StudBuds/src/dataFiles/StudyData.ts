@@ -47,6 +47,17 @@ export interface Lobby {
    * reasons like "Covers a course you want help with". Not set for your own lobby.
    */
   match?: { place: number; reasons: string[] };
+  /** The host's school, e.g. "rit.edu" */
+  school?: string;
+  /** At the user's own school (or one linked to it). Left out counts as yes. */
+  atMySchool?: boolean;
+}
+
+/** An invite to a lobby, sent by someone in it to one of their connections. ME on either side. */
+export interface LobbyInvite {
+  lobbyId: string;
+  inviterId: string;
+  inviteeId: string;
 }
 
 /** Friend-request style: 'sent' = you asked them, 'received' = they asked you */

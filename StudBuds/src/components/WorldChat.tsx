@@ -59,7 +59,9 @@ export default function WorldChat({ lines, history, unread, onOpen }: WorldChatP
   return (
     <div
       ref={wrapRef}
-      className="pointer-events-none absolute right-2 bottom-2 md:right-3 md:bottom-3 z-[62] w-[min(26rem,calc(100%-1rem))] flex flex-col items-end gap-2.5"
+      // Sits in <main>, outside the desk: 16px (24px on md+) from the screen's corner, the same
+      // gap the bottom-left gear uses on phones
+      className="pointer-events-none absolute right-4 bottom-4 md:right-6 md:bottom-6 z-[62] w-[min(26rem,calc(100%-2rem))] flex flex-col items-end gap-2.5"
     >
       {open ? (
         <section

@@ -607,6 +607,52 @@ export type Database = {
           },
         ]
       }
+      lobby_invites: {
+        Row: {
+          created_at: string
+          id: number
+          invitee_id: string
+          inviter_id: string
+          lobby_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: never
+          invitee_id: string
+          inviter_id: string
+          lobby_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: never
+          invitee_id?: string
+          inviter_id?: string
+          lobby_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lobby_invites_invitee_id_fkey"
+            columns: ["invitee_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lobby_invites_inviter_id_fkey"
+            columns: ["inviter_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lobby_invites_lobby_id_fkey"
+            columns: ["lobby_id"]
+            isOneToOne: false
+            referencedRelation: "lobbies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       lobby_messages: {
         Row: {
           body: string
@@ -1323,6 +1369,10 @@ export type Database = {
         Args: { accept: boolean; person: string }
         Returns: undefined
       }
+      answer_invite: {
+        Args: { accept: boolean; lobby_id: string }
+        Returns: undefined
+      }
       answer_join: {
         Args: { accept: boolean; lobby_id: string; student: string }
         Returns: undefined
@@ -1394,6 +1444,10 @@ export type Database = {
           title: string
         }[]
       }
+      invite_to_lobby: {
+        Args: { lobby_id: string; person: string }
+        Returns: undefined
+      }
       leave_lobby: { Args: { lobby_id: string }; Returns: undefined }
       lobby_matches: {
         Args: never
@@ -1414,6 +1468,7 @@ export type Database = {
           shared_free: Json
         }[]
       }
+      my_community: { Args: never; Returns: string[] }
       muse_uses_left: { Args: { what: string }; Returns: number }
       pair_on_cooldown: {
         Args: { student_a: string; student_b: string }

@@ -34,6 +34,8 @@ export interface TaskbarApp {
   /** Usually toggles the app's window */
   onClick?: () => void;
   disabled?: boolean;
+  /** Shows a small red dot on the link, e.g. for something waiting on the user */
+  alert?: boolean;
   /** Hide this one link */
   hidden?: boolean;
   /**
@@ -58,7 +60,7 @@ export interface TaskbarMenuItem {
 interface TaskbarProps {
   /** The user's name, shown next to the avatar */
   userName?: string;
-  /** Replaces the default drawing. A picture shows on its own, without the round badge. Size it with w-full h-full. */
+  /** Replaces the default drawing. A picture is cropped to a circle, without the sand badge. Size it with w-full h-full. */
   avatar?: ReactNode;
   /** App links, in the order they appear */
   apps?: TaskbarApp[];
@@ -70,11 +72,16 @@ interface TaskbarProps {
   /** Optional extra content at the right end of the bar (step counter, clock, etc.) */
   right?: ReactNode;
   /**
-   * Shows the paintbrush button at the very right of the bar. Clicking it drops down a small tall
-   * capsule with a sun (default theme) above a star (custom theme). `active` highlights the current one.
+   * Apps that live in the gear menu at the very right of the bar instead of in the row of links,
+   * e.g. the Upcoming drop-down. Each shows as its icon in the gear's capsule.
+   */
+  gearApps?: TaskbarApp[];
+  /**
+   * Adds the paintbrush to the gear menu: a sun (default theme) above a star (custom theme).
+   * `active` highlights the current one.
    */
   theme?: ThemeMenuProps;
-  /** Shows the speaker button next to the paintbrush: the piece playing, mute and volume */
+  /** Adds the speaker to the gear menu: the piece playing, mute and volume */
   music?: MusicMenuProps;
   /**
    * Makes the avatar and name clickable, e.g. to open the profile editor.
@@ -140,64 +147,23 @@ function ThemeOption({ icon, label, active, onClick }: { icon: ReactNode; label:
   );
 }
 
-/** The paintbrush button and the small sun / star capsule it drops down */
-function ThemeMenu({ active, onSelectDefault, onSelectCustom }: ThemeMenuProps) {
-  const menuId = useId();
-  const wrapRef = useRef<HTMLDivElement>(null);
-  const [open, setOpen] = useState(false);
-
-  // Close on a click anywhere else, or Escape
-  useEffect(() => {
-    if (!open) return;
-    const onPointer = (e: PointerEvent) => {
-      if (!wrapRef.current?.contains(e.target as Node)) setOpen(false);
-    };
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setOpen(false);
-    };
-    document.addEventListener('pointerdown', onPointer);
-    document.addEventListener('keydown', onKey);
-    return () => {
-      document.removeEventListener('pointerdown', onPointer);
-      document.removeEventListener('keydown', onKey);
-    };
-  }, [open]);
-
+/**
+ * The sun / star choices. They open right under the paintbrush, in the same column, so the gear
+ * capsule just grows longer, with a thin line between the paintbrush and them.
+ */
+function ThemePanel({ active, onSelectDefault, onSelectCustom, onDone }: ThemeMenuProps & { onDone: () => void }) {
   const choose = (select: () => void) => {
     select();
-    setOpen(false);
+    onDone();
   };
-
   return (
-    <div ref={wrapRef} className="relative shrink-0">
-      <button
-        type="button"
-        onClick={() => setOpen((o) => !o)}
-        aria-expanded={open}
-        aria-controls={menuId}
-        aria-label="Theme"
-        title="Theme"
-        className={[
-          'w-10 h-10 md:w-11 md:h-11 p-0 flex items-center justify-center rounded-full',
-          'border-0 [border-image:none] text-nav-ink transition-colors duration-150',
-          open ? 'bg-paper/25' : 'bg-paper/10 hover:bg-paper/20',
-        ].join(' ')}
-      >
-        <PaintbrushIcon />
-      </button>
-
-      {open && (
-        <div
-          id={menuId}
-          role="group"
-          aria-label="Choose a theme"
-          // A tall capsule centered under the paintbrush: sun on top, star below
-          className="absolute left-1/2 -translate-x-1/2 top-full mt-3 flex flex-col items-center gap-1 p-1.5 rounded-full bg-nav shadow-[0_10px_24px_-10px_rgba(40,30,20,0.6)] motion-safe:transition motion-safe:duration-150 starting:opacity-0 starting:-translate-y-1"
-        >
-          <ThemeOption icon={<SunIcon />} label="Default theme" active={active === 'default'} onClick={() => choose(onSelectDefault)} />
-          <ThemeOption icon={<StarIcon />} label="Custom theme" active={active === 'custom'} onClick={() => choose(onSelectCustom)} />
-        </div>
-      )}
+    <div
+      role="group"
+      aria-label="Choose a theme"
+      className="flex flex-col items-center gap-1 pt-1 border-t border-paper/25 motion-safe:transition motion-safe:duration-150 starting:opacity-0 starting:-translate-y-1"
+    >
+      <ThemeOption icon={<SunIcon />} label="Default theme" active={active === 'default'} onClick={() => choose(onSelectDefault)} />
+      <ThemeOption icon={<StarIcon />} label="Custom theme" active={active === 'custom'} onClick={() => choose(onSelectCustom)} />
     </div>
   );
 }
@@ -212,20 +178,176 @@ function SpeakerIcon({ muted, className = 'w-5 h-5 md:w-6 md:h-6' }: { muted: bo
   );
 }
 
-/** The speaker button and the small panel it drops down: what's playing, mute, and volume */
-function MusicMenu({ title, volume, muted, onVolume, onToggleMute }: MusicMenuProps) {
+/** What's playing, mute, and volume, shown beside the speaker in the gear menu */
+function MusicPanel({ title, volume, muted, onVolume, onToggleMute }: MusicMenuProps) {
+  return (
+    <div role="group" aria-label="Music" className={`${SIDE_PANEL} w-60 flex flex-col gap-2 p-3 rounded-2xl`}>
+      <p className="m-0 text-xs opacity-80">Now playing</p>
+      <p className="m-0 -mt-1.5 text-sm truncate" title={title}>
+        {title}
+      </p>
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          onClick={onToggleMute}
+          aria-pressed={muted}
+          aria-label="Mute music"
+          title={muted ? 'Unmute' : 'Mute'}
+          className={[
+            'shrink-0 w-9 h-9 p-0 flex items-center justify-center rounded-full',
+            'border-0 [border-image:none] text-nav-ink transition-colors duration-150',
+            muted ? 'bg-paper/25' : 'bg-transparent hover:bg-paper/15',
+          ].join(' ')}
+        >
+          <SpeakerIcon muted={muted} className="w-5 h-5" />
+        </button>
+        <input
+          type="range"
+          min={0}
+          max={100}
+          step={1}
+          value={muted ? 0 : Math.round(volume * 100)}
+          onChange={(e) => onVolume(Number(e.target.value) / 100)}
+          aria-label="Music volume"
+          // doodle.css frames every input; on a slider the frame throws off the track, so
+          // the knob looked short of the end at full volume
+          className="flex-1 min-w-0 m-0 p-0 border-0 [border-image:none] accent-accent"
+        />
+      </div>
+    </div>
+  );
+}
+
+/** A drop-down app's entries (e.g. Upcoming > Croft), shown beside its icon in the gear menu */
+function AppMenuPanel({ app, menu, onDone }: { app: TaskbarApp; menu: TaskbarMenuItem[]; onDone: () => void }) {
+  return (
+    <div role="group" aria-label={app.label} className={`${SIDE_PANEL} flex flex-col items-stretch gap-1 p-1.5 rounded-3xl`}>
+      <p className="m-0 px-4 pt-1 text-xs opacity-80 whitespace-nowrap">{app.name ?? app.label}</p>
+      {menu.map((item) => (
+        <button
+          key={item.id}
+          type="button"
+          onClick={() => {
+            item.onClick();
+            onDone();
+          }}
+          aria-pressed={item.open ?? false}
+          aria-label={item.label}
+          title={item.label}
+          className={[
+            'px-4 py-1.5 rounded-full text-base text-left whitespace-nowrap',
+            'border-0 [border-image:none] text-nav-ink transition-colors duration-150',
+            item.open ? 'bg-paper/25' : 'bg-transparent hover:bg-paper/15',
+          ].join(' ')}
+        >
+          {item.name}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+/**
+ * A panel beside its icon in the gear capsule: to the left of it in the bar, or, from the
+ * bottom-left corner on phones (`data-corner` on the gear), to the right of it and growing upward
+ */
+const SIDE_PANEL =
+  'absolute right-full top-0 mr-3 group-data-corner/gear:right-auto group-data-corner/gear:left-full group-data-corner/gear:mr-0 group-data-corner/gear:ml-3 group-data-corner/gear:top-auto group-data-corner/gear:bottom-0 bg-nav text-nav-ink shadow-[0_10px_24px_-10px_rgba(40,30,20,0.6)] motion-safe:transition motion-safe:duration-150 starting:opacity-0 starting:translate-x-1';
+
+/** One round icon in the gear capsule */
+function GearOption({
+  icon,
+  label,
+  active,
+  expanded,
+  onClick,
+}: {
+  icon: ReactNode;
+  label: string;
+  /** Highlighted, e.g. one of its windows is open */
+  active?: boolean;
+  /** Its side panel is showing; leave out for a plain button */
+  expanded?: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-expanded={expanded}
+      aria-label={label}
+      title={label}
+      className={[
+        'shrink-0 w-10 h-10 p-0 flex items-center justify-center rounded-full',
+        'border-0 [border-image:none] text-nav-ink transition-colors duration-150',
+        expanded || active ? 'bg-paper/25' : 'bg-transparent hover:bg-paper/15',
+      ].join(' ')}
+    >
+      <span aria-hidden="true" className="flex w-5 h-5 md:w-[22px] md:h-[22px] [&>svg]:w-full [&>svg]:h-full">
+        {icon}
+      </span>
+    </button>
+  );
+}
+
+/** Gear, drawn at 24x24 */
+function GearIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="w-5 h-5 md:w-6 md:h-6" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <circle cx="12" cy="12" r="3" />
+      <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+    </svg>
+  );
+}
+
+/**
+ * The gear: a tall capsule of icons (the gear apps like Upcoming, the speaker, and the paintbrush),
+ * each opening its own panel beside the capsule. Closes on a click elsewhere or Escape.
+ *
+ * In the bar (`corner` off), it sits at the very right and the capsule drops down. With `corner`
+ * (small phones, under 380px wide), it floats in the bottom-left corner of the screen and the capsule rises above it.
+ */
+function GearMenu({
+  apps,
+  music,
+  theme,
+  corner = false,
+  className = '',
+}: {
+  apps: TaskbarApp[];
+  music?: MusicMenuProps;
+  theme?: ThemeMenuProps;
+  corner?: boolean;
+  className?: string;
+}) {
   const menuId = useId();
   const wrapRef = useRef<HTMLDivElement>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
   const [open, setOpen] = useState(false);
+  // Which icon's side panel is showing: an app id, 'music' or 'theme'
+  const [section, setSection] = useState<string | null>(null);
+  // Light up the gear while a window from one of its apps is open
+  const anyAppOpen = apps.some((app) => app.open || app.menu?.some((item) => item.open));
 
-  // Close on a click anywhere else, or Escape
+  const close = () => {
+    setOpen(false);
+    setSection(null);
+  };
+  const toggleSection = (id: string) => setSection((s) => (s === id ? null : id));
+
   useEffect(() => {
     if (!open) return;
     const onPointer = (e: PointerEvent) => {
-      if (!wrapRef.current?.contains(e.target as Node)) setOpen(false);
+      if (!wrapRef.current?.contains(e.target as Node)) close();
     };
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setOpen(false);
+      if (e.key !== 'Escape') return;
+      // The first Escape closes a side panel, the next the whole menu
+      if (section) setSection(null);
+      else {
+        close();
+        buttonRef.current?.focus();
+      }
     };
     document.addEventListener('pointerdown', onPointer);
     document.addEventListener('keydown', onKey);
@@ -233,66 +355,90 @@ function MusicMenu({ title, volume, muted, onVolume, onToggleMute }: MusicMenuPr
       document.removeEventListener('pointerdown', onPointer);
       document.removeEventListener('keydown', onKey);
     };
-  }, [open]);
+  }, [open, section]);
 
   return (
-    <div ref={wrapRef} className="relative shrink-0">
+    <div
+      ref={wrapRef}
+      data-corner={corner || undefined}
+      className={[
+        'group/gear shrink-0',
+        corner
+          ? // Mirrors the chat button in the bottom-right corner: same 16px gap, same 40px size
+          'pointer-events-auto fixed z-20 left-4 bottom-4'
+          : 'relative',
+        className,
+      ].join(' ')}
+    >
       <button
+        ref={buttonRef}
         type="button"
-        onClick={() => setOpen((o) => !o)}
+        onClick={() => (open ? close() : setOpen(true))}
         aria-expanded={open}
         aria-controls={menuId}
-        aria-label={muted ? 'Music (muted)' : 'Music'}
-        title={muted ? 'Music (muted)' : `Music: ${title}`}
+        aria-label="Settings"
+        title="Settings"
         className={[
-          'w-10 h-10 md:w-11 md:h-11 p-0 flex items-center justify-center rounded-full',
+          'p-0 flex items-center justify-center rounded-full',
           'border-0 [border-image:none] text-nav-ink transition-colors duration-150',
-          open ? 'bg-paper/25' : 'bg-paper/10 hover:bg-paper/20',
+          corner
+            ? // On the page itself: its own dark disc, with a dashed ring when pressed
+              `w-10 h-10 bg-nav shadow-[0_10px_24px_-10px_rgba(40,30,20,0.6)] outline-2 outline-offset-2 ${
+                open || anyAppOpen ? 'outline-dashed outline-nav' : 'outline-transparent'
+              }`
+            : `w-10 h-10 md:w-11 md:h-11 ${open || anyAppOpen ? 'bg-paper/25' : 'bg-paper/10 hover:bg-paper/20'}`,
         ].join(' ')}
       >
-        <SpeakerIcon muted={muted} />
+        <GearIcon />
       </button>
 
       {open && (
         <div
           id={menuId}
           role="group"
-          aria-label="Music"
-          // Lines up with the bar's right end, so it never runs off a narrow screen
-          className="absolute right-0 top-full mt-3 w-60 flex flex-col gap-2 p-3 rounded-2xl bg-nav text-nav-ink shadow-[0_10px_24px_-10px_rgba(40,30,20,0.6)] motion-safe:transition motion-safe:duration-150 starting:opacity-0 starting:-translate-y-1"
+          aria-label="Settings"
+          // A tall capsule centered under the gear, or above it in the corner
+          className={`absolute left-1/2 -translate-x-1/2 ${
+            corner ? 'bottom-full mb-3 starting:translate-y-1' : 'top-full mt-3 starting:-translate-y-1'
+          } flex flex-col items-center gap-1 p-1.5 rounded-full bg-nav shadow-[0_10px_24px_-10px_rgba(40,30,20,0.6)] motion-safe:transition motion-safe:duration-150 starting:opacity-0`}
         >
-          <p className="m-0 text-xs opacity-80">Now playing</p>
-          <p className="m-0 -mt-1.5 text-sm truncate" title={title}>
-            {title}
-          </p>
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={onToggleMute}
-              aria-pressed={muted}
-              aria-label="Mute music"
-              title={muted ? 'Unmute' : 'Mute'}
-              className={[
-                'shrink-0 w-9 h-9 p-0 flex items-center justify-center rounded-full',
-                'border-0 [border-image:none] text-nav-ink transition-colors duration-150',
-                muted ? 'bg-paper/25' : 'bg-transparent hover:bg-paper/15',
-              ].join(' ')}
-            >
-              <SpeakerIcon muted={muted} className="w-5 h-5" />
-            </button>
-            <input
-              type="range"
-              min={0}
-              max={100}
-              step={1}
-              value={muted ? 0 : Math.round(volume * 100)}
-              onChange={(e) => onVolume(Number(e.target.value) / 100)}
-              aria-label="Music volume"
-              // doodle.css frames every input; on a slider the frame throws off the track, so
-              // the knob looked short of the end at full volume
-              className="flex-1 min-w-0 m-0 p-0 border-0 [border-image:none] accent-accent"
-            />
-          </div>
+          {apps.map((app) => {
+            const menu = app.menu;
+            return (
+              <div key={app.id} className="relative">
+                <GearOption
+                  icon={app.icon}
+                  label={app.label}
+                  active={app.open || menu?.some((item) => item.open)}
+                  expanded={menu ? section === app.id : undefined}
+                  onClick={() => {
+                    if (menu) return toggleSection(app.id);
+                    app.onClick?.();
+                    close();
+                  }}
+                />
+                {menu && section === app.id && <AppMenuPanel app={app} menu={menu} onDone={close} />}
+              </div>
+            );
+          })}
+          {music && (
+            <div className="relative">
+              <GearOption
+                icon={<SpeakerIcon muted={music.muted} />}
+                label={music.muted ? 'Music (muted)' : `Music: ${music.title}`}
+                expanded={section === 'music'}
+                onClick={() => toggleSection('music')}
+              />
+              {section === 'music' && <MusicPanel {...music} />}
+            </div>
+          )}
+          {theme && (
+            // The theme choices stack below the paintbrush, extending the capsule downward
+            <div className="flex flex-col items-center gap-1">
+              <GearOption icon={<PaintbrushIcon />} label="Theme" expanded={section === 'theme'} onClick={() => toggleSection('theme')} />
+              {section === 'theme' && <ThemePanel {...theme} onDone={close} />}
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -446,10 +592,19 @@ function TaskbarAppLink({ app }: { app: TaskbarApp }) {
       aria-pressed={app.open ?? false}
       aria-label={app.label}
       title={app.label}
-      className={LINK_CLASSES(app.open ?? false)}
+      // The welcome tour points at nav bar apps by id
+      data-tour={`app-${app.id}`}
+      className={`relative ${LINK_CLASSES(app.open ?? false)}`}
     >
       <LinkIcon icon={app.icon} />
       <span className={app.icon ? 'hidden sm:inline' : ''}>{name}</span>
+      {/* Same fixed red as the Activity button's unread dot, inside the link so the bar never clips it */}
+      {app.alert && (
+        <span
+          aria-hidden="true"
+          className="absolute top-1 right-1 w-2.5 h-2.5 rounded-full bg-[#e5484d] ring-2 ring-nav motion-safe:transition-transform motion-safe:duration-200 starting:scale-0"
+        />
+      )}
     </button>
   );
 }
@@ -460,12 +615,15 @@ export default function Taskbar({
   apps = [],
   visibleApps,
   right,
+  gearApps = [],
   theme,
   music,
   profile,
   className = '',
 }: TaskbarProps) {
   const shownApps = apps.filter((app) => !app.hidden && (!visibleApps || visibleApps.includes(app.id)));
+  const shownGearApps = gearApps.filter((app) => !app.hidden);
+  const hasGear = shownGearApps.length > 0 || !!music || !!theme;
 
   return (
     // Floats over the page. The full-width strip ignores clicks so windows under it stay reachable;
@@ -486,19 +644,24 @@ export default function Taskbar({
             A button when `profile` is given (opens the profile editor), plain otherwise. */}
         {(() => {
           const pill = [
-            'shrink-0 min-w-0 max-w-[55%] sm:max-w-[16rem] flex items-center gap-2 rounded-full bg-paper text-ink-strong p-1 pr-4',
+            'shrink-0 min-w-0 max-w-[55%] sm:max-w-[16rem] flex items-center gap-2 rounded-full bg-paper text-ink-strong p-1 sm:pr-4',
             'motion-safe:transition-opacity motion-safe:duration-500 motion-safe:delay-300 starting:opacity-0',
           ].join(' ');
           const contents = (
             <>
-              {/* The default drawing sits in a round badge; a picture (a Muse avatar tile) shows on its own,
-                  inset so its square corners stay inside the pill's rounded end */}
-              <span
-                className={`shrink-0 w-9 h-9 md:w-10 md:h-10 flex ${avatar ? 'p-1.5' : 'p-1 rounded-full bg-sand overflow-hidden'}`}
-              >
-                {avatar ?? <DefaultAvatar label={`${userName}'s avatar`} />}
-              </span>
-              <span className="min-w-0 truncate text-base md:text-lg">{userName}</span>
+              {/* The default drawing sits in a round badge; a picture (a Muse avatar tile) is cropped
+                  to a circle of its own */}
+              {avatar ? (
+                <span className="shrink-0 w-9 h-9 md:w-10 md:h-10 flex p-1">
+                  <span className="w-full h-full flex rounded-full overflow-hidden">{avatar}</span>
+                </span>
+              ) : (
+                <span className="shrink-0 w-9 h-9 md:w-10 md:h-10 flex p-1 rounded-full bg-sand overflow-hidden">
+                  <DefaultAvatar label={`${userName}'s avatar`} />
+                </span>
+              )}
+              {/* Phones show only the avatar, leaving room for the links */}
+              <span className="hidden sm:inline min-w-0 truncate text-base md:text-lg">{userName}</span>
             </>
           );
           return profile ? (
@@ -508,6 +671,7 @@ export default function Taskbar({
               aria-pressed={profile.open ?? false}
               aria-label={`${userName}: ${profile.open ? 'close' : 'edit'} your profile`}
               title="Edit your profile"
+              data-tour="profile"
               // [border-image:none]: its own look, not a doodle button; the dashed ring shows hover
               className={`${pill} border-0 [border-image:none] text-left outline-2 outline-offset-2 outline-transparent hover:outline-dashed hover:outline-nav-ink ${
                 profile.open ? 'outline-dashed outline-nav-ink' : ''
@@ -520,10 +684,11 @@ export default function Taskbar({
           );
         })()}
 
-        {/* Middle: app links. Scrolls sideways if there are more than fit. */}
+        {/* Middle: app links. Scrolls sideways (swipe or trackpad) if there are more than fit,
+            with the scroll bar hidden. */}
         <nav
           aria-label="Apps"
-          className="flex-1 min-w-0 flex items-center gap-1 overflow-x-auto px-1 sm:px-2 motion-safe:transition-opacity motion-safe:duration-500 motion-safe:delay-[400ms] starting:opacity-0"
+          className="flex-1 min-w-0 flex items-center gap-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden px-1 sm:px-2 motion-safe:transition-opacity motion-safe:duration-500 motion-safe:delay-[400ms] starting:opacity-0"
         >
           {shownApps.map((app) => (
             <TaskbarAppLink key={app.id} app={app} />
@@ -532,10 +697,12 @@ export default function Taskbar({
 
         {right && <div className="shrink-0 hidden sm:flex items-center gap-3 px-3 text-sm">{right}</div>}
 
-        {/* Very right: music, then the theme menu */}
-        {music && <MusicMenu {...music} />}
-        {theme && <ThemeMenu {...theme} />}
+        {/* Very right: the gear, holding the gear apps, music and theme */}
+        {hasGear && <GearMenu apps={shownGearApps} music={music} theme={theme} className="hidden min-[380px]:block" />}
       </div>
+
+      {/* Small phones (under 380px wide): the gear floats in the bottom-left corner of the screen instead */}
+      {hasGear && <GearMenu corner apps={shownGearApps} music={music} theme={theme} className="min-[380px]:hidden" />}
     </header>
   );
 }

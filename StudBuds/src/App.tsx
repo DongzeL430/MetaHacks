@@ -4,6 +4,8 @@ import AuthPage from './AuthPage.tsx';
 import HomePage from './HomePage.tsx';
 import PreSurveyFlow from './PresurveyFlow.tsx';
 import RequireAuth from './RequireAuth.tsx';
+import Tour, { useFirstTimeTour } from './components/Tour.tsx';
+import type { TourStep } from './components/Tour.tsx';
 import { supabase } from './lib/supabase.ts';
 import { finishOnboarding, saveAnswers, saveAvailability } from './lib/onboarding.ts';
 import { findCourses, matchCourses, saveAcademics } from './lib/courses.ts';
@@ -12,25 +14,47 @@ import { useStudyData } from './lib/study.ts';
 import { prefetchStudySpots, useStudySpots } from './lib/spots.ts';
 import { SURVEY_SECTIONS } from './dataFiles/SurveySections.ts';
 
+/** The first thing a new account sees: what the survey is for, and how to close this popup */
+const SURVEY_TOUR: TourStep[] = [
+  {
+    title: 'Welcome to StudBuds! 👋',
+    closeOnly: true,
+    body: (
+      <>
+        <p className="m-0">We’re glad you’re here.</p>
+        <p className="m-0">
+          First, fill out this short survey: when you’re free, what you’re studying, and how you like to work. We use
+          your answers to match you with other students who fit.
+        </p>
+        <p className="m-0 font-bold">When you’re done reading, close this with the glowing ✕ to get started.</p>
+      </>
+    ),
+  },
+];
+
 /** The pre-survey, saving each page as the student goes */
 function SurveyPage() {
   const navigate = useNavigate();
+  const tour = useFirstTimeTour('survey');
   // Muse starts finding the school's study spots when the account is created (AuthPage). This
   // covers a student who confirmed their email somewhere else; it shares the same request.
   useEffect(() => prefetchStudySpots(), []);
   return (
-    <PreSurveyFlow
-      onAvailabilitySubmit={(slots) => saveAvailability(slots)}
-      suggestCourses={findCourses}
-      matchCourses={matchCourses}
-      onAcademicsSubmit={saveAcademics}
-      onFinish={async ({ answers }) => {
-        await saveAnswers(answers, SURVEY_SECTIONS);
-        await finishOnboarding();
-        // Straight to Home, with the Study Lobbies window open
-        navigate('/', { replace: true, state: { openLobbies: true } });
-      }}
-    />
+    <>
+      {tour.status === 'open' && <Tour steps={SURVEY_TOUR} onClose={tour.close} />}
+      <PreSurveyFlow
+        onAvailabilitySubmit={(slots) => saveAvailability(slots)}
+        suggestCourses={findCourses}
+        matchCourses={matchCourses}
+        onAcademicsSubmit={saveAcademics}
+        onFinish={async ({ answers }) => {
+          await saveAnswers(answers, SURVEY_SECTIONS);
+          await finishOnboarding();
+          // Straight to Home: the welcome tour first, then the Study Lobbies window
+          navigate('/', { replace: true, state: { fromSurvey: true } });
+        }}
+      />
+    </>
   );
 }
 
@@ -40,7 +64,9 @@ function Home() {
   const study = useStudyData();
   const studySpots = useStudySpots();
   const location = useLocation();
-  const openLobbies = (location.state as { openLobbies?: boolean } | null)?.openLobbies ?? false;
+  const fromSurvey = (location.state as { fromSurvey?: boolean } | null)?.fromSurvey ?? false;
+  // Just finished the survey: a short tour of Home, shown once per account
+  const tour = useFirstTimeTour('home', fromSurvey);
 
   // Refusals ("This session is full.") show in the nav bar for a few seconds
   const { error, clearError } = study;
@@ -51,14 +77,15 @@ function Home() {
   }, [error, clearError]);
 
   // The profile window and nav bar start from the loaded profile, so wait for it
-  if (!me.ready || !study.ready) return null;
+  // ...and whether the tour shows, so the lobbies don't open first and then hide behind it
+  if (!me.ready || !study.ready || tour.status === 'checking') return null;
   return (
     <HomePage
       userName={me.nickname}
       avatar={
         me.avatarUrl ? (
           // doodle.css frames every image; the utilities turn that off for the avatar tile
-          <img src={me.avatarUrl} alt="" className="w-full h-full object-contain rounded-none border-0 [border-image:none]" />
+          <img src={me.avatarUrl} alt="" className="w-full h-full object-cover rounded-none border-0 [border-image:none]" />
         ) : undefined
       }
       avatarUrl={me.avatarUrl}
@@ -76,7 +103,8 @@ function Home() {
       initialStudyState={study.state}
       studyState={study.state}
       onRefreshStudy={study.refresh}
-      openLobbiesAtStart={openLobbies}
+      openLobbiesAtStart={fromSurvey}
+      welcomeTour={tour.status === 'open' ? { onDone: tour.close } : undefined}
       onStudyAction={(action) => void study.act(action)}
       initialProfile={{
         availability: me.availability,
