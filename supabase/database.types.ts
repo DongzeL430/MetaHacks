@@ -1182,6 +1182,10 @@ export type Database = {
       identity_changes_left: { Args: never; Returns: number }
       is_lobby_host: { Args: { p_lobby_id: string }; Returns: boolean }
       is_lobby_member: { Args: { p_lobby_id: string }; Returns: boolean }
+      kick_from_lobby: {
+        Args: { lobby_id: string; student: string }
+        Returns: undefined
+      }
       known_courses_for: {
         Args: { majors: string[]; school: string }
         Returns: {
