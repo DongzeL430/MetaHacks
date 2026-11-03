@@ -276,8 +276,12 @@ export default function HomePage({
                 onRefresh={onRefreshStudy}
               />
 
+              {/* One layer per window: windows in a shared layer stack below each other, so the
+                  visited croft landed under the desk, out of sight */}
               <WindowLayer>
                 <CroftWindow id="croft" open={croftOpen} onClose={() => setCroftOpen(false)} ownerId={null} />
+              </WindowLayer>
+              <WindowLayer>
                 <CroftWindow
                   id="croft-visit"
                   open={visitingId !== null}

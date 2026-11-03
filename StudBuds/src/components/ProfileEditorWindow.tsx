@@ -239,14 +239,14 @@ export default function ProfileEditorWindow({
       <div
         aria-hidden="true"
         onPointerDown={requestClose}
-        className="fixed inset-0 z-[45] bg-ink/25 motion-safe:transition-opacity motion-safe:duration-200 starting:opacity-0"
+        className="fixed inset-0 z-[65] bg-ink/25 motion-safe:transition-opacity motion-safe:duration-200 starting:opacity-0"
       />
 
       <div
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
-        className="absolute inset-0 z-50 p-3"
+        className="absolute inset-0 z-[70] p-3"
         onPointerDown={(e) => {
           if (e.target === e.currentTarget) requestClose();
         }}
