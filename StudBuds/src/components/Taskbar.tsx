@@ -270,7 +270,9 @@ function MusicMenu({ title, volume, muted, onVolume, onToggleMute }: MusicMenuPr
               value={muted ? 0 : Math.round(volume * 100)}
               onChange={(e) => onVolume(Number(e.target.value) / 100)}
               aria-label="Music volume"
-              className="flex-1 min-w-0 accent-accent"
+              // doodle.css frames every input; on a slider the frame throws off the track, so
+              // the knob looked short of the end at full volume
+              className="flex-1 min-w-0 m-0 p-0 border-0 [border-image:none] accent-accent"
             />
           </div>
         </div>
