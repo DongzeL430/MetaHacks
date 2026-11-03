@@ -196,8 +196,8 @@ export function welcomeTourSteps(nickname: string): TourStep[] {
       title: 'Join requests',
       body: (
         <p className="m-0">
-          Students who want to join show up here. Visit their croft to get a feel for them, then Accept to give them a
-          spot or Decline. Accepted students appear under “In this lobby”.
+          Students who want to join show up here. Accept to give them a spot, or Decline. Accepted students appear
+          under “In this lobby”.
         </p>
       ),
     },

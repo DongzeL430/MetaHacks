@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import ChipList from './ChipList';
 import PersonAvatar from './PersonAvatar';
 import { ME } from '../dataFiles/StudyData';
 import type { ConnectionStatus, Person } from '../dataFiles/StudyData';
@@ -128,6 +129,8 @@ interface PersonCardProps {
   dispatch: StudyDispatch;
   /** Shown to the host on everyone else's card: removes them from the session */
   onKick?: () => void;
+  /** Shows the "Visit croft" button (only on someone's profile popup for now) */
+  showCroft?: boolean;
   /** Runs before "Visit croft" opens their croft, e.g. to close the popup the card is in */
   onVisitCroft?: () => void;
 }
@@ -161,7 +164,16 @@ function KickControl({ name, onKick }: { name: string; onKick: () => void }) {
 }
 
 /** A filled lobby slot: who they are, what they need help with, when you're both free, what they've taken */
-export default function PersonCard({ person, isHost = false, isMe = false, status, dispatch, onKick, onVisitCroft }: PersonCardProps) {
+export default function PersonCard({
+  person,
+  isHost = false,
+  isMe = false,
+  status,
+  dispatch,
+  onKick,
+  showCroft = false,
+  onVisitCroft,
+}: PersonCardProps) {
   const blocks = toDayBlocks(person.sharedSlots);
 
   return (
@@ -182,17 +194,12 @@ export default function PersonCard({ person, isHost = false, isMe = false, statu
         <>
           <div className="flex flex-col gap-1">
             <p className="m-0 text-xs opacity-70">Looking for help with</p>
-            {person.seekingHelpWith.length > 0 ? (
-              <div className="flex flex-wrap gap-1">
-                {person.seekingHelpWith.map((subject) => (
-                  <span key={subject} className={`${CHIP} bg-accent/25`}>
-                    {subject}
-                  </span>
-                ))}
-              </div>
-            ) : (
-              <p className="m-0 text-sm opacity-70">Nothing listed</p>
-            )}
+            <ChipList
+              items={person.seekingHelpWith}
+              chipClassName={`${CHIP} bg-accent/25`}
+              title={`${person.name} is looking for help with`}
+              empty="Nothing listed"
+            />
           </div>
 
           <div className="flex flex-col gap-1">
@@ -213,25 +220,22 @@ export default function PersonCard({ person, isHost = false, isMe = false, statu
 
           <div className="flex flex-col gap-1">
             <p className="m-0 text-xs opacity-70">Courses taken</p>
-            {person.coursesTaken.length > 0 ? (
-              <div className="flex flex-wrap gap-1">
-                {person.coursesTaken.map((course) => (
-                  <span key={course} className={CHIP}>
-                    {course}
-                  </span>
-                ))}
-              </div>
-            ) : (
-              <p className="m-0 text-sm opacity-70">None listed</p>
-            )}
+            <ChipList
+              items={person.coursesTaken}
+              chipClassName={CHIP}
+              title={`${person.name}’s courses taken`}
+              empty="None listed"
+            />
           </div>
         </>
       )}
 
-      <div className="flex flex-wrap items-start justify-between gap-2">
-        {onKick && !isMe ? <KickControl name={person.name} onKick={onKick} /> : <span />}
-        <VisitCroftButton person={person} onVisit={onVisitCroft} />
-      </div>
+      {((onKick && !isMe) || showCroft) && (
+        <div className="flex flex-wrap items-start justify-between gap-2">
+          {onKick && !isMe ? <KickControl name={person.name} onKick={onKick} /> : <span />}
+          {showCroft && <VisitCroftButton person={person} onVisit={onVisitCroft} />}
+        </div>
+      )}
     </article>
   );
 }
