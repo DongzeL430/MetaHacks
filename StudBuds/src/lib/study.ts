@@ -12,6 +12,26 @@ const RELOAD_DELAY_MS = 250;
 
 const EMPTY: StudyState = { lobbies: [], connections: {}, invites: [] };
 
+/** What to tell a student when the database turns an action down */
+function messageFor(error: { message: string; code?: string }): string {
+  switch (error.code) {
+    case 'P0001':
+      // Written for students ("This session is full.")
+      return error.message;
+    case '42501':
+      // Not allowed any more: the session closed, they were removed, the person left
+      return 'That isn’t possible any more. The lists are up to date now.';
+    case '23505':
+      return 'That’s already done.';
+    case undefined:
+    case '':
+      // No database code: the request never got an answer
+      return 'That didn’t go through. Check your connection and try again.';
+    default:
+      return 'That didn’t go through. Try again in a moment.';
+  }
+}
+
 /**
  * Lobbies at the student's school, the people in them, connections, and every lobby and
  * connection action, through Supabase.
@@ -247,12 +267,7 @@ export function useStudyData() {
           break;
       }
 
-      if (result?.error) {
-        // P0001 messages ("This session is full.") are written for students
-        setError(
-          result.error.code === 'P0001' ? result.error.message : 'That didn’t go through. Check your connection and try again.',
-        );
-      }
+      if (result?.error) setError(messageFor(result.error));
       reloadSoon();
     },
     [reloadSoon],
