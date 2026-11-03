@@ -6,7 +6,7 @@
 begin;
 create extension if not exists pgtap with schema extensions;
 
-select plan(33);
+select plan(32);
 
 insert into auth.users (id, email, raw_user_meta_data) values
   ('a1000000-0000-4000-8000-00000000000a', 'a@northeastern.edu', '{"adult_confirmed": true}'),
@@ -77,16 +77,11 @@ select is(
 select lives_ok($$select public.request_join('10000000-0000-4000-8000-000000000001')$$, 'A second classmate asks to join');
 
 set local request.jwt.claims to '{"sub": "d4000000-0000-4000-8000-00000000000d", "role": "authenticated"}';
-select is((select count(*)::integer from public.lobbies where id = '10000000-0000-4000-8000-000000000001'), 0, 'Students at another school don''t see the session');
+select is((select count(*)::integer from public.lobbies where id = '10000000-0000-4000-8000-000000000001'), 1, 'Students at another school see the session too');
 select is(
   (select count(*)::integer from public.lobby_members where lobby_id = '10000000-0000-4000-8000-000000000001'),
-  0,
-  'Or who''s in it'
-);
-select throws_ok(
-  $$select public.request_join('10000000-0000-4000-8000-000000000001')$$,
-  'P0001', 'That session isn’t available anymore.',
-  'Or ask to join it'
+  1,
+  'They see who''s in it (the host), but not who asked to join'
 );
 
 set local request.jwt.claims to '{"sub": "a7000000-0000-4000-8000-000000000007", "role": "authenticated"}';

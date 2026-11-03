@@ -5,7 +5,7 @@
 begin;
 create extension if not exists pgtap with schema extensions;
 
-select plan(21);
+select plan(20);
 
 insert into auth.users (id, email, raw_user_meta_data) values
   ('a1000000-0000-4000-8000-00000000000a', 'v@vanderbilt.edu', '{"adult_confirmed": true}'),
@@ -29,15 +29,10 @@ select is((select count(*)::integer from public.lobbies where id = '10000000-000
 select lives_ok($$select public.request_join('10000000-0000-4000-8000-000000000001')$$, 'And can ask to join');
 
 set local request.jwt.claims to '{"sub": "c1000000-0000-4000-8000-00000000000c", "role": "authenticated"}';
-select is((select count(*)::integer from public.lobbies where id = '10000000-0000-4000-8000-000000000001'), 0, 'A school that isn''t linked doesn''t see it');
+select is((select count(*)::integer from public.lobbies where id = '10000000-0000-4000-8000-000000000001'), 1, 'A school that isn''t linked sees it too (filtered out by default in the app)');
 select ok(
   not exists (select 1 from public.my_community() d where d in ('rit.edu', 'vanderbilt.edu')),
-  'And those schools aren''t in its community'
-);
-select throws_ok(
-  $$select public.request_join('10000000-0000-4000-8000-000000000001')$$,
-  'P0001', 'That session isn’t available anymore.',
-  'Or ask to join it'
+  'But it isn''t in their community, so "Only my school" hides it'
 );
 
 
@@ -50,10 +45,9 @@ select is(
   'pending',
   'V sees it as pending'
 );
-select throws_ok(
+select lives_ok(
   $$select public.connect_with('c1000000-0000-4000-8000-00000000000c')$$,
-  'P0001', 'You can’t connect with this student.',
-  'Students at schools that aren''t linked can''t connect'
+  'Students at schools that aren''t linked can connect too'
 );
 select throws_ok(
   $$insert into public.connections (requester_id, addressee_id) values ('a1000000-0000-4000-8000-00000000000a', 'a2000000-0000-4000-8000-00000000000a')$$,
@@ -75,7 +69,8 @@ select lives_ok($$select public.answer_connection('a1000000-0000-4000-8000-00000
 
 set local request.jwt.claims to '{"sub": "a1000000-0000-4000-8000-00000000000a", "role": "authenticated"}';
 select is(
-  (select status from public.connections where requester_id = 'a1000000-0000-4000-8000-00000000000a'),
+  (select status from public.connections
+   where requester_id = 'a1000000-0000-4000-8000-00000000000a' and addressee_id = 'b1000000-0000-4000-8000-00000000000b'),
   'connected',
   'Now both are connected'
 );

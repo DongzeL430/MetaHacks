@@ -13,6 +13,7 @@
 -- Lobbies ------------------------------------------------------------------------------------------
 
 drop policy "Students see lobbies" on public.lobbies;
+
 create policy "Students see their school's lobbies"
   on public.lobbies for select to authenticated
   using (
@@ -52,7 +53,6 @@ begin
   insert into public.lobby_members (lobby_id, user_id, role) values (l.id, me, 'requested');
 end;
 $$;
-
 
 -- Cards --------------------------------------------------------------------------------------------
 
@@ -131,7 +131,6 @@ as $$
   cross join me
   where private.is_onboarded(p.user_id) and not private.blocked_between(me.id, p.user_id)
 $$;
-
 
 -- Ranking ------------------------------------------------------------------------------------------
 
@@ -247,7 +246,6 @@ as $$
     ], null)
   from scored s
 $$;
-
 
 -- Invites ------------------------------------------------------------------------------------------
 

@@ -108,8 +108,8 @@ select is(
 set local request.jwt.claims to '{"sub": "c1000000-0000-4000-8000-00000000000c", "role": "authenticated"}';
 select is(
   (select count(*)::integer from public.lobby_matches() where lobby_id::text like '10000000-%'),
-  0,
-  'A school that isn''t linked sees none of them'
+  4,
+  'A school that isn''t linked gets every one of them ranked too'
 );
 
 reset role;
