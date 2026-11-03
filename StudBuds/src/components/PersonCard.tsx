@@ -29,6 +29,37 @@ export function VisitCroftButton({ person, onVisit }: { person: Person; onVisit?
   );
 }
 
+/** "Connected", with a Remove button that asks once before ending the connection */
+function ConnectedControl({ person, dispatch }: { person: Person; dispatch: StudyDispatch }) {
+  const [confirming, setConfirming] = useState(false);
+  if (!confirming) {
+    return (
+      <span className="flex items-center gap-1.5">
+        <span className="px-2 py-0.5 rounded-md bg-free/60 text-sm">Connected</span>
+        <button
+          type="button"
+          onClick={() => setConfirming(true)}
+          aria-label={`Remove ${person.name} from your connections`}
+          className={SMALL_BUTTON}
+        >
+          Remove
+        </button>
+      </span>
+    );
+  }
+  return (
+    <span role="group" aria-label={`Remove ${person.name}?`} className="flex flex-wrap items-center gap-1.5 text-sm">
+      <span>Remove {person.name}?</span>
+      <button type="button" onClick={() => dispatch({ type: 'remove-connect', personId: person.id })} className={SMALL_BUTTON}>
+        Remove
+      </button>
+      <button type="button" onClick={() => setConfirming(false)} className={SMALL_BUTTON} autoFocus>
+        Keep
+      </button>
+    </span>
+  );
+}
+
 /** Friend-request style connect button. Shows what's possible for the current status. */
 export function ConnectControl({
   person,
@@ -41,7 +72,7 @@ export function ConnectControl({
 }) {
   switch (status) {
     case 'connected':
-      return <span className="px-2 py-0.5 rounded-md bg-free/60 text-sm">Connected</span>;
+      return <ConnectedControl person={person} dispatch={dispatch} />;
     case 'sent':
       return (
         <button

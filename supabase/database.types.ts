@@ -345,6 +345,35 @@ export type Database = {
           },
         ]
       }
+      croft_harvests: {
+        Row: {
+          crop: string
+          harvested_at: string
+          id: number
+          user_id: string
+        }
+        Insert: {
+          crop: string
+          harvested_at?: string
+          id?: never
+          user_id: string
+        }
+        Update: {
+          crop?: string
+          harvested_at?: string
+          id?: never
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "croft_harvests_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "crofts"
+            referencedColumns: ["user_id"]
+          },
+        ]
+      }
       croft_help: {
         Row: {
           created_at: string
@@ -353,6 +382,7 @@ export type Database = {
           helper_id: string
           id: number
           owner_id: string
+          thanked_at: string | null
         }
         Insert: {
           created_at?: string
@@ -361,6 +391,7 @@ export type Database = {
           helper_id: string
           id?: never
           owner_id: string
+          thanked_at?: string | null
         }
         Update: {
           created_at?: string
@@ -369,6 +400,7 @@ export type Database = {
           helper_id?: string
           id?: never
           owner_id?: string
+          thanked_at?: string | null
         }
         Relationships: [
           {
@@ -424,16 +456,19 @@ export type Database = {
       }
       crofts: {
         Row: {
+          active_at: string
           created_at: string
           pennies: number
           user_id: string
         }
         Insert: {
+          active_at?: string
           created_at?: string
           pennies?: number
           user_id: string
         }
         Update: {
+          active_at?: string
           created_at?: string
           pennies?: number
           user_id?: string
@@ -605,6 +640,39 @@ export type Database = {
           {
             foreignKeyName: "lobby_messages_sender_id_fkey"
             columns: ["sender_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      lobby_removals: {
+        Row: {
+          lobby_id: string
+          removed_at: string
+          user_id: string
+        }
+        Insert: {
+          lobby_id: string
+          removed_at?: string
+          user_id: string
+        }
+        Update: {
+          lobby_id?: string
+          removed_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lobby_removals_lobby_id_fkey"
+            columns: ["lobby_id"]
+            isOneToOne: false
+            referencedRelation: "lobbies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lobby_removals_user_id_fkey"
+            columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
@@ -1272,7 +1340,30 @@ export type Database = {
         Returns: Json
       }
       croft_help: { Args: { owner: string; tile: number }; Returns: Json }
+      croft_names: {
+        Args: { ids: string[] }
+        Returns: {
+          avatar_path: string
+          id: string
+          nickname: string
+        }[]
+      }
+      croft_thank: { Args: { help: number }; Returns: Json }
+      croft_valley: { Args: never; Returns: Json }
       croft_view: { Args: { owner?: string }; Returns: Json }
+      croft_village: {
+        Args: never
+        Returns: {
+          avatar_path: string
+          connected: boolean
+          dry_seeds: number
+          growing: number
+          helped_today: boolean
+          nickname: string
+          owner_id: string
+          ready: number
+        }[]
+      }
       delete_my_account: { Args: never; Returns: undefined }
       finish_onboarding: { Args: never; Returns: undefined }
       hook_before_user_created: { Args: { event: Json }; Returns: Json }
@@ -1291,6 +1382,10 @@ export type Database = {
       identity_changes_left: { Args: never; Returns: number }
       is_lobby_host: { Args: { p_lobby_id: string }; Returns: boolean }
       is_lobby_member: { Args: { p_lobby_id: string }; Returns: boolean }
+      kick_from_lobby: {
+        Args: { lobby_id: string; student: string }
+        Returns: undefined
+      }
       known_courses_for: {
         Args: { majors: string[]; school: string }
         Returns: {
@@ -1324,6 +1419,7 @@ export type Database = {
         Args: { student_a: string; student_b: string }
         Returns: boolean
       }
+      remove_connection: { Args: { person: string }; Returns: undefined }
       request_join: { Args: { lobby_id: string }; Returns: undefined }
       save_my_answers: { Args: { answers: Json }; Returns: undefined }
       save_my_courses: { Args: { courses: Json }; Returns: undefined }
