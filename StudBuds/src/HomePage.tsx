@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
-import { WindowManagerProvider } from './components/AppWindow';
+import { WindowLayer, WindowManagerProvider } from './components/AppWindow';
 import Taskbar, { TASKBAR_CLEARANCE } from './components/Taskbar';
 import type { TaskbarApp } from './components/Taskbar';
 import StudyLayout from './components/StudyLayout';
@@ -9,6 +9,10 @@ import { useUserTheme } from './utils/UserTheme';
 import { DEFAULT_MUSIC, FALLBACK_MUSIC } from './utils/Music';
 import { useThemeMusic } from './utils/MusicPlayer';
 import ProfileEditorWindow from './components/ProfileEditorWindow';
+import CroftWindow from './components/croft/CroftWindow';
+import WorldChat from './components/WorldChat';
+import { useWorldChat } from './lib/worldChat';
+import { CroftVisitContext } from './lib/croft';
 import type { MyProfile } from './dataFiles/StudyData';
 import { ME } from './dataFiles/StudyData';
 import type { Person } from './dataFiles/StudyData';
@@ -39,6 +43,14 @@ const LinkIcon = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <path d="M10 13a5 5 0 0 0 7.07 0l3-3a5 5 0 0 0-7.07-7.07l-1.5 1.5" />
     <path d="M14 11a5 5 0 0 0-7.07 0l-3 3a5 5 0 0 0 7.07 7.07l1.5-1.5" />
+  </svg>
+);
+
+/** An hourglass, for features on the way */
+const UpcomingIcon = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M6 3h12M6 21h12" />
+    <path d="M7 3c0 5 10 5 10 9s-10 4-10 9M17 3c0 5-10 5-10 9s10 4 10 9" />
   </svg>
 );
 
@@ -110,6 +122,13 @@ export default function HomePage({
 }: HomePageProps) {
   const [lobbiesOpen, setLobbiesOpen] = useState(openLobbiesAtStart);
   const [connectionsOpen, setConnectionsOpen] = useState(false);
+  // My Croft: your own, and the one you're visiting from someone's profile card
+  const [croftOpen, setCroftOpen] = useState(false);
+  const [visitingId, setVisitingId] = useState<string | null>(null);
+  const visitCroft = useCallback((personId: string) => {
+    if (personId === ME) setCroftOpen(true);
+    else setVisitingId(personId);
+  }, []);
   const [sessionsOpen, setSessionsOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   // Theme: 'default' (sun) or 'custom' (star). The star opens the prompt window.
@@ -141,6 +160,9 @@ export default function HomePage({
     return saved;
   };
   const [study, dispatch] = useStudyState(initialStudyState, onStudyAction, studyState);
+  // The live activity feed at the bottom right: sessions that fit you, and visits and help on your croft
+  const peopleById = useMemo(() => new Map(people.map((p) => [p.id, p])), [people]);
+  const chat = useWorldChat(study.lobbies, peopleById);
 
   const pendingRequests = Object.values(study.connections).filter((s) => s === 'received').length;
   // People waiting to join the lobby you host
@@ -175,6 +197,22 @@ export default function HomePage({
       icon: <LinkIcon />,
       open: connectionsOpen,
       onClick: () => setConnectionsOpen((o) => !o),
+    },
+    {
+      // Features on the way, in a drop-down; My Croft is the first
+      id: 'upcoming',
+      name: 'Upcoming',
+      label: 'Upcoming features',
+      icon: <UpcomingIcon />,
+      menu: [
+        {
+          id: 'croft',
+          name: 'Croft',
+          label: croftOpen ? 'Close your croft' : 'Open your croft',
+          open: croftOpen,
+          onClick: () => setCroftOpen((o) => !o),
+        },
+      ],
     },
   ];
 
@@ -215,25 +253,43 @@ export default function HomePage({
         {/* Desk area: windows rest inside this box. `relative` so window layers can cover it.
             It starts empty; windows open from the nav bar. */}
         <div className="relative flex-1 min-h-0 min-w-0">
+          <WorldChat lines={chat.lines} history={chat.history} unread={chat.unread} onOpen={chat.markRead} />
           {/* All windows on the desk share one stack and one tiling layout */}
           <WindowManagerProvider>
-            <StudyLayout
-              me={{ name: profile.nickname, avatar: avatarUrl }}
-              people={people}
-              myAvailability={profile.availability}
-              // The "My subjects" lobby filter matches both lists
-              mySubjects={[...profile.seekingHelpWith, ...profile.coursesTaken]}
-              locationSuggestions={locationSuggestions}
-              state={study}
-              dispatch={dispatch}
-              lobbiesOpen={lobbiesOpen}
-              onLobbiesClose={() => setLobbiesOpen(false)}
-              connectionsOpen={connectionsOpen}
-              onConnectionsClose={() => setConnectionsOpen(false)}
-              sessionsOpen={sessionsOpen}
-              onSessionsClose={() => setSessionsOpen(false)}
-              onRefresh={onRefreshStudy}
-            />
+            {/* "Visit croft" on any profile card opens that person's croft */}
+            <CroftVisitContext.Provider value={visitCroft}>
+              <StudyLayout
+                me={{ name: profile.nickname, avatar: avatarUrl }}
+                people={people}
+                myAvailability={profile.availability}
+                // The "My subjects" lobby filter matches both lists
+                mySubjects={[...profile.seekingHelpWith, ...profile.coursesTaken]}
+                locationSuggestions={locationSuggestions}
+                state={study}
+                dispatch={dispatch}
+                lobbiesOpen={lobbiesOpen}
+                onLobbiesClose={() => setLobbiesOpen(false)}
+                connectionsOpen={connectionsOpen}
+                onConnectionsClose={() => setConnectionsOpen(false)}
+                sessionsOpen={sessionsOpen}
+                onSessionsClose={() => setSessionsOpen(false)}
+                onRefresh={onRefreshStudy}
+              />
+
+              {/* One layer per window: windows in a shared layer stack below each other, so the
+                  visited croft landed under the desk, out of sight */}
+              <WindowLayer>
+                <CroftWindow id="croft" open={croftOpen} onClose={() => setCroftOpen(false)} ownerId={null} />
+              </WindowLayer>
+              <WindowLayer>
+                <CroftWindow
+                  id="croft-visit"
+                  open={visitingId !== null}
+                  onClose={() => setVisitingId(null)}
+                  ownerId={visitingId}
+                />
+              </WindowLayer>
+            </CroftVisitContext.Provider>
           </WindowManagerProvider>
 
           {/* Popup from the avatar and name in the nav bar */}

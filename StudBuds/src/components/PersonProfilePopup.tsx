@@ -27,13 +27,13 @@ export default function PersonProfilePopup({ person, status, dispatch, onClose }
       <div
         aria-hidden="true"
         onPointerDown={onClose}
-        className="fixed inset-0 z-[45] bg-ink/25 motion-safe:transition-opacity motion-safe:duration-200 starting:opacity-0"
+        className="fixed inset-0 z-[65] bg-ink/25 motion-safe:transition-opacity motion-safe:duration-200 starting:opacity-0"
       />
       <div
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
-        className="absolute inset-0 z-50 p-3"
+        className="absolute inset-0 z-[70] p-3"
         onPointerDown={(e) => {
           if (e.target === e.currentTarget) onClose();
         }}
@@ -61,7 +61,8 @@ export default function PersonProfilePopup({ person, status, dispatch, onClose }
           minHeight={260}
           bodyClassName="p-3 flex flex-col gap-3"
         >
-          <PersonCard person={person} status={status} dispatch={dispatch} />
+          {/* Visiting their croft closes this popup, so the croft isn't hidden behind it */}
+          <PersonCard person={person} status={status} dispatch={dispatch} onVisitCroft={onClose} />
         </AppWindow>
       </div>
     </>

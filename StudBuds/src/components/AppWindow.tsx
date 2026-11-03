@@ -957,7 +957,20 @@ export default function AppWindow({
     onFullscreenChangeRef.current?.(next);
   };
 
-  const toggleFullscreen = () => setFullscreen(!isFullscreen);
+  const toggleFullscreen = () => {
+    // Going full screen brings it to the front too, so the check below doesn't undo it
+    if (!isFullscreen) manager?.focus(windowId);
+    setFullscreen(!isFullscreen);
+  };
+
+  // A full-screen window covers every other window. When another one opens or comes to the
+  // front (a Visit, a popup, an app from the nav bar), this one leaves full screen, so the new
+  // window isn't hidden behind it.
+  const isFrontmost = managerState.zOrder.length === 0 || managerState.zOrder[managerState.zOrder.length - 1] === windowId;
+  useEffect(() => {
+    if (isFullscreen && manager && !isFrontmost) setFullscreen(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isFullscreen, isFrontmost, manager]);
 
   // Escape leaves full screen (a popup that handles Escape itself stops it first)
   useEffect(() => {

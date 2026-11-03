@@ -192,6 +192,9 @@ export function useStudyData() {
             accept: action.type === 'accept-connect',
           });
           break;
+        case 'remove-connect':
+          result = await supabase.rpc('remove_connection', { person: toId(action.personId) });
+          break;
       }
 
       if (result?.error) {
