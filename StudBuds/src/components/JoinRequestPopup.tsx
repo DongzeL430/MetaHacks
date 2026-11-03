@@ -29,7 +29,7 @@ export default function JoinRequestsPopup({ lobby, people, dispatch, onClose }: 
       <div
         aria-hidden="true"
         onPointerDown={onClose}
-        className="fixed inset-0 z-[45] bg-[#3c3c3c]/25 motion-safe:transition-opacity motion-safe:duration-200 starting:opacity-0"
+        className="fixed inset-0 z-[45] bg-ink/25 motion-safe:transition-opacity motion-safe:duration-200 starting:opacity-0"
       />
       <div
         role="dialog"

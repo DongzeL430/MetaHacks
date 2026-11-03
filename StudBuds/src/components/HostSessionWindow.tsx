@@ -99,7 +99,7 @@ function FieldError({ id, children }: { id: string; children: string }) {
     <span
       id={id}
       role="alert"
-      className="flex items-center gap-1.5 text-sm text-[#A8402C] motion-safe:transition motion-safe:duration-200 starting:opacity-0 starting:-translate-y-1"
+      className="flex items-center gap-1.5 text-sm text-danger motion-safe:transition motion-safe:duration-200 starting:opacity-0 starting:-translate-y-1"
     >
       <svg viewBox="0 0 20 20" className="w-4 h-4 shrink-0" aria-hidden="true">
         <circle cx="10" cy="10" r="8" fill="none" stroke="currentColor" strokeWidth="2" />
@@ -223,7 +223,7 @@ export default function HostSessionWindow({
       <div
         aria-hidden="true"
         onPointerDown={onClose}
-        className="fixed inset-0 z-[45] bg-[#3c3c3c]/25 motion-safe:transition-opacity motion-safe:duration-200 starting:opacity-0"
+        className="fixed inset-0 z-[45] bg-ink/25 motion-safe:transition-opacity motion-safe:duration-200 starting:opacity-0"
       />
 
       <div
@@ -333,7 +333,7 @@ export default function HostSessionWindow({
               ref={timeAreaRef}
               aria-describedby={warn.time ? `${fieldId}-time-error` : undefined}
               className={`min-w-0 rounded-md transition-[outline-color] ${
-                warn.time ? 'outline-2 outline-dashed outline-[#C4553F] outline-offset-4' : ''
+                warn.time ? 'outline-2 outline-dashed outline-danger-strong outline-offset-4' : ''
               }`}
             >
               {compact ? (
@@ -414,11 +414,11 @@ export default function HostSessionWindow({
                   // Pops up whenever the picked time overlaps busy time, in either mode
                   <p
                     role="alert"
-                    className="m-0 flex items-start gap-2 p-2 rounded-md border-2 border-[#C4553F]/50 bg-[#F2C9C4]/40 text-sm text-[#A8402C] motion-safe:transition motion-safe:duration-200 starting:opacity-0 starting:-translate-y-1"
+                    className="m-0 flex items-start gap-2 p-2 rounded-md border-2 border-danger-strong/50 bg-danger-soft/40 text-sm text-danger motion-safe:transition motion-safe:duration-200 starting:opacity-0 starting:-translate-y-1"
                   >
                     <span
                       aria-hidden="true"
-                      className={`mt-0.5 w-4 h-4 shrink-0 rounded-sm border-2 border-[#3c3c3c] ${PICKED_BUSY}`}
+                      className={`mt-0.5 w-4 h-4 shrink-0 rounded-sm border-2 border-ink ${PICKED_BUSY}`}
                     />
                     Heads up: {durationLabel(busyMinutes)} of this falls during time you marked as busy. You can still
                     create it.

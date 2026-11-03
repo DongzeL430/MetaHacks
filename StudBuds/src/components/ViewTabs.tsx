@@ -45,7 +45,7 @@ export default function ViewTabs<T extends string>({ baseId, label, tabs, value,
     <div
       role="tablist"
       aria-label={label}
-      className="shrink-0 self-start max-w-full flex items-center gap-1 p-1 rounded-full bg-[#6B5E54] overflow-x-auto"
+      className="shrink-0 self-start max-w-full flex items-center gap-1 p-1 rounded-full bg-nav overflow-x-auto"
     >
       {tabs.map((tab, index) => {
         const selected = tab.id === value;
@@ -63,14 +63,14 @@ export default function ViewTabs<T extends string>({ baseId, label, tabs, value,
             className={[
               'shrink-0 flex items-center gap-2 rounded-full px-4 py-1.5 text-sm md:text-base',
               'border-0 [border-image:none] transition-colors duration-150',
-              selected ? 'bg-[#FDF7F1] text-[#2b2b2b]' : 'bg-transparent text-[#FDF7F1] hover:bg-[#FDF7F1]/15',
+              selected ? 'bg-paper text-ink-strong' : 'bg-transparent text-nav-ink hover:bg-nav-ink/15',
             ].join(' ')}
           >
             {tab.label}
             {!!tab.count && (
               <span
                 className={`min-w-5 px-1.5 rounded-full text-xs leading-5 text-center ${
-                  selected ? 'bg-[#6B5E54] text-[#FDF7F1]' : 'bg-[#FDF7F1]/25'
+                  selected ? 'bg-nav text-nav-ink' : 'bg-paper/25'
                 }`}
               >
                 {tab.count}

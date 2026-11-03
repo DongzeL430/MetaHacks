@@ -344,8 +344,8 @@ function WindowInfo({ children, windowTitle }: { children: ReactNode; windowTitl
         aria-label={`About this window: ${typeof windowTitle === 'string' ? windowTitle : 'info'}`}
         aria-expanded={open}
         aria-describedby={open ? popoverId : undefined}
-        className={`w-6 h-6 p-0 flex items-center justify-center rounded-full border-2 border-[#3c3c3c]/70 [border-image:none] transition-colors ${
-          pinned ? 'bg-[#3c3c3c] text-[#FDF7F1]' : 'bg-transparent hover:bg-[#FDF7F1]/70'
+        className={`w-6 h-6 p-0 flex items-center justify-center rounded-full border-2 border-ink/70 [border-image:none] transition-colors ${
+          pinned ? 'bg-ink text-paper' : 'bg-transparent hover:bg-paper/70'
         }`}
       >
         <svg viewBox="0 0 20 20" className="w-3.5 h-3.5" aria-hidden="true">
@@ -359,7 +359,7 @@ function WindowInfo({ children, windowTitle }: { children: ReactNode; windowTitl
         <span
           id={popoverId}
           role="tooltip"
-          className="absolute left-0 top-full mt-2 z-40 w-64 max-w-[70vw] p-3 rounded-md border-2 border-[#3c3c3c] bg-[#FFFDFA] text-sm font-normal leading-snug whitespace-normal shadow-[3px_4px_0_rgba(60,60,60,0.25)] motion-safe:transition motion-safe:duration-150 starting:opacity-0 starting:-translate-y-1"
+          className="absolute left-0 top-full mt-2 z-40 w-64 max-w-[70vw] p-3 rounded-md border-2 border-ink bg-surface text-sm font-normal leading-snug whitespace-normal shadow-[3px_4px_0_rgba(60,60,60,0.25)] motion-safe:transition motion-safe:duration-150 starting:opacity-0 starting:-translate-y-1"
         >
           {children}
         </span>
@@ -373,21 +373,21 @@ function WindowInfo({ children, windowTitle }: { children: ReactNode; windowTitl
             <span
               aria-hidden="true"
               onPointerDown={close}
-              className="fixed inset-0 z-[79] bg-[#3c3c3c]/25 motion-safe:transition-opacity motion-safe:duration-150 starting:opacity-0"
+              className="fixed inset-0 z-[79] bg-ink/25 motion-safe:transition-opacity motion-safe:duration-150 starting:opacity-0"
             />
             <span
               ref={popoverRef}
               id={popoverId}
               // A small dialog here, since it has its own close button
               role="dialog"
-              className="fixed left-1/2 top-1/2 z-[80] -translate-x-1/2 -translate-y-1/2 w-[min(20rem,calc(100vw-2rem))] flex flex-col gap-3 p-4 rounded-md border-2 border-[#3c3c3c] bg-[#FFFDFA] font-sans text-base text-[#3c3c3c] leading-snug shadow-[4px_6px_0_rgba(60,60,60,0.3)] motion-safe:transition motion-safe:duration-150 starting:opacity-0 starting:scale-95"
+              className="fixed left-1/2 top-1/2 z-[80] -translate-x-1/2 -translate-y-1/2 w-[min(20rem,calc(100vw-2rem))] flex flex-col gap-3 p-4 rounded-md border-2 border-ink bg-surface font-sans text-base text-ink leading-snug shadow-[4px_6px_0_rgba(60,60,60,0.3)] motion-safe:transition motion-safe:duration-150 starting:opacity-0 starting:scale-95"
             >
               <span className="font-bold">{windowTitle}</span>
               <span>{children}</span>
               <button
                 type="button"
                 onClick={close}
-                className="self-end px-3 py-1 text-sm rounded-md border-2 border-[#3c3c3c] [border-image:none] bg-[#FDF7F1] font-sans"
+                className="self-end px-3 py-1 text-sm rounded-md border-2 border-ink [border-image:none] bg-paper font-sans"
               >
                 Got it
               </button>
@@ -404,13 +404,13 @@ function WindowInfo({ children, windowTitle }: { children: ReactNode; windowTitl
  * Pass one as `accent`. Soft enough that the dark title text and buttons stay readable.
  */
 export const WINDOW_ACCENTS = {
-  sand: '#EADBC8', // default (main windows)
-  sky: '#BFD8EE',
-  mint: '#C6E5C9',
-  peach: '#F6CFA8',
-  lilac: '#D9CBEE',
-  butter: '#F2E2A6',
-  rose: '#F2C9C4',
+  sand: 'var(--color-sand)', // default (main windows)
+  sky: 'var(--color-title-sky)',
+  mint: 'var(--color-title-mint)',
+  peach: 'var(--color-title-peach)',
+  lilac: 'var(--color-title-lilac)',
+  butter: 'var(--color-title-butter)',
+  rose: 'var(--color-title-rose)',
 } as const;
 
 /** A fixed size in px, or a function that works it out from the desk area's size when the window opens */
@@ -471,7 +471,7 @@ interface AppWindowProps {
 const KEYBOARD_STEP = 16;
 
 /** Body fill. A shade lighter than the page (#FDF7F1) so the window reads as a solid sheet, not a hole. */
-const BODY_BG = 'bg-[#FFFDFA]';
+const BODY_BG = 'bg-surface';
 
 /**
  * Space between the window's box and its visible edge. Leaves room for the resize handles
@@ -485,7 +485,7 @@ const SURFACE_INSET = 4;
  * inset could line a fill up with it everywhere.) Uneven corner radii keep the hand-drawn feel.
  * Change the radii to make it more or less wobbly.
  */
-const FRAME = 'border-[2.5px] border-[#3c3c3c] rounded-[14px_7px_16px_8px/8px_16px_7px_14px]';
+const FRAME = 'border-[2.5px] border-ink rounded-[14px_7px_16px_8px/8px_16px_7px_14px]';
 
 /** While dragging, keep at least this much of the window on screen so it can always be grabbed again */
 const DRAG_KEEP_VISIBLE = 80;
@@ -1016,10 +1016,10 @@ export default function AppWindow({
   // Paper chips that sit on top of the title bar. Hover lifts and tilts them, press pushes them in.
   const titleButton = [
     'shrink-0 w-8 h-8 p-0 flex items-center justify-center rounded-md',
-    'border-2 border-[#3c3c3c] [border-image:none]',
+    'border-2 border-ink [border-image:none]',
     'shadow-[2px_2px_0_rgba(60,60,60,0.35)] transition duration-150 ease-out',
     'disabled:opacity-45 disabled:cursor-not-allowed disabled:shadow-none',
-    'enabled:hover:shadow-[3px_4px_0_#3c3c3c] enabled:active:shadow-[1px_1px_0_#3c3c3c]',
+    'enabled:hover:shadow-[3px_4px_0_var(--color-ink)] enabled:active:shadow-[1px_1px_0_var(--color-ink)]',
     'motion-safe:enabled:hover:-translate-y-0.5 motion-safe:enabled:hover:-rotate-6',
     'motion-safe:enabled:active:translate-y-0 motion-safe:enabled:active:rotate-0',
   ].join(' ');
@@ -1032,7 +1032,7 @@ export default function AppWindow({
         createPortal(
           <div
             aria-hidden="true"
-            className="pointer-events-none fixed z-[25] rounded-md border-2 border-dashed border-[#3c3c3c] bg-[#F2A65A]/20 motion-safe:transition-opacity motion-safe:duration-150 starting:opacity-0"
+            className="pointer-events-none fixed z-[25] rounded-md border-2 border-dashed border-ink bg-accent/20 motion-safe:transition-opacity motion-safe:duration-150 starting:opacity-0"
             style={{
               left: dropPreview.left + TILE_GAP / 2,
               top: dropPreview.top + TILE_GAP / 2,
@@ -1054,7 +1054,7 @@ export default function AppWindow({
           Full screen: square, edge to edge, no frame or shadow. */}
       <div
         style={{ inset: isFullscreen ? 0 : SURFACE_INSET }}
-        className={`absolute flex flex-col overflow-hidden bg-[#FDF7F1] ${
+        className={`absolute flex flex-col overflow-hidden bg-paper ${
           isFullscreen ? '' : `${FRAME} ${isDragging ? SHADOW_LIFTED : SHADOW_RESTING}`
         }`}
       >
@@ -1076,7 +1076,7 @@ export default function AppWindow({
             {pinState !== 'hidden' && (
               <button
                 type="button"
-                className={`${titleButton} ${pinned ? 'bg-[#F2A65A]' : 'bg-[#FDF7F1] enabled:hover:bg-[#EADBC8]'}`}
+                className={`${titleButton} ${pinned ? 'bg-accent' : 'bg-paper enabled:hover:bg-sand'}`}
                 onClick={togglePin}
                 disabled={pinState === 'disabled' || isFullscreen}
                 aria-pressed={pinned}
@@ -1099,7 +1099,7 @@ export default function AppWindow({
             {fullscreenState !== 'hidden' && (
               <button
                 type="button"
-                className={`${titleButton} bg-[#FDF7F1] enabled:hover:bg-[#BFE3C4]`}
+                className={`${titleButton} bg-paper enabled:hover:bg-title-mint`}
                 onClick={toggleFullscreen}
                 disabled={!canFullscreen}
                 aria-label={isFullscreen ? 'Exit full screen' : 'Full screen'}
@@ -1125,7 +1125,7 @@ export default function AppWindow({
             {closeState !== 'hidden' && (
               <button
                 type="button"
-                className={`${titleButton} bg-[#FDF7F1] enabled:hover:bg-[#F2A99E]`}
+                className={`${titleButton} bg-paper enabled:hover:bg-busy`}
                 onClick={handleClose}
                 disabled={closeState === 'disabled'}
                 aria-label="Close"
@@ -1154,7 +1154,7 @@ export default function AppWindow({
         {footer && (
           <>
             <hr className="m-0 shrink-0" />
-            <div className={`shrink-0 bg-[#F6EDE2] ${footerClassName}`}>{footer}</div>
+            <div className={`shrink-0 bg-sand-soft ${footerClassName}`}>{footer}</div>
           </>
         )}
       </div>

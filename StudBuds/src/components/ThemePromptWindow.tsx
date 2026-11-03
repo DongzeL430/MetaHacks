@@ -12,7 +12,7 @@ const EXAMPLES = [
   'Cozy autumn colors with warm oranges and browns',
   'Calm ocean blues, clean and minimal',
   'Soft pastel spring with light greens and pinks',
-  'Dark mode with high contrast and neon accents',
+  'Moody night sky with deep blues and glowing gold accents',
 ];
 
 interface ThemePromptWindowProps {

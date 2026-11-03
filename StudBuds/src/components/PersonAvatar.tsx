@@ -1,5 +1,5 @@
 /** Background colors for initials avatars, picked from the person's id so each person keeps theirs */
-const PALETTE = ['#F2A65A', '#9FD6A6', '#F2A99E', '#A9C7E8', '#E8D27A', '#C9B3E6'];
+const PALETTE = ['var(--color-accent)', 'var(--color-free)', 'var(--color-busy)', 'var(--color-info)', '#E8D27A', '#C9B3E6'];
 
 const colorFor = (id: string) => {
   let hash = 0;
@@ -28,7 +28,7 @@ export default function PersonAvatar({
   person: { id: string; name: string; avatar?: string };
   className?: string;
 }) {
-  const shared = `${className} shrink-0 rounded-full border-2 border-[#3c3c3c]`;
+  const shared = `${className} shrink-0 rounded-full border-2 border-ink`;
 
   // A Muse avatar is its own square tile, so it shows as is: no circle, and none of doodle.css's image frame
   if (person.avatar) {

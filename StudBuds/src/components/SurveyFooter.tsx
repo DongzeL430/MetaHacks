@@ -25,13 +25,13 @@ export function StepDots({ total, step, completed, onSelect, disabled = false }:
         const dot = (
           <span
             aria-hidden="true"
-            className={`block rounded-full border-2 border-[#3c3c3c] transition-all duration-150 ${
+            className={`block rounded-full border-2 border-ink transition-all duration-150 ${
               isCurrent
-                ? 'w-3.5 h-3.5 bg-[#F2A65A]'
+                ? 'w-3.5 h-3.5 bg-accent'
                 : isDone
-                  ? 'w-2.5 h-2.5 bg-[#3c3c3c]'
+                  ? 'w-2.5 h-2.5 bg-ink'
                   : 'w-2.5 h-2.5 bg-transparent'
-            } ${canJump ? 'group-hover:scale-125 group-hover:bg-[#F2A65A]/60' : ''}`}
+            } ${canJump ? 'group-hover:scale-125 group-hover:bg-accent/60' : ''}`}
           />
         );
 
@@ -91,7 +91,7 @@ export default function SurveyFooter({
   return (
     <div className="flex flex-col gap-1">
       {error && (
-        <p role="alert" className="m-0 text-sm text-[#B23A2E]">
+        <p role="alert" className="m-0 text-sm text-danger">
           {error}
         </p>
       )}

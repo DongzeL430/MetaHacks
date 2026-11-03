@@ -99,7 +99,7 @@ export default function BrowserWindow({
       <div
         role="tablist"
         aria-label="Open tabs"
-        className="shrink-0 flex items-end gap-1 px-2 pt-2 bg-[#F6EDE2] border-b-2 border-[#3c3c3c]/40 overflow-x-auto"
+        className="shrink-0 flex items-end gap-1 px-2 pt-2 bg-sand-soft border-b-2 border-ink/40 overflow-x-auto"
       >
         {tabs.map((tab, index) => {
           const selected = tab.id === active?.id;
@@ -110,8 +110,8 @@ export default function BrowserWindow({
                 'relative shrink-0 flex items-center max-w-[12rem] rounded-t-md border-2 border-b-0',
                 // The active tab overlaps the strip's bottom line so it joins the page below, like a browser
                 selected
-                  ? 'bg-[#FFFDFA] border-[#3c3c3c]/50 -mb-[2px] pb-[2px] z-10'
-                  : 'bg-[#EADBC8]/70 border-[#3c3c3c]/20 hover:bg-[#EADBC8]',
+                  ? 'bg-surface border-ink/50 -mb-[2px] pb-[2px] z-10'
+                  : 'bg-sand/70 border-ink/20 hover:bg-sand',
                 // New tabs slide up into place
                 'motion-safe:transition motion-safe:duration-200 starting:opacity-0 starting:translate-y-2',
               ].join(' ')}
@@ -143,7 +143,7 @@ export default function BrowserWindow({
                 aria-label={`Close ${tab.label}`}
                 title="Close tab"
                 tabIndex={-1}
-                className="shrink-0 w-6 h-6 mr-1 p-0 flex items-center justify-center rounded border-0 [border-image:none] bg-transparent transition-colors hover:bg-[#F2A99E]"
+                className="shrink-0 w-6 h-6 mr-1 p-0 flex items-center justify-center rounded border-0 [border-image:none] bg-transparent transition-colors hover:bg-busy"
               >
                 <svg viewBox="0 0 20 20" className="w-3 h-3" aria-hidden="true">
                   <path d="M5 5l10 10M15 5L5 15" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" />
@@ -158,8 +158,8 @@ export default function BrowserWindow({
         <>
           {address && (
             // Address bar: just for the browser feel
-            <div aria-hidden="true" className="shrink-0 px-3 py-1.5 border-b border-[#3c3c3c]/15">
-              <span className="block truncate rounded-full border-2 border-[#3c3c3c]/25 px-3 py-0.5 text-xs opacity-75">
+            <div aria-hidden="true" className="shrink-0 px-3 py-1.5 border-b border-ink/15">
+              <span className="block truncate rounded-full border-2 border-ink/25 px-3 py-0.5 text-xs opacity-75">
                 {address}
               </span>
             </div>

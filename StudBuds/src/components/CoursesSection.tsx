@@ -238,11 +238,11 @@ function shortUrl(url: string): string {
 }
 
 export const CHIP = [
-  'inline-flex items-center justify-center px-3 py-1 rounded-md border-2 border-[#3c3c3c]/45',
-  'cursor-pointer select-none text-sm transition-colors hover:bg-[#EADBC8]/60',
-  'has-checked:border-[#3c3c3c] has-focus-visible:outline-2 has-focus-visible:outline-dashed has-focus-visible:outline-offset-2',
+  'inline-flex items-center justify-center px-3 py-1 rounded-md border-2 border-ink/45',
+  'cursor-pointer select-none text-sm transition-colors hover:bg-sand/60',
+  'has-checked:border-ink has-focus-visible:outline-2 has-focus-visible:outline-dashed has-focus-visible:outline-offset-2',
 ].join(' ');
-export const ERROR_TEXT = 'text-sm text-[#B23A2E]';
+export const ERROR_TEXT = 'text-sm text-danger';
 export const FIELD_LABEL = 'text-sm';
 
 /** Enter in a text box would submit the whole page */
@@ -359,8 +359,8 @@ export default function CoursesSection({ value, onChange, missing, onOpenAutofil
             return (
               <div
                 key={course.id}
-                className={`flex flex-col gap-3 p-3 rounded-md border-2 bg-[#FDF7F1] ${
-                  nameMissing || confidenceMissing ? 'border-[#B23A2E]/70' : 'border-[#3c3c3c]/25'
+                className={`flex flex-col gap-3 p-3 rounded-md border-2 bg-paper ${
+                  nameMissing || confidenceMissing ? 'border-danger/70' : 'border-ink/25'
                 }`}
               >
                 {/* Name + remove */}
@@ -369,7 +369,7 @@ export default function CoursesSection({ value, onChange, missing, onOpenAutofil
                     <span className={`${FIELD_LABEL} flex items-center gap-2`}>
                       Course
                       {course.suggested && (
-                        <span className="px-1.5 rounded bg-[#F2A65A]/40 text-xs">Suggested</span>
+                        <span className="px-1.5 rounded bg-accent/40 text-xs">Suggested</span>
                       )}
                     </span>
                     <input
@@ -397,7 +397,7 @@ export default function CoursesSection({ value, onChange, missing, onOpenAutofil
                     onClick={() => removeCourse(course.id)}
                     aria-label={`Remove ${label}`}
                     title="Remove course"
-                    className="mt-6 shrink-0 w-8 h-8 p-0 flex items-center justify-center rounded-md border-2 border-[#3c3c3c]/60 [border-image:none] bg-transparent transition-colors hover:bg-[#F2A99E]"
+                    className="mt-6 shrink-0 w-8 h-8 p-0 flex items-center justify-center rounded-md border-2 border-ink/60 [border-image:none] bg-transparent transition-colors hover:bg-busy"
                   >
                     <svg viewBox="0 0 20 20" className="w-3.5 h-3.5" aria-hidden="true">
                       <path
@@ -419,7 +419,7 @@ export default function CoursesSection({ value, onChange, missing, onOpenAutofil
                     </p>
                     <div role="radiogroup" aria-label={`${label}: status`} className="flex flex-wrap gap-2">
                       {STATUS_OPTIONS.map((option) => (
-                        <label key={option.value} className={`${CHIP} has-checked:bg-[#EADBC8]`}>
+                        <label key={option.value} className={`${CHIP} has-checked:bg-sand`}>
                           <input
                             type="radio"
                             name={`status-${course.id}`}
@@ -448,7 +448,7 @@ export default function CoursesSection({ value, onChange, missing, onOpenAutofil
                         <label
                           key={level.value}
                           title={level.label}
-                          className={`${CHIP} w-9 px-0 has-checked:bg-[#F2A65A]`}
+                          className={`${CHIP} w-9 px-0 has-checked:bg-accent`}
                         >
                           <input
                             type="radio"

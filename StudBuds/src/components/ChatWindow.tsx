@@ -75,7 +75,7 @@ export default function ChatWindow({ id, lobby, people, onClose }: ChatWindowPro
       footer={
         <div className="flex flex-col gap-1">
           {chat.sendError && (
-            <p role="alert" className="m-0 text-sm text-[#A8402C]">
+            <p role="alert" className="m-0 text-sm text-danger">
               {chat.sendError}
             </p>
           )}
@@ -107,7 +107,7 @@ export default function ChatWindow({ id, lobby, people, onClose }: ChatWindowPro
       }
     >
       {statusLine && (
-        <p role="status" className={`m-0 text-sm ${chat.status === 'error' ? 'text-[#A8402C]' : 'opacity-70'}`}>
+        <p role="status" className={`m-0 text-sm ${chat.status === 'error' ? 'text-danger' : 'opacity-70'}`}>
           {statusLine}
         </p>
       )}
@@ -138,8 +138,8 @@ export default function ChatWindow({ id, lobby, people, onClose }: ChatWindowPro
                     </span>
                   )}
                   <p
-                    className={`m-0 px-3 py-1.5 rounded-xl border-2 border-[#3c3c3c]/25 text-sm whitespace-pre-wrap break-words ${
-                      mine ? 'bg-[#F2A65A]/35 rounded-br-sm' : 'bg-[#FDF7F1] rounded-bl-sm'
+                    className={`m-0 px-3 py-1.5 rounded-xl border-2 border-ink/25 text-sm whitespace-pre-wrap break-words ${
+                      mine ? 'bg-accent/35 rounded-br-sm' : 'bg-paper rounded-bl-sm'
                     } ${m.pending ? 'opacity-60' : ''}`}
                   >
                     {m.body}
