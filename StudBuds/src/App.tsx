@@ -96,46 +96,57 @@ function Home() {
     );
   }
   return (
-    <HomePage
-      userName={me.nickname}
-      avatar={
-        me.avatarUrl ? (
-          // doodle.css frames every image; the utilities turn that off for the avatar tile
-          <img src={me.avatarUrl} alt="" className="w-full h-full object-cover rounded-none border-0 [border-image:none]" />
-        ) : undefined
-      }
-      avatarUrl={me.avatarUrl}
-      taskbarRight={
-        error ? (
-          <p role="alert" className="m-0 max-w-[16rem] text-sm leading-tight">
-            {error}
-          </p>
-        ) : undefined
-      }
-      people={study.people}
-      locationSuggestions={studySpots}
-      myAvailability={me.availability}
-      mySubjects={[...new Set([...me.seekingHelpWith, ...me.coursesTaken])]}
-      initialStudyState={study.state}
-      studyState={study.state}
-      onRefreshStudy={study.refresh}
-      openLobbiesAtStart={fromSurvey}
-      welcomeTour={tour.status === 'open' ? { onDone: tour.close } : undefined}
-      onStudyAction={(action) => void study.act(action)}
-      initialProfile={{
-        availability: me.availability,
-        contact: me.contact,
-        coursesTaken: me.coursesTaken,
-        seekingHelpWith: me.seekingHelpWith,
-        courses: me.courses,
-        answers: me.answers,
-      }}
-      onSaveProfile={me.save}
-      onRedrawAvatar={me.redrawAvatar}
-      identityChangesLeft={me.changesLeft}
-      onLogOut={() => void supabase.auth.signOut()}
-      onDeleteAccount={deleteMyAccount}
-    />
+    <>
+      <HomePage
+        userName={me.nickname}
+        avatar={
+          me.avatarUrl ? (
+            // doodle.css frames every image; the utilities turn that off for the avatar tile
+            <img src={me.avatarUrl} alt="" className="w-full h-full object-cover rounded-none border-0 [border-image:none]" />
+          ) : undefined
+        }
+        avatarUrl={me.avatarUrl}
+        taskbarRight={
+          error ? (
+            <p role="alert" className="m-0 max-w-[16rem] text-sm leading-tight">
+              {error}
+            </p>
+          ) : undefined
+        }
+        people={study.people}
+        locationSuggestions={studySpots}
+        myAvailability={me.availability}
+        mySubjects={[...new Set([...me.seekingHelpWith, ...me.coursesTaken])]}
+        initialStudyState={study.state}
+        studyState={study.state}
+        onRefreshStudy={study.refresh}
+        openLobbiesAtStart={fromSurvey}
+        welcomeTour={tour.status === 'open' ? { onDone: tour.close } : undefined}
+        onStudyAction={(action) => void study.act(action)}
+        initialProfile={{
+          availability: me.availability,
+          contact: me.contact,
+          coursesTaken: me.coursesTaken,
+          seekingHelpWith: me.seekingHelpWith,
+          courses: me.courses,
+          answers: me.answers,
+        }}
+        onSaveProfile={me.save}
+        onRedrawAvatar={me.redrawAvatar}
+        identityChangesLeft={me.changesLeft}
+        onLogOut={() => void supabase.auth.signOut()}
+        onDeleteAccount={deleteMyAccount}
+      />
+      {error && (
+        // On phones the nav bar has no room for it, so the same message shows as a note over the page
+        <p
+          role="alert"
+          className="sm:hidden fixed inset-x-4 bottom-20 z-[80] m-0 px-3 py-2 rounded-md border-2 border-danger bg-paper text-sm shadow-md motion-safe:transition-opacity motion-safe:duration-200 starting:opacity-0"
+        >
+          {error}
+        </p>
+      )}
+    </>
   );
 }
 
