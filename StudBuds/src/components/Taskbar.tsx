@@ -40,7 +40,7 @@ export interface TaskbarApp {
 interface TaskbarProps {
   /** The user's name, shown next to the avatar */
   userName?: string;
-  /** Replaces the default drawing in the round badge. Size it with w-full h-full. */
+  /** Replaces the default drawing. A picture shows on its own, without the round badge. Size it with w-full h-full. */
   avatar?: ReactNode;
   /** App links, in the order they appear */
   apps?: TaskbarApp[];
@@ -256,7 +256,10 @@ export default function Taskbar({
           ].join(' ');
           const contents = (
             <>
-              <span className="shrink-0 w-9 h-9 md:w-10 md:h-10 p-1 rounded-full bg-sand overflow-hidden flex">
+              {/* The default drawing sits in a round badge; a picture (a Muse avatar tile) shows on its own */}
+              <span
+                className={`shrink-0 w-9 h-9 md:w-10 md:h-10 flex ${avatar ? '' : 'p-1 rounded-full bg-sand overflow-hidden'}`}
+              >
                 {avatar ?? <DefaultAvatar label={`${userName}'s avatar`} />}
               </span>
               <span className="min-w-0 truncate text-base md:text-lg">{userName}</span>

@@ -47,7 +47,12 @@ function Home() {
   return (
     <HomePage
       userName={me.nickname}
-      avatar={me.avatarUrl ? <img src={me.avatarUrl} alt="" className="w-full h-full object-cover" /> : undefined}
+      avatar={
+        me.avatarUrl ? (
+          // doodle.css frames every image; the utilities turn that off for the avatar tile
+          <img src={me.avatarUrl} alt="" className="w-full h-full object-contain rounded-none border-0 [border-image:none]" />
+        ) : undefined
+      }
       avatarUrl={me.avatarUrl}
       taskbarRight={
         error ? (
