@@ -1,7 +1,8 @@
 -- Tests for migrations/*_croft_community.sql.
 -- Everything runs in one transaction that is rolled back, so no test data is left behind.
 -- A and B play (Vanderbilt); D is at Vanderbilt but never opened the game; N is at a school that
--- isn't linked.
+-- isn't linked. The live database may hold real crofts too, so checks look only at these students,
+-- and the valley's counts are compared with where they started.
 
 begin;
 create extension if not exists pgtap with schema extensions;
@@ -19,6 +20,10 @@ where id in ('a1000000-0000-4000-8000-00000000000a', 'b1000000-0000-4000-8000-00
 
 set local role authenticated;
 set local request.jwt.claims to '{"sub": "a1000000-0000-4000-8000-00000000000a", "role": "authenticated"}';
+select set_config('test.valley', public.croft_valley()::text, true);
+set local request.jwt.claims to '{"sub": "c1000000-0000-4000-8000-00000000000c", "role": "authenticated"}';
+select set_config('test.valley_n', public.croft_valley()::text, true);
+set local request.jwt.claims to '{"sub": "a1000000-0000-4000-8000-00000000000a", "role": "authenticated"}';
 select public.croft_act('sow', 0, 'kale');
 select public.croft_act('sow', 1, 'oats');
 select public.croft_act('water', 1);
@@ -30,12 +35,13 @@ select public.croft_view();
 -- The village --------------------------------------------------------------------------------------
 
 select is(
-  (select array_agg(owner_id) from public.croft_village()),
+  (select array_agg(owner_id order by owner_id) from public.croft_village()
+   where owner_id in ('a1000000-0000-4000-8000-00000000000a', 'd1000000-0000-4000-8000-00000000000d')),
   array['a1000000-0000-4000-8000-00000000000a']::uuid[],
   'B''s village lists A, who plays, and not D, who never opened the game'
 );
 select is(
-  (select jsonb_build_array(dry_seeds, growing, ready, helped_today) from public.croft_village()),
+  (select jsonb_build_array(dry_seeds, growing, ready, helped_today) from public.croft_village() where owner_id = 'a1000000-0000-4000-8000-00000000000a'),
   '[1, 1, 0, false]'::jsonb,
   'With what''s happening there: a seed waiting for water, a crop growing'
 );
@@ -113,18 +119,27 @@ set local request.jwt.claims to '{"sub": "a1000000-0000-4000-8000-00000000000a",
 select public.croft_act('harvest', 1);
 
 select is(
-  public.croft_valley(),
-  '{"harvests": 1, "helps": 1, "crofts": 2}'::jsonb,
-  'The valley counts this week''s harvests and help, and the crofts in it'
+  (select jsonb_build_array(
+     (v ->> 'harvests')::integer - (b ->> 'harvests')::integer,
+     (v ->> 'helps')::integer - (b ->> 'helps')::integer,
+     (v ->> 'crofts')::integer - (b ->> 'crofts')::integer)
+   from public.croft_valley() v, (select current_setting('test.valley')::jsonb) x(b)),
+  '[1, 1, 2]'::jsonb,
+  'The valley counts this week''s harvest and help, and the two new crofts in it'
 );
 
 set local request.jwt.claims to '{"sub": "c1000000-0000-4000-8000-00000000000c", "role": "authenticated"}';
 select is(
   public.croft_valley(),
-  '{"harvests": 0, "helps": 0, "crofts": 0}'::jsonb,
-  'A school that isn''t linked has its own valley'
+  current_setting('test.valley_n')::jsonb,
+  'A school that isn''t linked has its own valley: nothing here changed it'
 );
-select is((select count(*)::integer from public.croft_village()), 0, 'And its own village');
+select is(
+  (select count(*)::integer from public.croft_village()
+   where owner_id in ('a1000000-0000-4000-8000-00000000000a', 'b1000000-0000-4000-8000-00000000000b')),
+  0,
+  'And its own village'
+);
 
 
 -- "Visiting now" ----------------------------------------------------------------------------------
