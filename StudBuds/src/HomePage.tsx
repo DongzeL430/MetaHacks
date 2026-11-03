@@ -46,12 +46,11 @@ const LinkIcon = () => (
   </svg>
 );
 
-/** A sprout in a furrow, for My Croft */
-const CroftIcon = () => (
+/** An hourglass, for features on the way */
+const UpcomingIcon = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M12 20v-8" />
-    <path d="M12 13c0-3.5-2.5-5.5-6-5.5 0 3.5 2.5 5.5 6 5.5zM12 11c0-3 2-5 5.5-5 0 3-2 5-5.5 5z" />
-    <path d="M3 20h18" />
+    <path d="M6 3h12M6 21h12" />
+    <path d="M7 3c0 5 10 5 10 9s-10 4-10 9M17 3c0 5-10 5-10 9s10 4 10 9" />
   </svg>
 );
 
@@ -200,12 +199,20 @@ export default function HomePage({
       onClick: () => setConnectionsOpen((o) => !o),
     },
     {
-      id: 'croft',
-      name: 'Croft',
-      label: croftOpen ? 'Close your croft' : 'Open your croft',
-      icon: <CroftIcon />,
-      open: croftOpen,
-      onClick: () => setCroftOpen((o) => !o),
+      // Features on the way, in a drop-down; My Croft is the first
+      id: 'upcoming',
+      name: 'Upcoming',
+      label: 'Upcoming features',
+      icon: <UpcomingIcon />,
+      menu: [
+        {
+          id: 'croft',
+          name: 'Croft',
+          label: croftOpen ? 'Close your croft' : 'Open your croft',
+          open: croftOpen,
+          onClick: () => setCroftOpen((o) => !o),
+        },
+      ],
     },
   ];
 

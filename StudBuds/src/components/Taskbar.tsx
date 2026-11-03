@@ -1,5 +1,6 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 
 /*
  * A floating, pill-shaped nav bar: a light pill with the avatar and the user's name on the left,
@@ -35,6 +36,23 @@ export interface TaskbarApp {
   disabled?: boolean;
   /** Hide this one link */
   hidden?: boolean;
+  /**
+   * Makes the link a drop-down instead (like "Upcoming"): clicking it lists these, and each one
+   * usually toggles a window. The link is highlighted while any of their windows is open.
+   */
+  menu?: TaskbarMenuItem[];
+}
+
+/** One entry in a nav bar link's drop-down */
+export interface TaskbarMenuItem {
+  id: string;
+  /** Text shown in the drop-down, e.g. "Croft" */
+  name: string;
+  /** Tooltip and screen reader name, e.g. "Open your croft" */
+  label: string;
+  /** Its window is open: the entry is highlighted */
+  open?: boolean;
+  onClick: () => void;
 }
 
 interface TaskbarProps {
@@ -301,8 +319,124 @@ function DefaultAvatar({ label }: { label: string }) {
   );
 }
 
+const LINK_CLASSES = (active: boolean) =>
+  [
+    'shrink-0 flex items-center gap-2 rounded-full px-3 sm:px-4 py-2 text-base md:text-lg',
+    'border-0 [border-image:none] text-nav-ink transition-colors duration-150',
+    'disabled:opacity-45 disabled:cursor-not-allowed',
+    active ? 'bg-paper/25' : 'bg-transparent enabled:hover:bg-paper/15',
+  ].join(' ');
+
+function LinkIcon({ icon }: { icon?: ReactNode }) {
+  return icon ? (
+    <span aria-hidden="true" className="flex sm:hidden w-5 h-5 [&>svg]:w-full [&>svg]:h-full">
+      {icon}
+    </span>
+  ) : null;
+}
+
+/**
+ * A nav bar link with a drop-down (TaskbarApp.menu). The list is drawn on top of the page, under
+ * the link, because the row of links scrolls sideways on narrow screens and would cut it off.
+ * Closes on a click elsewhere, Escape, or a resize.
+ */
+function TaskbarMenuLink({ app, menu }: { app: TaskbarApp; menu: TaskbarMenuItem[] }) {
+  const menuId = useId();
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const listRef = useRef<HTMLDivElement>(null);
+  const [at, setAt] = useState<{ left: number; top: number } | null>(null);
+  const name = app.name ?? app.label;
+  const anyOpen = menu.some((item) => item.open);
+
+  const close = () => setAt(null);
+  const toggle = () => {
+    if (at) return close();
+    const r = buttonRef.current?.getBoundingClientRect();
+    if (r) setAt({ left: r.left + r.width / 2, top: r.bottom + 12 });
+  };
+
+  useEffect(() => {
+    if (!at) return;
+    const onPointer = (e: PointerEvent) => {
+      const target = e.target as Node;
+      if (!buttonRef.current?.contains(target) && !listRef.current?.contains(target)) close();
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        close();
+        buttonRef.current?.focus();
+      }
+    };
+    document.addEventListener('pointerdown', onPointer);
+    document.addEventListener('keydown', onKey);
+    window.addEventListener('resize', close);
+    return () => {
+      document.removeEventListener('pointerdown', onPointer);
+      document.removeEventListener('keydown', onKey);
+      window.removeEventListener('resize', close);
+    };
+  }, [at]);
+
+  return (
+    <>
+      <button
+        ref={buttonRef}
+        type="button"
+        onClick={toggle}
+        disabled={app.disabled}
+        aria-expanded={!!at}
+        aria-controls={menuId}
+        aria-label={app.label}
+        title={app.label}
+        className={LINK_CLASSES(!!at || anyOpen)}
+      >
+        <LinkIcon icon={app.icon} />
+        <span className={app.icon ? 'hidden sm:inline' : ''}>{name}</span>
+        <svg viewBox="0 0 12 12" className="hidden sm:block w-3 h-3" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <path d="M2.5 4.5 6 8l3.5-3.5" />
+        </svg>
+      </button>
+      {at &&
+        createPortal(
+          <div
+            ref={listRef}
+            id={menuId}
+            role="group"
+            aria-label={app.label}
+            style={{ left: at.left, top: at.top }}
+            // The same capsule as the theme menu, centered under the link
+            className="doodle fixed z-30 -translate-x-1/2 flex flex-col items-stretch gap-1 p-1.5 rounded-3xl bg-nav text-nav-ink shadow-[0_10px_24px_-10px_rgba(40,30,20,0.6)] motion-safe:transition motion-safe:duration-150 starting:opacity-0 starting:-translate-y-1"
+          >
+            {menu.map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => {
+                  item.onClick();
+                  close();
+                }}
+                aria-pressed={item.open ?? false}
+                aria-label={item.label}
+                title={item.label}
+                className={[
+                  'px-4 py-1.5 rounded-full text-base text-left whitespace-nowrap',
+                  'border-0 [border-image:none] text-nav-ink transition-colors duration-150',
+                  item.open ? 'bg-paper/25' : 'bg-transparent hover:bg-paper/15',
+                ].join(' ')}
+              >
+                {item.name}
+              </button>
+            ))}
+          </div>,
+          document.body,
+        )}
+    </>
+  );
+}
+
 /** Text link on the dark bar. Open apps get a soft highlight; on narrow screens only the icon shows. */
 function TaskbarAppLink({ app }: { app: TaskbarApp }) {
+  if (app.menu) return <TaskbarMenuLink app={app} menu={app.menu} />;
   const name = app.name ?? app.label;
   return (
     <button
@@ -312,18 +446,9 @@ function TaskbarAppLink({ app }: { app: TaskbarApp }) {
       aria-pressed={app.open ?? false}
       aria-label={app.label}
       title={app.label}
-      className={[
-        'shrink-0 flex items-center gap-2 rounded-full px-3 sm:px-4 py-2 text-base md:text-lg',
-        'border-0 [border-image:none] text-nav-ink transition-colors duration-150',
-        'disabled:opacity-45 disabled:cursor-not-allowed',
-        app.open ? 'bg-paper/25' : 'bg-transparent enabled:hover:bg-paper/15',
-      ].join(' ')}
+      className={LINK_CLASSES(app.open ?? false)}
     >
-      {app.icon && (
-        <span aria-hidden="true" className="flex sm:hidden w-5 h-5 [&>svg]:w-full [&>svg]:h-full">
-          {app.icon}
-        </span>
-      )}
+      <LinkIcon icon={app.icon} />
       <span className={app.icon ? 'hidden sm:inline' : ''}>{name}</span>
     </button>
   );
