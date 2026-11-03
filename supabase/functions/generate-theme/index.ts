@@ -276,22 +276,41 @@ function readablePalette(colors: Record<string, string>): Record<string, string>
   return Object.fromEntries(PALETTE_KEYS.filter((k) => !dropped.has(k)).map((k) => [k, all[k]]));
 }
 
+interface ImageCheck {
+  /** Nothing unsafe or off-limits in it */
+  safe: boolean;
+  /** No footer strip across the bottom and no frame around it */
+  fills_frame: boolean;
+  /** What's wrong, for the logs; "" when it passes */
+  problem: string;
+}
+
 /** Checks a generated picture before it can become anyone's background */
-async function checkImage(image: Uint8Array): Promise<boolean> {
+async function checkImage(image: Uint8Array): Promise<ImageCheck> {
   let binary = '';
   for (let i = 0; i < image.length; i += 0x8000) binary += String.fromCharCode(...image.subarray(i, i + 0x8000));
-  const { ok } = await askSpark<{ ok: boolean }>(
-    `You check a background picture for a college study app before it's used.
-ok is true only if it's scenery, a landscape or an abstract pattern; the scene fills the picture to every edge, with no plain band, strip, footer, border or frame along the bottom or any other edge; it has no people or faces; no text, letters, numbers, logos or signs; nothing violent, sexual, scary or hateful; and no flashing-looking, high-contrast stripes.`,
+  const check = await askSpark<ImageCheck>(
+    `You check a generated background picture for a college study app before it's used.
+safe: true unless it shows people or faces; text, letters, numbers, logos or signs; anything violent, sexual, scary or hateful; or flashing-looking, high-contrast stripes. Animals, plants, buildings and objects that are part of a scene are fine.
+fills_frame: true unless a flat, empty strip or band (like a footer) runs across the bottom edge, or a border or frame is drawn around the picture. Open sky or a calm, plain area at the top is fine; what matters is that the scenery runs all the way to the bottom edge.
+problem: a few words on what's wrong, or "" if both are true.`,
     [
       { type: 'text', text: 'Check this background.' },
       { type: 'image_url', image_url: { url: `data:image/webp;base64,${btoa(binary)}` } },
     ],
-    { type: 'object', additionalProperties: false, required: ['ok'], properties: { ok: { type: 'boolean' } } },
+    {
+      type: 'object',
+      additionalProperties: false,
+      required: ['safe', 'fills_frame', 'problem'],
+      properties: { safe: { type: 'boolean' }, fills_frame: { type: 'boolean' }, problem: { type: 'string' } },
+    },
     'background_check',
   );
-  return ok;
+  console.log('generate-theme background check', JSON.stringify(check).slice(0, 300));
+  return check;
 }
+
+const usable = (check: ImageCheck) => check.safe && check.fills_frame;
 
 /* ------------------------------------------------------------------ *
  * Music: Muse Spark composes a short music box piece for the theme.
@@ -462,8 +481,8 @@ function backgroundPrompt(idea: string): string {
     'No text, letters, numbers, logos, signs, user interface elements or QR codes.',
     'No people, faces or real, identifiable persons. No copyrighted characters.',
     'No flashing, strobing or high-contrast stripe patterns. Nothing violent, sexual or disturbing.',
-    'The scene fills the whole picture to every edge: the ground or foreground keeps going, with the same scenery, all the way to the very bottom.',
-    'No plain band, strip, footer, border, frame or empty area along the bottom or any other edge.',
+    'The scene fills the whole picture: the ground or foreground keeps going, with the same scenery, all the way to the very bottom edge.',
+    'No plain band, strip or footer across the bottom, and no border or frame around the picture.',
     'Keep the whole picture calm and low in detail, so the app stays readable on top of it.',
   ].join(' ');
 }
@@ -540,10 +559,14 @@ Deno.serve(async (req) => {
   if (IMAGES_ENABLED) {
     try {
       let raw = await metaMuse.generate(backgroundPrompt(prompt), user.id);
-      // One more try if the check turns it down (a plain strip along an edge, say); the claim's
-      // cost guess allows for the extra picture
-      if (!(await checkImage(raw))) raw = await metaMuse.generate(backgroundPrompt(prompt), user.id);
-      if (await checkImage(raw)) {
+      // One more try if the check turns it down (a footer strip along the bottom, say); the
+      // claim's cost guess allows for the extra picture
+      let check = await checkImage(raw);
+      if (!usable(check)) {
+        raw = await metaMuse.generate(backgroundPrompt(prompt), user.id);
+        check = await checkImage(raw);
+      }
+      if (usable(check)) {
         const clean = cleanImage(raw);
         const path = `${user.id}/${crypto.randomUUID()}.webp`;
         const { error } = await admin.storage
