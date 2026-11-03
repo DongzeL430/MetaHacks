@@ -5,7 +5,7 @@
 begin;
 create extension if not exists pgtap with schema extensions;
 
-select plan(16);
+select plan(19);
 
 insert into auth.users (id, email, raw_user_meta_data) values
   ('a1000000-0000-4000-8000-00000000000a', 'a@vanderbilt.edu', '{"adult_confirmed": true}'),
@@ -87,6 +87,19 @@ select throws_ok(
   '42501', null,
   'Blocks only go through block_student'
 );
+select is(
+  (select array_agg(id) from public.my_blocks()),
+  array['a1000000-0000-4000-8000-00000000000a']::uuid[],
+  'B''s blocked list shows A'
+);
+
+set local request.jwt.claims to '{"sub": "a1000000-0000-4000-8000-00000000000a", "role": "authenticated"}';
+select is((select count(*)::integer from public.my_blocks()), 0, 'A never learns they were blocked');
+
+set local request.jwt.claims to '{"sub": "b1000000-0000-4000-8000-00000000000b", "role": "authenticated"}';
+select public.unblock_student('a1000000-0000-4000-8000-00000000000a');
+select is((select count(*)::integer from public.my_blocks()), 0, 'Unblocking takes A off the list');
+select public.block_student('a1000000-0000-4000-8000-00000000000a');
 
 reset role;
 select is(

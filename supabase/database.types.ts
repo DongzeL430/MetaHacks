@@ -220,6 +220,39 @@ export type Database = {
           },
         ]
       }
+      contact_grants: {
+        Row: {
+          created_at: string
+          owner_id: string
+          viewer_id: string
+        }
+        Insert: {
+          created_at?: string
+          owner_id: string
+          viewer_id: string
+        }
+        Update: {
+          created_at?: string
+          owner_id?: string
+          viewer_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "contact_grants_owner_id_fkey"
+            columns: ["owner_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contact_grants_viewer_id_fkey"
+            columns: ["viewer_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       contact_shares: {
         Row: {
           decided_at: string
@@ -1413,6 +1446,7 @@ export type Database = {
         Args: { accept: boolean; lobby_id: string; student: string }
         Returns: undefined
       }
+      block_student: { Args: { person: string }; Returns: undefined }
       cancel_connection_request: {
         Args: { person: string }
         Returns: undefined
@@ -1421,6 +1455,7 @@ export type Database = {
       claim_muse_use: { Args: { student: string; what: string }; Returns: Json }
       close_lobby: { Args: { lobby_id: string }; Returns: undefined }
       connect_with: { Args: { person: string }; Returns: undefined }
+      contact_sharing: { Args: never; Returns: Json }
       croft_act: {
         Args: { action: string; item?: string; tile: number }
         Returns: Json
@@ -1505,19 +1540,40 @@ export type Database = {
         }[]
       }
       muse_uses_left: { Args: { what: string }; Returns: number }
+      my_blocks: {
+        Args: never
+        Returns: {
+          avatar_path: string
+          id: string
+          nickname: string
+        }[]
+      }
       my_community: { Args: never; Returns: string[] }
       pair_on_cooldown: {
         Args: { student_a: string; student_b: string }
         Returns: boolean
       }
       remove_connection: { Args: { person: string }; Returns: undefined }
+      report_student: {
+        Args: {
+          details?: string
+          person: string
+          reason: Database["public"]["Enums"]["report_reason"]
+        }
+        Returns: undefined
+      }
       request_join: { Args: { lobby_id: string }; Returns: undefined }
       save_my_answers: { Args: { answers: Json }; Returns: undefined }
       save_my_courses: { Args: { courses: Json }; Returns: undefined }
+      set_contact_shared: {
+        Args: { person: string; share: boolean }
+        Returns: undefined
+      }
       set_lobby_locked: {
         Args: { lobby_id: string; locked: boolean }
         Returns: undefined
       }
+      unblock_student: { Args: { person: string }; Returns: undefined }
     }
     Enums: {
       accessory_slot: "head" | "face" | "neck" | "held"
