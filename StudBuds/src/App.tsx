@@ -6,6 +6,7 @@ import RequireAuth from './RequireAuth.tsx';
 import { supabase } from './lib/supabase.ts';
 import { finishOnboarding, saveAnswers, saveAvailability } from './lib/onboarding.ts';
 import { findCourses, matchCourses, saveAcademics } from './lib/courses.ts';
+import { deleteMyAccount, useMyProfile } from './lib/profile.ts';
 import { SURVEY_SECTIONS } from './dataFiles/SurveySections.ts';
 
 /** The pre-survey, saving each page as the student goes */
@@ -26,15 +27,23 @@ function SurveyPage() {
   );
 }
 
-/** Home, with a way to log out (logging out sends the student back to /login) */
+/** Home, filled with the student's own profile. Logging out or deleting sends them to /login. */
 function Home() {
+  const me = useMyProfile();
+  // The profile window and nav bar start from the loaded profile, so wait for it
+  if (!me.ready) return null;
   return (
     <HomePage
-      taskbarRight={
-        <button type="button" onClick={() => void supabase.auth.signOut()} className="px-3 py-0.5 text-sm">
-          Log out
-        </button>
-      }
+      userName={me.nickname}
+      avatar={me.avatarUrl ? <img src={me.avatarUrl} alt="" className="w-full h-full object-cover" /> : undefined}
+      avatarUrl={me.avatarUrl}
+      myAvailability={me.availability}
+      initialProfile={{ availability: me.availability, contact: me.contact }}
+      onSaveProfile={me.save}
+      onRedrawAvatar={me.redrawAvatar}
+      identityChangesLeft={me.changesLeft}
+      onLogOut={() => void supabase.auth.signOut()}
+      onDeleteAccount={deleteMyAccount}
     />
   );
 }

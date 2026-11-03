@@ -67,6 +67,13 @@ interface HomePageProps {
   initialProfile?: Partial<MyProfile>;
   /** Saves the edited profile, e.g. to your backend. Throw to show an error in the window. */
   onSaveProfile?: (profile: MyProfile) => void | Promise<void>;
+  /** Muse draws a new avatar from the nickname (the profile window's "Draw a new avatar") */
+  onRedrawAvatar?: () => Promise<void>;
+  /** Nickname and avatar changes left today, shown in the profile window */
+  identityChangesLeft?: number | null;
+  /** The profile window's Account section */
+  onLogOut?: () => void;
+  onDeleteAccount?: () => Promise<void>;
 }
 
 export default function HomePage({
@@ -82,6 +89,10 @@ export default function HomePage({
   onStudyAction,
   initialProfile,
   onSaveProfile,
+  onRedrawAvatar,
+  identityChangesLeft,
+  onLogOut,
+  onDeleteAccount,
 }: HomePageProps) {
   const [lobbiesOpen, setLobbiesOpen] = useState(false);
   const [connectionsOpen, setConnectionsOpen] = useState(false);
@@ -200,6 +211,11 @@ export default function HomePage({
                 onClose={() => setProfileOpen(false)}
                 profile={profile}
                 onSave={saveProfile}
+                avatarUrl={avatarUrl}
+                changesLeft={identityChangesLeft}
+                onRedrawAvatar={onRedrawAvatar}
+                onLogOut={onLogOut}
+                onDeleteAccount={onDeleteAccount}
               />
             </WindowLayer>
           </WindowManagerProvider>
