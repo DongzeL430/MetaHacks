@@ -30,7 +30,7 @@ export default function MultipleChoiceSection({
             <legend className="px-2 text-lg">{q.prompt}</legend>
 
             {isMissing && (
-              <p id={errorId} className="m-0 mb-2 text-sm text-[#B23A2E]">
+              <p id={errorId} className="m-0 mb-2 text-sm text-danger">
                 Pick one to continue.
               </p>
             )}
@@ -39,7 +39,7 @@ export default function MultipleChoiceSection({
               {q.options.map((option) => (
                 <label
                   key={option}
-                  className="flex items-center gap-3 px-3 py-2 rounded-md cursor-pointer transition-colors hover:bg-[#EADBC8]/60 has-checked:bg-[#EADBC8]"
+                  className="flex items-center gap-3 px-3 py-2 rounded-md cursor-pointer transition-colors hover:bg-sand/60 has-checked:bg-sand"
                 >
                   <input
                     type="radio"

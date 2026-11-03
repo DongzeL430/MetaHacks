@@ -73,7 +73,7 @@ export default function ConnectionsWindow({ id, open, onClose, people, connectio
             {list.map((p) => (
               <li
                 key={p.id}
-                className="list-none flex items-center gap-3 p-3 rounded-md border-2 border-[#3c3c3c]/25 bg-[#FDF7F1]"
+                className="list-none flex items-center gap-3 p-3 rounded-md border-2 border-ink/25 bg-paper"
               >
                 <PersonAvatar person={p} className="w-10 h-10" />
                 <span className="flex-1 min-w-0 truncate text-lg">{p.name}</span>

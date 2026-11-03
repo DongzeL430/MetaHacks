@@ -1,5 +1,7 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import AppWindow, { WINDOW_ACCENTS } from './AppWindow';
+import { DEFAULT_COLORS } from '../utils/Theme';
+import type { ThemeLibraryItem } from '../utils/UserTheme';
 
 /** Longest theme description allowed */
 export const MAX_THEME_PROMPT = 300;
@@ -10,7 +12,7 @@ const EXAMPLES = [
   'Cozy autumn colors with warm oranges and browns',
   'Calm ocean blues, clean and minimal',
   'Soft pastel spring with light greens and pinks',
-  'Dark mode with high contrast and neon accents',
+  'Moody night sky with deep blues and glowing gold accents',
 ];
 
 interface ThemePromptWindowProps {
@@ -21,10 +23,14 @@ interface ThemePromptWindowProps {
    * Leave out until generation is connected: the window explains it isn't available yet.
    */
   onGenerate?: (prompt: string) => void | Promise<void>;
-  /** Name of the user's saved custom theme, when it isn't in use right now */
-  savedThemeName?: string;
-  /** Switches back to the saved custom theme */
-  onUseSaved?: () => void;
+  /** Every theme the user has made, newest first */
+  themes?: ThemeLibraryItem[];
+  /** The library theme in use right now, or null on the default look */
+  activeThemeId?: string | null;
+  /** Switches to a theme from the library */
+  onUseTheme?: (id: string) => void;
+  /** Deletes a theme from the library. Throw to show an error. */
+  onDeleteTheme?: (id: string) => Promise<void>;
   /** Themes the user can still make this week (3 a week), or null if unknown */
   themesLeft?: number | null;
 }
@@ -39,8 +45,10 @@ export default function ThemePromptWindow({
   open,
   onClose,
   onGenerate,
-  savedThemeName,
-  onUseSaved,
+  themes = [],
+  activeThemeId = null,
+  onUseTheme,
+  onDeleteTheme,
   themesLeft = null,
 }: ThemePromptWindowProps) {
   const titleId = useId();
@@ -49,6 +57,8 @@ export default function ThemePromptWindow({
   const [prompt, setPrompt] = useState('');
   const [working, setWorking] = useState(false);
   const [error, setError] = useState('');
+  // Library theme waiting for a second click to delete
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
   // Fresh, focused box each time it opens
   useEffect(() => {
@@ -56,6 +66,7 @@ export default function ThemePromptWindow({
     setPrompt('');
     setError('');
     setWorking(false);
+    setConfirmDeleteId(null);
     requestAnimationFrame(() => boxRef.current?.focus());
   }, [open]);
 
@@ -154,14 +165,79 @@ export default function ThemePromptWindow({
             </p>
           </div>
 
-          {savedThemeName && onUseSaved && (
-            <div className="flex flex-wrap items-center gap-3 p-3 rounded-md border-2 border-ink/25 bg-paper">
-              <span className="flex-1 min-w-[10rem] text-sm">
-                Your saved theme: <strong>{savedThemeName}</strong>
-              </span>
-              <button type="button" onClick={onUseSaved} className="px-3 py-0.5 text-sm">
-                Use it again
-              </button>
+          {themes.length > 0 && (
+            <div className="flex flex-col gap-2">
+              <p className="m-0 text-sm">Your themes</p>
+              <ul className="m-0 p-0 list-none flex flex-col gap-2">
+                {themes.map((item) => {
+                  const inUse = item.id === activeThemeId;
+                  const colors = { ...DEFAULT_COLORS, ...item.theme.colors };
+                  const confirming = confirmDeleteId === item.id;
+                  return (
+                    <li
+                      key={item.id}
+                      className="list-none flex flex-wrap items-center gap-3 p-2 rounded-md border-2 border-ink/25 bg-paper"
+                    >
+                      {/* Preview: its background picture, on its paper color */}
+                      <span
+                        aria-hidden="true"
+                        className="w-16 h-10 shrink-0 rounded border-2 border-ink/25 overflow-hidden"
+                        style={{ backgroundColor: colors.paper }}
+                      >
+                        {item.previewUrl && (
+                          <img
+                            src={item.previewUrl}
+                            alt=""
+                            className="w-full h-full object-cover rounded-none border-0 [border-image:none]"
+                          />
+                        )}
+                      </span>
+                      <span className="flex-1 min-w-[7rem] flex flex-col gap-1">
+                        <span className="text-sm truncate">{item.theme.name}</span>
+                        <span aria-hidden="true" className="flex gap-1">
+                          {(['paper', 'sand', 'nav', 'accent'] as const).map((key) => (
+                            <span
+                              key={key}
+                              className="w-3.5 h-3.5 rounded-full border border-ink/30"
+                              style={{ backgroundColor: colors[key] }}
+                            />
+                          ))}
+                        </span>
+                      </span>
+                      {inUse ? (
+                        <span className="px-2 py-0.5 rounded bg-sand text-xs">In use</span>
+                      ) : (
+                        onUseTheme && (
+                          <button type="button" onClick={() => onUseTheme(item.id)} className="px-3 py-0.5 text-sm">
+                            Use
+                          </button>
+                        )
+                      )}
+                      {onDeleteTheme && (
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            if (!confirming) {
+                              setConfirmDeleteId(item.id);
+                              return;
+                            }
+                            setConfirmDeleteId(null);
+                            try {
+                              await onDeleteTheme(item.id);
+                            } catch (err) {
+                              setError(err instanceof Error ? err.message : 'That theme wasn’t deleted.');
+                            }
+                          }}
+                          aria-label={confirming ? `Confirm deleting ${item.theme.name}` : `Delete ${item.theme.name}`}
+                          className="px-3 py-0.5 text-sm"
+                        >
+                          {confirming ? 'Delete it' : 'Delete'}
+                        </button>
+                      )}
+                    </li>
+                  );
+                })}
+              </ul>
             </div>
           )}
 

@@ -7,6 +7,18 @@ import type { UserTheme } from './Theme';
 /** How long a signed link to a generated background lasts. It's renewed whenever the theme loads. */
 const SIGNED_URL_SECONDS = 60 * 60;
 
+/** A theme in the student's library, for the theme window */
+export interface ThemeLibraryItem {
+  id: string;
+  theme: UserTheme;
+  /** A short-lived link to its background picture, for the preview */
+  previewUrl?: string;
+}
+
+/** The theme's own generated picture in the user-backgrounds bucket, if it has one */
+const generatedPath = (theme: UserTheme | null | undefined) =>
+  theme?.background?.image.kind === 'generated' ? theme.background.image.path : null;
+
 /**
  * The signed-in user's theme.
  *  - Loads their saved theme from the user_themes table and applies it (colors + background).
@@ -22,37 +34,64 @@ export function useUserTheme() {
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   // Themes left this week (3 a week, counted on the server)
   const [themesLeft, setThemesLeft] = useState<number | null>(null);
+  // Every theme the student has made, newest first, and which one is the current theme
+  const [library, setLibrary] = useState<ThemeLibraryItem[]>([]);
+  const [savedId, setSavedId] = useState<string | null>(null);
 
-  // Load the saved theme for whoever is signed in
+  const loadLibrary = useCallback(async (id: string) => {
+    const { data } = await supabase.from('saved_themes').select('id, theme').order('created_at', { ascending: false });
+    const items = (data ?? []).flatMap((row): ThemeLibraryItem[] => {
+      const checked = sanitizeTheme(row.theme, id);
+      return checked ? [{ id: row.id, theme: checked.theme }] : [];
+    });
+    const paths = [...new Set(items.map((i) => generatedPath(i.theme)).filter((p): p is string => !!p))];
+    const { data: links } = paths.length
+      ? await supabase.storage.from('user-backgrounds').createSignedUrls(paths, SIGNED_URL_SECONDS)
+      : { data: [] };
+    const byPath = new Map((links ?? []).map((l) => [l.path, l.signedUrl]));
+    setLibrary(items.map((i) => ({ ...i, previewUrl: byPath.get(generatedPath(i.theme) ?? '') ?? undefined })));
+  }, []);
+
+  // Load the saved theme for whoever is signed in. Only when the student changes (not on token
+  // refreshes), so a theme picked or made in this session isn't replaced by an older copy.
   useEffect(() => {
     let cancelled = false;
+    let loadedFor: string | null | undefined;
     const load = async (id: string | null) => {
+      if (id === loadedFor) return;
+      loadedFor = id;
       setUserId(id);
       if (!id) {
         setSaved(null);
         setUseCustom(false);
+        setLibrary([]);
+        setSavedId(null);
         return;
       }
       void supabase.rpc('muse_uses_left', { what: 'theme' }).then(({ data }) => {
         if (!cancelled && typeof data === 'number') setThemesLeft(data);
       });
+      void loadLibrary(id);
       const { data, error } = await supabase
         .from('user_themes')
-        .select('theme, use_custom')
+        .select('theme, use_custom, saved_theme_id')
         .eq('user_id', id)
         .maybeSingle();
       if (cancelled || error || !data) return;
       const checked = sanitizeTheme(data.theme, id);
       setSaved(checked?.theme ?? null);
       setUseCustom(!!checked && data.use_custom);
+      setSavedId(data.saved_theme_id);
     };
-    supabase.auth.getUser().then(({ data }) => load(data.user?.id ?? null));
-    const { data } = supabase.auth.onAuthStateChange((_event, session) => load(session?.user.id ?? null));
+    // Supabase calls inside the auth callback can deadlock, so loading starts just after it
+    const { data } = supabase.auth.onAuthStateChange((_event, session) => {
+      setTimeout(() => void load(session?.user.id ?? null), 0);
+    });
     return () => {
       cancelled = true;
       data.subscription.unsubscribe();
     };
-  }, []);
+  }, [loadLibrary]);
 
   const active = useCustom && saved ? saved : null;
 
@@ -87,12 +126,52 @@ export function useUserTheme() {
   }, [active]);
 
   const persist = useCallback(
-    async (theme: UserTheme, custom: boolean) => {
+    async (theme: UserTheme, custom: boolean, libraryId?: string | null) => {
       if (!userId) return;
       // A theme is plain data (sanitizeTheme checked it), so it fits the jsonb column as is
-      await supabase.from('user_themes').upsert({ user_id: userId, theme: theme as unknown as Json, use_custom: custom });
+      await supabase.from('user_themes').upsert({
+        user_id: userId,
+        theme: theme as unknown as Json,
+        use_custom: custom,
+        // Left out unless given, so switching on and off keeps the link to the library theme
+        ...(libraryId !== undefined ? { saved_theme_id: libraryId } : {}),
+      });
     },
     [userId],
+  );
+
+  /** Switches to a theme from the library */
+  const switchToLibraryTheme = useCallback(
+    (id: string) => {
+      const item = library.find((i) => i.id === id);
+      if (!item) return;
+      setSaved(item.theme);
+      setSavedId(id);
+      setUseCustom(true);
+      void persist(item.theme, true, id);
+    },
+    [library, persist],
+  );
+
+  /** Deletes a theme from the library, and its picture. The theme in use goes back to the default look. */
+  const deleteLibraryTheme = useCallback(
+    async (id: string) => {
+      const item = library.find((i) => i.id === id);
+      if (!item) return;
+      const { error } = await supabase.from('saved_themes').delete().eq('id', id);
+      if (error) throw new Error('That theme wasn’t deleted. Try again in a moment.');
+      if (id === savedId) {
+        setUseCustom(false);
+        setSavedId(null);
+        if (saved) void persist(saved, false);
+      }
+      const path = generatedPath(item.theme);
+      if (path && !library.some((i) => i.id !== id && generatedPath(i.theme) === path)) {
+        await supabase.storage.from('user-backgrounds').remove([path]);
+      }
+      setLibrary((items) => items.filter((i) => i.id !== id));
+    },
+    [library, savedId, saved, persist],
   );
 
   /** The sun: back to the default look. The custom theme stays saved for later. */
@@ -126,12 +205,14 @@ export function useUserTheme() {
       if (typeof data?.themesLeft === 'number') setThemesLeft(data.themesLeft);
       const checked = sanitizeTheme(data?.theme, userId ?? undefined);
       if (!checked) throw new Error('That theme didn’t come out right. Try describing it a little differently.');
+      // The theme function already saved it to the library and switched it on
       setSaved(checked.theme);
       setUseCustom(true);
-      await persist(checked.theme, true);
+      setSavedId(typeof data?.savedThemeId === 'string' ? data.savedThemeId : null);
+      if (userId) void loadLibrary(userId);
       return { note: typeof data?.note === 'string' ? data.note : undefined };
     },
-    [userId, persist],
+    [userId, loadLibrary],
   );
 
   return {
@@ -141,6 +222,12 @@ export function useUserTheme() {
     savedTheme: saved,
     /** Themes left this week, or null until known */
     themesLeft,
+    /** Every theme the student has made, newest first */
+    library,
+    /** The library theme in use right now, or null on the default look */
+    activeThemeId: active ? savedId : null,
+    switchToLibraryTheme,
+    deleteLibraryTheme,
     switchToDefault,
     switchToSaved,
     generate,

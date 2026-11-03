@@ -326,7 +326,7 @@ export default function AuthPage() {
           {/* PAPER: the fill, scrolls if the form is taller than the screen */}
           <div
             className={[
-              'flex-1 min-h-0 overflow-y-auto bg-[#FDF7F1] p-6 flex flex-col gap-6',
+              'flex-1 min-h-0 overflow-y-auto bg-paper p-6 flex flex-col gap-6',
               'shadow-[6px_10px_0_rgba(60,60,60,0.25),0_18px_40px_-10px_rgba(60,60,60,0.45)]',
               'md:p-8 md:border-l-2 md:border-black md:shadow-[-10px_0_30px_rgba(60,60,60,0.22)]',
             ].join(' ')}

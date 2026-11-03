@@ -104,7 +104,7 @@ export default function AboutYouWindow({
       <div
         aria-hidden="true"
         onPointerDown={onClose}
-        className={`fixed inset-0 bg-[#3c3c3c]/25 ${coverScreen ? 'z-[65]' : 'z-[45]'} motion-safe:transition-opacity motion-safe:duration-200 starting:opacity-0`}
+        className={`fixed inset-0 bg-ink/25 ${coverScreen ? 'z-[65]' : 'z-[45]'} motion-safe:transition-opacity motion-safe:duration-200 starting:opacity-0`}
       />
 
       <div
@@ -255,7 +255,7 @@ export default function AboutYouWindow({
             </p>
             <div role="radiogroup" aria-labelledby={`${titleId}-year`} className="flex flex-wrap gap-2">
               {YEAR_OPTIONS.map((year) => (
-                <label key={year} className={`${CHIP} has-checked:bg-[#EADBC8]`}>
+                <label key={year} className={`${CHIP} has-checked:bg-sand`}>
                   <input
                     type="radio"
                     name="year"

@@ -16,17 +16,17 @@ const DAYS: { key: DayKey; short: string; long: string }[] = [
 ];
 
 /** Every slot starts unavailable (red). Dragging marks it available (green). */
-const SLOT_UNAVAILABLE = 'bg-[#F2A99E] hover:bg-[#EC978A]';
-const SLOT_AVAILABLE = 'bg-[#9FD6A6] hover:bg-[#8DCB95]';
-const LINE = 'border-[#3c3c3c]/40';
+const SLOT_UNAVAILABLE = 'bg-busy hover:brightness-95';
+const SLOT_AVAILABLE = 'bg-free hover:brightness-95';
+const LINE = 'border-ink/40';
 
 /* Block mode: the user's free/busy time is shown faintly under the picked block.
    Picked time is solid orange, or red stripes where it covers busy time (a warning). */
-const BG_FREE = 'bg-[#9FD6A6]/55 hover:bg-[#9FD6A6]/80';
-const BG_BUSY = 'bg-[#F2A99E]/55 hover:bg-[#F2A99E]/80';
-const BG_UNKNOWN = 'bg-[#EADBC8]/40 hover:bg-[#EADBC8]/70';
-const PICKED = 'bg-[#F2A65A]';
-export const PICKED_BUSY = 'bg-[repeating-linear-gradient(45deg,#E0745F_0_5px,#C4553F_5px_10px)]';
+const BG_FREE = 'bg-free/55 hover:bg-free/80';
+const BG_BUSY = 'bg-busy/55 hover:bg-busy/80';
+const BG_UNKNOWN = 'bg-sand/40 hover:bg-sand/70';
+const PICKED = 'bg-accent';
+export const PICKED_BUSY = 'bg-[repeating-linear-gradient(45deg,var(--color-busy-strong)_0_5px,var(--color-danger-strong)_5px_10px)]';
 
 export type CalendarMode = 'paint' | 'block';
 
@@ -84,7 +84,7 @@ function formatTime(mins: number): string {
 function LegendSwatch({ color, label }: { color: string; label: string }) {
   return (
     <span className="flex items-center gap-2">
-      <span className={`w-4 h-4 rounded-sm border-2 border-[#3c3c3c] ${color}`} aria-hidden="true" />
+      <span className={`w-4 h-4 rounded-sm border-2 border-ink ${color}`} aria-hidden="true" />
       {label}
     </span>
   );
@@ -349,7 +349,7 @@ export default function AvailabilityCalendar({
   const rowBottom = (r: number, mins: number) => {
     if (r === rows.length - 1) return '';
     return (mins + slotMinutes) % 60 === 0
-      ? 'border-b border-b-[#3c3c3c]/60'
+      ? 'border-b border-b-ink/60'
       : `border-b ${LINE} [border-bottom-style:dashed]`;
   };
 
@@ -363,19 +363,19 @@ export default function AvailabilityCalendar({
           <>
             {freeKnown ? (
               <>
-                <LegendSwatch color="bg-[#9FD6A6]/55" label="Free" />
-                <LegendSwatch color="bg-[#F2A99E]/55" label="Busy" />
+                <LegendSwatch color="bg-free/55" label="Free" />
+                <LegendSwatch color="bg-busy/55" label="Busy" />
               </>
             ) : (
-              <LegendSwatch color="bg-[#EADBC8]/40" label="Schedule not set" />
+              <LegendSwatch color="bg-sand/40" label="Schedule not set" />
             )}
             <LegendSwatch color={PICKED} label="Picked" />
             {freeKnown && <LegendSwatch color={PICKED_BUSY} label="Picked during busy time" />}
           </>
         ) : (
           <>
-            <LegendSwatch color="bg-[#F2A99E]" label="Unavailable" />
-            <LegendSwatch color="bg-[#9FD6A6]" label="Available" />
+            <LegendSwatch color="bg-busy" label="Unavailable" />
+            <LegendSwatch color="bg-free" label="Available" />
           </>
         )}
 
@@ -450,7 +450,7 @@ export default function AvailabilityCalendar({
         <p
           role="status"
           className={`m-0 text-sm flex flex-wrap items-center gap-x-3 ${
-            importStatus.kind === 'error' ? 'text-[#B23A2E]' : ''
+            importStatus.kind === 'error' ? 'text-danger' : ''
           }`}
         >
           {importStatus.text}
@@ -463,7 +463,7 @@ export default function AvailabilityCalendar({
       )}
 
       <div className="overflow-x-auto">
-        <div className="min-w-max w-full rounded-md border-2 border-[#3c3c3c] overflow-hidden">
+        <div className="min-w-max w-full rounded-md border-2 border-ink overflow-hidden">
           <div
             ref={gridRef}
             role="group"
@@ -484,12 +484,12 @@ export default function AvailabilityCalendar({
             onKeyDown={onKeyDown}
           >
             {/* Header row */}
-            <div className={`bg-[#EADBC8] border-r ${LINE} border-b-2 border-b-[#3c3c3c]/70`} />
+            <div className={`bg-sand border-r ${LINE} border-b-2 border-b-ink/70`} />
             {columns.map((d, c) => (
               <div
                 key={d.key}
                 title={d.long}
-                className={`bg-[#EADBC8] py-2 text-center border-b-2 border-b-[#3c3c3c]/70 ${
+                className={`bg-sand py-2 text-center border-b-2 border-b-ink/70 ${
                   c < lastCol ? `border-r ${LINE}` : ''
                 }`}
               >
@@ -501,7 +501,7 @@ export default function AvailabilityCalendar({
             {rows.map((mins, r) => (
               <Fragment key={mins}>
                 <div
-                  className={`h-7 px-2 pt-1 text-xs text-right leading-none bg-[#F6EDE2] border-r ${LINE} ${rowBottom(r, mins)}`}
+                  className={`h-7 px-2 pt-1 text-xs text-right leading-none bg-sand-soft border-r ${LINE} ${rowBottom(r, mins)}`}
                 >
                   {mins % 60 === 0 ? formatTime(mins) : ''}
                 </div>
@@ -535,7 +535,7 @@ export default function AvailabilityCalendar({
                       data-c={c}
                       className={[
                         'h-7 cursor-pointer transition-colors duration-100',
-                        'outline-none focus-visible:outline-2 focus-visible:outline-dashed focus-visible:-outline-offset-4 focus-visible:outline-[#3c3c3c]',
+                        'outline-none focus-visible:outline-2 focus-visible:outline-dashed focus-visible:-outline-offset-4 focus-visible:outline-ink',
                         color,
                         c < lastCol ? `border-r ${LINE}` : '',
                         rowBottom(r, mins),

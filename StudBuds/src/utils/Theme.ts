@@ -45,6 +45,20 @@ const READABLE_PAIRS: [ThemeColor, ThemeColor][] = [
   ['ink-strong', 'paper'],
   ['nav-ink', 'nav'],
   ['danger', 'surface'],
+  // Text also sits on these (chips, badges, calendar slots, window title bars). Same list as the
+  // generate-theme Edge Function, so a theme Muse made always passes here too.
+  ['danger', 'paper'],
+  ['ink', 'accent'],
+  ['ink', 'info'],
+  ['ink', 'free'],
+  ['ink', 'busy'],
+  ['ink', 'danger-soft'],
+  ['ink', 'title-sky'],
+  ['ink', 'title-mint'],
+  ['ink', 'title-peach'],
+  ['ink', 'title-lilac'],
+  ['ink', 'title-butter'],
+  ['ink', 'title-rose'],
 ];
 const MIN_CONTRAST = 4.5;
 
