@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { ChangeEvent, FormEvent } from 'react';
+import { useNavigate } from 'react-router';
 import type { AuthError, Session } from '@supabase/supabase-js';
 import { supabase } from './lib/supabase.ts';
 import Turnstile from './Turnstile.tsx';
@@ -11,6 +12,7 @@ import defaultbg from './assets/defaultbg.png';
 const BG_FOCUS = 'center bottom';
 
 type Mode = 'signup' | 'login';
+type ResetStep = 'none' | 'email' | 'code';
 
 interface FormValues {
   email: string;
@@ -18,9 +20,10 @@ interface FormValues {
   confirm: string;
 }
 
-// The sign-up email holds a code, not a link: school email scanners open links on their own,
-// which confirmed accounts nobody had checked. Matches otp_length in supabase/config.toml.
+// Emails hold a code, not a link: school email scanners open links on their own, which
+// confirmed accounts nobody had checked. Matches otp_length in supabase/config.toml.
 const CODE_LENGTH = 8;
+const CODE_PATTERN = new RegExp(`^\\d{${CODE_LENGTH}}$`);
 
 // Turns Supabase errors into something a student can act on. The sign-up rules (.edu email,
 // 18+) already come back from the server with student-facing messages.
@@ -58,11 +61,17 @@ export default function AuthPage() {
   const [sending, setSending] = useState(false);
   // Set while waiting for the student to type the code emailed to this address.
   const [confirmEmail, setConfirmEmail] = useState('');
+  const [resetStep, setResetStep] = useState<ResetStep>('none');
   const [code, setCode] = useState('');
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [deleteText, setDeleteText] = useState('');
   // undefined until the saved session has been read.
   const [session, setSession] = useState<Session | null | undefined>(undefined);
 
   const signup = mode === 'signup';
+  // "/" sends each student on: new ones to the pre-survey, finished ones to Home
+  const navigate = useNavigate();
+  const goIn = () => navigate('/');
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => setSession(data.session));
@@ -88,7 +97,15 @@ export default function AuthPage() {
 
   const backToLogin = (): void => {
     setConfirmEmail('');
+    setResetStep('none');
     setMode('login');
+    setError('');
+    setNotice('');
+  };
+
+  const openForgotPassword = (): void => {
+    setResetStep('email');
+    setValues((v) => ({ ...v, password: '', confirm: '' }));
     setError('');
     setNotice('');
   };
@@ -142,13 +159,15 @@ export default function AuthPage() {
       setError(describeError(authError));
     } else if (signup) {
       showCodeScreen(email, `We sent a ${CODE_LENGTH}-digit code to ${email}. It can take a minute, and it might land in junk.`);
+    } else {
+      goIn();
     }
   };
 
   const onVerify = async (e: FormEvent<HTMLFormElement>): Promise<void> => {
     e.preventDefault();
     const token = code.replace(/\s/g, '');
-    if (!new RegExp(`^\\d{${CODE_LENGTH}}$`).test(token)) {
+    if (!CODE_PATTERN.test(token)) {
       setError(`Enter the ${CODE_LENGTH}-digit code from the email.`);
       return;
     }
@@ -158,8 +177,12 @@ export default function AuthPage() {
     const { error: authError } = await supabase.auth.verifyOtp({ email: confirmEmail, token, type: 'email' });
     setSending(false);
 
-    if (authError) setError(describeError(authError));
-    else setConfirmEmail('');
+    if (authError) {
+      setError(describeError(authError));
+    } else {
+      setConfirmEmail('');
+      goIn();
+    }
   };
 
   const onResend = async (): Promise<void> => {
@@ -180,6 +203,101 @@ export default function AuthPage() {
 
     if (authError) setError(describeError(authError));
     else setNotice(`We sent a new code to ${confirmEmail}.`);
+  };
+
+  // Used for the first reset code and for "Send a new code". Supabase answers the same way
+  // whether or not the account exists, so the form can't be used to check who has one.
+  const sendResetCode = async (): Promise<void> => {
+    const email = values.email.trim();
+    if (!email) {
+      setError('Enter your school email.');
+      return;
+    }
+    if (!captchaToken) {
+      setError('The bot check is still loading. Try again in a moment.');
+      return;
+    }
+
+    setError('');
+    setSending(true);
+    const { error: authError } = await supabase.auth.resetPasswordForEmail(email, { captchaToken });
+    setSending(false);
+    setCaptchaReset((n) => n + 1);
+
+    if (authError) {
+      setError(describeError(authError));
+    } else {
+      setResetStep('code');
+      setCode('');
+      setNotice(`If an account exists for ${email}, we sent a ${CODE_LENGTH}-digit code. It can take a minute, and it might land in junk.`);
+    }
+  };
+
+  const onResetPassword = async (e: FormEvent<HTMLFormElement>): Promise<void> => {
+    e.preventDefault();
+    const token = code.replace(/\s/g, '');
+    if (!CODE_PATTERN.test(token)) {
+      setError(`Enter the ${CODE_LENGTH}-digit code from the email.`);
+      return;
+    }
+    if (values.password.length < 8) {
+      setError('Use a password with at least 8 characters.');
+      return;
+    }
+    if (values.password !== values.confirm) {
+      setError('Passwords don’t match.');
+      return;
+    }
+
+    setError('');
+    setSending(true);
+    // A correct code signs the student in; the new password is then set on that session.
+    const { error: codeError } = await supabase.auth.verifyOtp({
+      email: values.email.trim(),
+      token,
+      type: 'recovery',
+    });
+    if (codeError) {
+      setSending(false);
+      setError(describeError(codeError));
+      return;
+    }
+
+    const { error: passwordError } = await supabase.auth.updateUser({ password: values.password });
+    setSending(false);
+    setResetStep('none');
+    setNotice(
+      passwordError?.code === 'same_password'
+        ? 'You are signed in, but your password didn’t change because it matches your old one.'
+        : passwordError
+          ? `You are signed in, but your password didn’t change (${describeError(passwordError)}).`
+          : 'Your password has been changed.',
+    );
+  };
+
+  const onLogOut = async (): Promise<void> => {
+    setNotice('');
+    setConfirmingDelete(false);
+    await supabase.auth.signOut();
+  };
+
+  const onDeleteAccount = async (): Promise<void> => {
+    setError('');
+    setSending(true);
+    const { error: deleteError } = await supabase.rpc('delete_my_account');
+    if (deleteError) {
+      setSending(false);
+      setError(`Your account wasn’t deleted (${deleteError.message}). Try again.`);
+      return;
+    }
+
+    // The account is gone on the server, so only the copy of the session in this browser is left.
+    await supabase.auth.signOut({ scope: 'local' });
+    setSending(false);
+    setConfirmingDelete(false);
+    setDeleteText('');
+    setMode('login');
+    setNotice('Your account has been deleted.');
   };
 
   return (
@@ -234,12 +352,61 @@ export default function AuthPage() {
           <div className="flex flex-col w-full max-w-sm mx-auto md:flex-1 md:justify-center motion-safe:transition motion-safe:duration-500 motion-safe:delay-300 starting:opacity-0 starting:translate-y-3">
             <h1 className="text-4xl mb-6">Welcome!</h1>
 
-            {session === undefined ? null : session ? (
+            {session === undefined ? null : session && resetStep === 'none' ? (
               <div className="flex flex-col gap-4">
                 <p>You are signed in as {session.user.email}.</p>
-                <button type="button" onClick={() => supabase.auth.signOut()} className="self-center px-10 py-2">
+                {notice && <p>{notice}</p>}
+                <button type="button" onClick={goIn} className="self-center px-10 py-2">
+                  Continue
+                </button>
+                <button type="button" onClick={onLogOut} className="self-center px-10 py-2">
                   Log out
                 </button>
+
+                {confirmingDelete ? (
+                  <div className="flex flex-col gap-3 mt-4">
+                    <p>This deletes your account and everything tied to you. It can&rsquo;t be undone.</p>
+                    <label className="flex flex-col gap-1">
+                      Type DELETE to confirm:
+                      <input
+                        type="text"
+                        name="delete"
+                        autoComplete="off"
+                        value={deleteText}
+                        onChange={(e) => setDeleteText(e.target.value)}
+                        className="w-full"
+                      />
+                    </label>
+                    <p className="text-red-600 min-h-[1.5rem]" role="alert">
+                      {error}
+                    </p>
+                    <div className="flex justify-center gap-3">
+                      <button
+                        type="button"
+                        onClick={onDeleteAccount}
+                        disabled={deleteText !== 'DELETE' || sending}
+                        className="px-3 py-1"
+                      >
+                        Delete my account
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setConfirmingDelete(false);
+                          setDeleteText('');
+                          setError('');
+                        }}
+                        className="px-3 py-1"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <button type="button" onClick={() => setConfirmingDelete(true)} className="self-center px-3 py-1">
+                    Delete my account
+                  </button>
+                )}
               </div>
             ) : confirmEmail ? (
             <form onSubmit={onVerify} className="flex flex-col gap-4" noValidate>
@@ -279,8 +446,110 @@ export default function AuthPage() {
                 </div>
               </div>
             </form>
+            ) : resetStep === 'email' ? (
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                void sendResetCode();
+              }}
+              className="flex flex-col gap-4"
+              noValidate
+            >
+              <p>Enter your school email and we&rsquo;ll send a code to reset your password.</p>
+
+              <label className="flex flex-col gap-1">
+                Email:
+                <input
+                  type="email"
+                  name="email"
+                  autoComplete="email"
+                  value={values.email}
+                  onChange={onChange}
+                  className="w-full"
+                />
+              </label>
+
+              <Turnstile onToken={setCaptchaToken} resetKey={captchaReset} />
+
+              <p className="text-red-600 min-h-[1.5rem]" role="alert">
+                {error}
+              </p>
+
+              <div className="mt-2 flex flex-col items-center gap-3">
+                <button type="submit" disabled={sending} className="w-full max-w-[14rem] px-10 py-2">
+                  Send code
+                </button>
+                <button type="button" onClick={backToLogin} className="px-3 py-1">
+                  Back to log in
+                </button>
+              </div>
+            </form>
+            ) : resetStep === 'code' ? (
+            <form onSubmit={onResetPassword} className="flex flex-col gap-4" noValidate>
+              <p>{notice}</p>
+
+              <label className="flex flex-col gap-1">
+                Code:
+                <input
+                  type="text"
+                  name="code"
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
+                  maxLength={CODE_LENGTH + 2}
+                  value={code}
+                  onChange={(e) => setCode(e.target.value)}
+                  className="w-full"
+                />
+              </label>
+
+              <label className="flex flex-col gap-1">
+                New password:
+                <input
+                  type="password"
+                  name="password"
+                  autoComplete="new-password"
+                  value={values.password}
+                  onChange={onChange}
+                  className="w-full"
+                />
+              </label>
+
+              <label className="flex flex-col gap-1">
+                Confirm new password:
+                <input
+                  type="password"
+                  name="confirm"
+                  autoComplete="new-password"
+                  value={values.confirm}
+                  onChange={onChange}
+                  className="w-full"
+                />
+              </label>
+
+              <Turnstile onToken={setCaptchaToken} resetKey={captchaReset} />
+
+              <p className="text-red-600 min-h-[1.5rem]" role="alert">
+                {error}
+              </p>
+
+              <div className="mt-2 flex flex-col items-center gap-3">
+                <button type="submit" disabled={sending} className="w-full max-w-[14rem] px-10 py-2">
+                  Change password
+                </button>
+                <div className="flex gap-3">
+                  <button type="button" onClick={sendResetCode} disabled={sending} className="px-3 py-1">
+                    Send a new code
+                  </button>
+                  <button type="button" onClick={backToLogin} className="px-3 py-1">
+                    Back to log in
+                  </button>
+                </div>
+              </div>
+            </form>
             ) : (
             <form onSubmit={onSubmit} className="flex flex-col gap-4" noValidate>
+              {notice && <p>{notice}</p>}
+
               <label className="flex flex-col gap-1">
                 Email:
                 <input
@@ -361,6 +630,12 @@ export default function AuthPage() {
                   ›
                 </button>
               </div>
+
+              {!signup && (
+                <button type="button" onClick={openForgotPassword} className="self-center px-3 py-1">
+                  Forgot password?
+                </button>
+              )}
             </form>
             )}
           </div>

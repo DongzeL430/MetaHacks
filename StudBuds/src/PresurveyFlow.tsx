@@ -56,6 +56,8 @@ interface PreSurveyFlowProps {
   onAcademicsSubmit?: (academics: AcademicProfile) => void | Promise<void>;
   /** Runs when the last page is submitted, with everything collected */
   onFinish?: (result: PreSurveyResult) => void | Promise<void>;
+  /** Shows a "Go to StudBuds" button on the final page */
+  onDone?: () => void;
 }
 
 /** Each page of the flow, in order */
@@ -92,6 +94,7 @@ export default function PreSurveyFlow({
   onAvailabilitySubmit,
   onAcademicsSubmit,
   onFinish,
+  onDone,
 }: PreSurveyFlowProps) {
   const steps = useMemo(() => {
     const list: Step[] = [{ kind: 'calendar' }];
@@ -327,7 +330,16 @@ export default function PreSurveyFlow({
 
   let stepContent: ReactNode;
   if (isDone) {
-    stepContent = <p className="m-auto text-center text-lg">Thanks for filling this out.</p>;
+    stepContent = (
+      <div className="m-auto flex flex-col items-center gap-4 text-center">
+        <p className="m-0 text-lg">Thanks for filling this out.</p>
+        {onDone && (
+          <button type="button" onClick={onDone} className="px-8 py-1.5">
+            Go to StudBuds
+          </button>
+        )}
+      </div>
+    );
   } else if (current.kind === 'calendar') {
     stepContent = (
       <AvailabilityCalendar
