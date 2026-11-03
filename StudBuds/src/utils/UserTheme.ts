@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import type { Json } from '../../../supabase/database.types.ts';
+import { sanitizeMusic } from './Music';
 import { applyThemeColors, backgroundStyle, sanitizeTheme } from './Theme';
 import type { UserTheme } from './Theme';
 
@@ -124,6 +125,26 @@ export function useUserTheme() {
       window.clearInterval(timer);
     };
   }, [active]);
+
+  // Every theme has its own music. One without any yet (made before theme music, or its music
+  // didn't come out right) gets it written by Muse the first time it's in use on this visit.
+  const musicRequested = useRef(new Set<string>());
+  useEffect(() => {
+    if (!active || active.music || !savedId || musicRequested.current.has(savedId)) return;
+    musicRequested.current.add(savedId);
+    const themeId = savedId;
+    void supabase.functions.invoke('generate-theme', { body: { action: 'compose', themeId } }).then(({ data, error }) => {
+      // Until it's written, the stand-in piece plays
+      const music = error ? null : sanitizeMusic(data?.music);
+      if (!music) {
+        console.warn('theme music not written yet', error);
+        return;
+      }
+      // Only swaps it in if that theme is still the one in use
+      setSaved((s) => (s === active ? { ...s, music } : s));
+      setLibrary((items) => items.map((i) => (i.id === themeId ? { ...i, theme: { ...i.theme, music } } : i)));
+    });
+  }, [active, savedId]);
 
   const persist = useCallback(
     async (theme: UserTheme, custom: boolean, libraryId?: string | null) => {

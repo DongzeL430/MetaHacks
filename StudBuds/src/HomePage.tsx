@@ -6,7 +6,7 @@ import type { TaskbarApp } from './components/Taskbar';
 import StudyLayout from './components/StudyLayout';
 import ThemePromptWindow from './components/ThemePromptWindow';
 import { useUserTheme } from './utils/UserTheme';
-import { DEFAULT_MUSIC } from './utils/Music';
+import { DEFAULT_MUSIC, FALLBACK_MUSIC } from './utils/Music';
 import { useThemeMusic } from './utils/MusicPlayer';
 import ProfileEditorWindow from './components/ProfileEditorWindow';
 import type { MyProfile } from './dataFiles/StudyData';
@@ -116,8 +116,11 @@ export default function HomePage({
   // The user's theme: loaded from Supabase, applied to the whole page, saved when it changes
   const theme = useUserTheme();
   const [themePromptOpen, setThemePromptOpen] = useState(false);
-  // The custom theme's own piece, or the default one (also for themes made before music)
-  const music = useThemeMusic((theme.choice === 'custom' ? theme.savedTheme?.music : undefined) ?? DEFAULT_MUSIC);
+  // Every theme has its own piece: the default theme's meadow tune, or the custom theme's. A custom
+  // theme without one yet plays the stand-in while Muse writes it (useUserTheme asks for it).
+  const music = useThemeMusic(
+    theme.choice === 'custom' ? (theme.savedTheme?.music ?? FALLBACK_MUSIC) : DEFAULT_MUSIC,
+  );
 
   // The user's own profile. Saving it updates the nav bar, lobby filters and host form right away.
   const [profile, setProfile] = useState<MyProfile>(() => ({

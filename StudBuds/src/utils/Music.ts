@@ -106,14 +106,49 @@ export function sanitizeMusic(input: unknown): ThemeMusic | null {
   };
 }
 
-// Shorthand for writing the default piece: [step, beats], with null steps as rests
+// Shorthand for writing the built-in pieces: [step, beats], with null steps as rests
 const bar = (chord: number, ...notes: [number | null, number][]): MusicBar => ({
   chord,
   notes: notes.map(([step, beats]) => ({ step, beats })),
 });
 
-/** The default theme's piece, and what any theme without its own music plays. Written by hand. */
+/*
+ * The app's own two pieces, written by hand. Every theme has its own music, so these never repeat
+ * a theme's. The generate-theme Edge Function lists both (BUILT_IN_PIECES) so Muse writes
+ * something different.
+ */
+
+/** The default theme's piece: its grassy meadow under a little mountain. Bright, climbing up the hill and back. */
 export const DEFAULT_MUSIC: ThemeMusic = {
+  title: 'Little Mountain Meadow',
+  mode: 'ionian',
+  tonic: 'G',
+  tempo: 70,
+  beatsPerBar: 4,
+  a: [
+    bar(1, [0, 1], [2, 1], [4, 2]),
+    bar(4, [5, 1.5], [4, 0.5], [3, 1], [5, 1]),
+    bar(1, [4, 2], [2, 1], [1, 1]),
+    bar(5, [1, 3], [null, 1]),
+    bar(1, [0, 1], [2, 1], [4, 1], [7, 1]),
+    bar(6, [8, 1.5], [7, 0.5], [5, 2]),
+    bar(5, [4, 1], [5, 1], [2, 1], [1, 1]),
+    bar(1, [0, 4]),
+  ],
+  b: [
+    bar(6, [7, 1.5], [8, 0.5], [9, 2]),
+    bar(4, [8, 1], [7, 1], [5, 2]),
+    bar(1, [4, 1], [5, 1], [7, 2]),
+    bar(5, [8, 3], [null, 1]),
+    bar(6, [9, 1], [8, 1], [7, 1], [5, 1]),
+    bar(4, [7, 1.5], [5, 0.5], [4, 2]),
+    bar(5, [2, 1], [4, 1], [1, 2]),
+    bar(1, [0, 3], [null, 1]),
+  ],
+};
+
+/** Plays for a custom theme while its own music is being written (or if Muse can't write it) */
+export const FALLBACK_MUSIC: ThemeMusic = {
   title: 'Hearth and Oak',
   mode: 'dorian',
   tonic: 'D',
