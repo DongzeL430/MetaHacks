@@ -117,6 +117,9 @@ function FieldError({ id, children }: { id: string; children: string }) {
  * Closes with its X, Cancel, Escape, or a click on the dimmed area.
  * Render it in the desk area (which needs `relative`), not inside a WindowLayer.
  */
+/** Matches the lobbies table's limit */
+const SUBJECT_MAX = 60;
+
 export default function HostSessionWindow({
   id,
   open,
@@ -172,8 +175,10 @@ export default function HostSessionWindow({
   const busyMinutes = known ? slots.filter((s) => !freeSet.has(s)).length * grid.slotMinutes : 0;
 
   // What still needs filling in
+  // A picked suggestion can be longer than typing allows, so the length is checked here too
+  const subjectTooLong = trimmed.length > SUBJECT_MAX;
   const needs = {
-    subject: trimmed.length < 2,
+    subject: trimmed.length < 2 || subjectTooLong,
     location: place.length < 2,
     time: slots.length === 0,
   };
@@ -281,11 +286,17 @@ export default function HostSessionWindow({
               onChange={setSubject}
               suggestions={subjectSuggestions}
               placeholder="e.g. Linear Algebra"
-              maxLength={60}
+              maxLength={SUBJECT_MAX}
               invalid={warn.subject}
               describedBy={warn.subject ? `${fieldId}-subject-error` : undefined}
             />
-            {warn.subject && <FieldError id={`${fieldId}-subject-error`}>Add what you’ll be studying.</FieldError>}
+            {warn.subject && (
+              <FieldError id={`${fieldId}-subject-error`}>
+                {subjectTooLong
+                  ? `Shorten it to ${SUBJECT_MAX} characters (it’s ${trimmed.length} now).`
+                  : 'Add what you’ll be studying.'}
+              </FieldError>
+            )}
           </div>
 
           {/* LOCATION: suggestions plus anything the user types */}
