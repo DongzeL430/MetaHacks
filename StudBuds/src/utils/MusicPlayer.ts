@@ -1,41 +1,39 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { MODES, TONICS } from './Music';
-import type { AccompanimentVoice, MelodyVoice, MusicBar, ThemeMusic } from './Music';
+import type { MusicBar, ThemeMusic } from './Music';
 
 /*
- * Plays a theme's score (Music.ts) in a loop with the Web Audio API. Every sound is made here:
- *  - lute, harp and dulcimer are plucked strings (Karplus-Strong), rendered once per pitch
- *  - recorder, flute and fiddle are oscillators with a breathy attack and a slow vibrato
- *  - an optional low drone, a soft frame drum, and a small room reverb over everything
+ * Plays a theme's score (Music.ts) in a loop as a simple music box, with the Web Audio API.
+ * Each note is a struck metal tine: a pure tone with a little shimmer and a soft click, fading
+ * slowly, made once per pitch and reused. A small room reverb sits over everything.
  * Notes are scheduled a few seconds ahead of time, so the loop is seamless and keeps going in a
  * background tab. Switching pieces fades one out and the next in.
  */
-
-type Voice = MelodyVoice | AccompanimentVoice;
-type Plucked = 'lute' | 'harp' | 'dulcimer';
 
 interface NoteEvent {
   /** Beats from the start of the loop */
   beat: number;
   midi: number;
-  beats: number;
-  voice: Voice;
   velocity: number;
-  part: 'melody' | 'harmony' | 'accompaniment' | 'drum';
+  part: 'melody' | 'harmony' | 'accompaniment';
 }
 
 /** How far ahead notes are scheduled, and how often the scheduler wakes up */
 const LOOKAHEAD_SECONDS = 3;
 const TICK_MS = 250;
 const FADE_SECONDS = 1.5;
-/** How long each plucked string rings, in seconds (time to fade by 60 dB) */
-const RING: Record<Plucked, number> = { lute: 1.6, harp: 3, dulcimer: 2.2 };
-/** Lute and harp patterns: scale steps above the chord's root, one per eighth note or beat */
-const LUTE_PATTERN = { 3: [0, 4, 7, 9, 7, 4], 4: [0, 4, 7, 9, 7, 4, 7, 4] };
-const HARP_CHORD = [-7, 0, 4, 7, 9];
-const DULCIMER_PATTERN = [0, 4, 7, 4];
+/** The tine's overtones: [frequency ratio, loudness, how fast it fades relative to the tone] */
+const PARTIALS: [number, number, number][] = [
+  [1, 1, 1],
+  [2, 0.18, 0.5],
+  // A cantilevered tine's first overtone sits at about 6.27 times the tone: the metallic shimmer
+  [6.27, 0.07, 0.12],
+];
+/** Broken chords under each bar, as scale steps above the chord's root, one per beat */
+const ACCOMPANIMENT = { 3: [0, 4, 9], 4: [0, 4, 7, 4] };
+/** Notes above this get too shrill for a second line or an octave */
+const HIGHEST = 96;
 
-const isPlucked = (v: Voice): v is Plucked => v === 'lute' || v === 'harp' || v === 'dulcimer';
 const midiToFreq = (midi: number) => 440 * 2 ** ((midi - 69) / 12);
 
 /** The MIDI note for a scale step of the piece, `octaves` up or down from the melody's range */
@@ -47,17 +45,17 @@ function pitchOf(music: ThemeMusic, step: number, octaves = 0): number {
 }
 
 /**
- * The whole loop as a list of notes: A, A again with a second voice a third below (gymel, the
- * medieval way of singing in thirds), B, then A. The accompaniment and drum follow each bar's chord.
+ * The whole loop as a list of notes: A, A again with a second line a third below, B, then A.
+ * Under every bar, a soft broken chord on its chord: a low root, then the chord's upper notes.
  */
 function arrange(music: ThemeMusic): { events: NoteEvent[]; beats: number } {
   const events: NoteEvent[] = [];
   const perBar = music.beatsPerBar;
-  const sections: { bars: MusicBar[]; gymel: boolean }[] = [
-    { bars: music.a, gymel: false },
-    { bars: music.a, gymel: true },
-    { bars: music.b, gymel: false },
-    { bars: music.a, gymel: false },
+  const sections: { bars: MusicBar[]; thirds: boolean }[] = [
+    { bars: music.a, thirds: false },
+    { bars: music.a, thirds: true },
+    { bars: music.b, thirds: false },
+    { bars: music.a, thirds: false },
   ];
 
   let start = 0;
@@ -66,32 +64,17 @@ function arrange(music: ThemeMusic): { events: NoteEvent[]; beats: number } {
       let t = start;
       for (const n of bar.notes) {
         if (n.step !== null) {
-          events.push({ beat: t, midi: pitchOf(music, n.step), beats: n.beats, voice: music.melody, velocity: 0.5, part: 'melody' });
-          if (section.gymel) {
-            events.push({ beat: t, midi: pitchOf(music, n.step - 2), beats: n.beats, voice: music.melody, velocity: 0.26, part: 'harmony' });
-          }
+          events.push({ beat: t, midi: pitchOf(music, n.step), velocity: 0.6, part: 'melody' });
+          if (section.thirds) events.push({ beat: t, midi: pitchOf(music, n.step - 2), velocity: 0.3, part: 'harmony' });
         }
         t += n.beats;
       }
-
       // Chord roots on the 5th, 6th or 7th degree sit below the tonic, so the bass stays close
       const root = bar.chord - 1 >= 4 ? bar.chord - 8 : bar.chord - 1;
-      const accompany = (beat: number, step: number, beats: number, velocity: number) =>
-        events.push({ beat, midi: pitchOf(music, root + step, -1), beats, voice: music.accompaniment, velocity, part: 'accompaniment' });
-      if (music.accompaniment === 'lute') {
-        LUTE_PATTERN[perBar].forEach((step, i) => accompany(start + i * 0.5, step, 1, i === 0 ? 0.36 : 0.24));
-      } else if (music.accompaniment === 'harp') {
-        // A rolled chord, low to high
-        HARP_CHORD.forEach((step, i) => accompany(start + i * 0.09, step, perBar, 0.26));
-        if (perBar === 4) HARP_CHORD.slice(1, 4).forEach((step, i) => accompany(start + 2 + i * 0.09, step, 2, 0.17));
-      } else {
-        for (let beat = 0; beat < perBar; beat++) accompany(start + beat, DULCIMER_PATTERN[beat % 4], 1, beat === 0 ? 0.3 : 0.2);
-      }
-
-      if (music.drum) {
-        events.push({ beat: start, midi: 0, beats: 1, voice: 'lute', velocity: 0.5, part: 'drum' });
-        if (perBar === 4) events.push({ beat: start + 2, midi: 0, beats: 1, voice: 'lute', velocity: 0.28, part: 'drum' });
-      }
+      ACCOMPANIMENT[perBar].forEach((step, beat) => {
+        const midi = pitchOf(music, root + step, -1);
+        events.push({ beat: start + beat, midi: midi > HIGHEST ? midi - 12 : midi, velocity: beat === 0 ? 0.34 : 0.22, part: 'accompaniment' });
+      });
       start += perBar;
     }
   }
@@ -99,43 +82,45 @@ function arrange(music: ThemeMusic): { events: NoteEvent[]; beats: number } {
   return { events, beats: start };
 }
 
-/** A plucked string at one pitch: rendered once, then reused */
-function renderPluck(ctx: BaseAudioContext, freq: number, voice: Plucked): { buffer: AudioBuffer; rate: number } {
+/** One music box tine at one pitch. Low notes ring longer, as on a real comb. */
+function renderTine(ctx: BaseAudioContext, freq: number): AudioBuffer {
   const rate = ctx.sampleRate;
-  const length = Math.floor(rate * (RING[voice] + 0.4));
-  // The delay line's length sets the pitch; the small rounding error is fixed with playbackRate
-  const size = Math.max(2, Math.floor(rate / freq - 0.5));
-  const line = new Float32Array(size);
-  // Softer noise for a darker pluck: the lute is warm, the dulcimer bright
-  const smooth = voice === 'lute' ? 0.65 : voice === 'harp' ? 0.4 : 0.15;
-  let prev = 0;
-  let mean = 0;
-  for (let i = 0; i < size; i++) {
-    prev = prev * smooth + (Math.random() * 2 - 1) * (1 - smooth);
-    line[i] = prev;
-    mean += prev / size;
-  }
-  for (let i = 0; i < size; i++) line[i] -= mean;
-
-  const decay = Math.pow(0.001, 1 / (RING[voice] * freq));
+  const ring = Math.min(4.5, Math.max(1.2, 3.6 * (300 / freq) ** 0.45));
+  const length = Math.floor(rate * (ring + 0.2));
   const buffer = ctx.createBuffer(1, length, rate);
   const out = buffer.getChannelData(0);
-  let peak = 0;
-  for (let i = 0, at = 0; i < length; i++) {
-    const next = (at + 1) % size;
-    out[i] = line[at];
-    peak = Math.max(peak, Math.abs(out[i]));
-    line[at] = decay * 0.5 * (line[at] + line[next]);
-    at = next;
+  const attack = Math.floor(rate * 0.002);
+  for (const [ratio, loudness, fade] of PARTIALS) {
+    const f = freq * ratio;
+    if (f > rate / 2.2) continue;
+    // Fades by 60 dB over this partial's ring time. The sine comes from a two-term recurrence
+    // and the fade from a running product, so rendering a note takes a few milliseconds.
+    const keep = Math.exp(-Math.log(1000) / (ring * fade * rate));
+    const turn = (2 * Math.PI * f) / rate;
+    const twoCos = 2 * Math.cos(turn);
+    let s1 = 0;
+    let s2 = -Math.sin(turn);
+    let level = loudness;
+    for (let i = 0; i < length; i++) {
+      const s = twoCos * s1 - s2;
+      s2 = s1;
+      s1 = s;
+      out[i] += level * s2 * Math.min(1, i / attack);
+      level *= keep;
+    }
   }
-  const fade = Math.floor(rate * 0.05);
-  for (let i = 0; i < length; i++) out[i] *= (0.9 / (peak || 1)) * Math.min(1, (length - i) / fade);
-  return { buffer, rate: freq / (rate / (size + 0.5)) };
+  // The pin's click as it lets go of the tine
+  for (let i = 0; i < rate * 0.004; i++) out[i] += (Math.random() * 2 - 1) * 0.04 * (1 - i / (rate * 0.004));
+  let peak = 0;
+  for (let i = 0; i < length; i++) peak = Math.max(peak, Math.abs(out[i]));
+  const fadeOut = Math.floor(rate * 0.05);
+  for (let i = 0; i < length; i++) out[i] *= (0.9 / (peak || 1)) * Math.min(1, (length - i) / fadeOut);
+  return buffer;
 }
 
 /** A room-like reverb: two channels of fading noise */
 function makeReverb(ctx: BaseAudioContext): AudioBuffer {
-  const length = Math.floor(ctx.sampleRate * 2.6);
+  const length = Math.floor(ctx.sampleRate * 2.8);
   const buffer = ctx.createBuffer(2, length, ctx.sampleRate);
   for (let c = 0; c < 2; c++) {
     const data = buffer.getChannelData(c);
@@ -144,18 +129,11 @@ function makeReverb(ctx: BaseAudioContext): AudioBuffer {
   return buffer;
 }
 
-function makeNoise(ctx: BaseAudioContext): AudioBuffer {
-  const buffer = ctx.createBuffer(1, ctx.sampleRate, ctx.sampleRate);
-  const data = buffer.getChannelData(0);
-  for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
-  return buffer;
-}
-
 /** Where pieces play into: dry sound plus a little reverb, a gentle limiter so nothing clips, then the volume */
 function buildMix(ctx: BaseAudioContext, level: number): { bus: GainNode; master: GainNode } {
   const bus = new GainNode(ctx);
   const reverb = new ConvolverNode(ctx, { buffer: makeReverb(ctx) });
-  const wet = new GainNode(ctx, { gain: 0.32 });
+  const wet = new GainNode(ctx, { gain: 0.36 });
   const dry = new GainNode(ctx, { gain: 0.85 });
   const limiter = new DynamicsCompressorNode(ctx, { threshold: -14, ratio: 4, attack: 0.01, release: 0.3 });
   const master = new GainNode(ctx, { gain: level });
@@ -174,23 +152,20 @@ class Performance {
   private readonly events: NoteEvent[];
   private readonly loopSeconds: number;
   private readonly beat: number;
-  private readonly plucks = new Map<string, { buffer: AudioBuffer; rate: number }>();
-  private readonly noise: AudioBuffer;
-  private readonly drone: OscillatorNode[] = [];
+  private readonly tines = new Map<number, AudioBuffer>();
   private next = 0;
   private loopStart: number;
 
-  constructor(ctx: BaseAudioContext, out: AudioNode, music: ThemeMusic, noise: AudioBuffer, startAt: number) {
+  constructor(ctx: BaseAudioContext, out: AudioNode, music: ThemeMusic, startAt: number) {
     this.ctx = ctx;
     this.music = music;
-    this.noise = noise;
     this.beat = 60 / music.tempo;
     const { events, beats } = arrange(music);
     this.events = events;
     this.loopSeconds = beats * this.beat;
     this.loopStart = startAt;
 
-    this.fader = ctx.createGain();
+    this.fader = new GainNode(ctx, { gain: 0 });
     this.fader.gain.setValueAtTime(0, startAt);
     this.fader.gain.linearRampToValueAtTime(1, startAt + FADE_SECONDS);
     this.fader.connect(out);
@@ -199,30 +174,7 @@ class Performance {
       p.connect(this.fader);
       return p;
     };
-    this.parts = { melody: spot(-0.15), harmony: spot(0.2), accompaniment: spot(0.25), drum: spot(0) };
-
-    if (music.drone) this.startDrone(startAt);
-  }
-
-  /** Low tonic and fifth, slowly breathing through a soft filter */
-  private startDrone(at: number) {
-    const filter = new BiquadFilterNode(this.ctx, { type: 'lowpass', frequency: 420, Q: 0.4 });
-    const level = new GainNode(this.ctx, { gain: 0 });
-    level.gain.setValueAtTime(0, at);
-    level.gain.linearRampToValueAtTime(0.045, at + 4);
-    // In the middle, with the drum
-    filter.connect(level).connect(this.parts.drum);
-    const wobble = new OscillatorNode(this.ctx, { frequency: 0.07 });
-    const depth = new GainNode(this.ctx, { gain: 90 });
-    wobble.connect(depth).connect(filter.frequency);
-    wobble.start(at);
-    this.drone.push(wobble);
-    for (const step of [0, 4]) {
-      const osc = new OscillatorNode(this.ctx, { type: 'sawtooth', frequency: midiToFreq(pitchOf(this.music, step, -2)) });
-      osc.connect(filter);
-      osc.start(at);
-      this.drone.push(osc);
-    }
+    this.parts = { melody: spot(-0.1), harmony: spot(0.2), accompaniment: spot(0.15) };
   }
 
   /** Schedules every note that starts before `until`; notes the clock already passed are skipped */
@@ -242,98 +194,17 @@ class Performance {
   }
 
   private play(ev: NoteEvent, at: number) {
-    // A little looseness in timing and touch, like a person playing
-    const t = at + (ev.part === 'melody' ? 0 : Math.random() * 0.012);
-    const velocity = ev.velocity * (0.9 + Math.random() * 0.2);
-    const out = this.parts[ev.part];
-    if (ev.part === 'drum') return this.playDrum(t, velocity, out);
-    const seconds = ev.beats * this.beat;
-    if (isPlucked(ev.voice)) this.playPluck(ev.voice, ev.midi, t, seconds, velocity, out);
-    else this.playWind(ev.voice, ev.midi, t, seconds, velocity, out);
-  }
-
-  private playPluck(voice: Plucked, midi: number, at: number, seconds: number, velocity: number, out: AudioNode) {
-    const key = `${voice}:${midi}`;
-    let pluck = this.plucks.get(key);
-    if (!pluck) {
-      pluck = renderPluck(this.ctx, midiToFreq(midi), voice);
-      this.plucks.set(key, pluck);
+    let buffer = this.tines.get(ev.midi);
+    if (!buffer) {
+      buffer = renderTine(this.ctx, midiToFreq(ev.midi));
+      this.tines.set(ev.midi, buffer);
     }
-    const level = new GainNode(this.ctx, { gain: velocity * 0.55 });
-    level.connect(out);
-    // Harp and dulcimer ring on; the lute is damped a little after its note
-    const stopAt = at + (voice === 'lute' ? Math.max(seconds, 0.6) * 1.6 : RING[voice]);
-    level.gain.setValueAtTime(velocity * 0.55, Math.max(at, stopAt - 0.25));
-    level.gain.linearRampToValueAtTime(0, stopAt);
-    // The dulcimer has two strings per note, a hair apart in pitch
-    const detunes = voice === 'dulcimer' ? [0.9984, 1.0016] : [1];
-    for (const d of detunes) {
-      const src = new AudioBufferSourceNode(this.ctx, { buffer: pluck.buffer, playbackRate: pluck.rate * d });
-      src.connect(level);
-      src.start(at);
-      src.stop(stopAt + 0.05);
-    }
-  }
-
-  private playWind(voice: 'recorder' | 'flute' | 'fiddle', midi: number, at: number, seconds: number, velocity: number, out: AudioNode) {
-    const freq = midiToFreq(midi);
-    const end = at + Math.max(0.15, seconds * 0.94);
-    const fiddle = voice === 'fiddle';
-    const attack = fiddle ? 0.14 : 0.06;
-    const peak = velocity * (fiddle ? 0.16 : voice === 'flute' ? 0.42 : 0.3);
-
-    const osc = new OscillatorNode(this.ctx, { type: fiddle ? 'sawtooth' : voice === 'flute' ? 'sine' : 'triangle', frequency: freq });
-    const tone = new BiquadFilterNode(this.ctx, { type: 'lowpass', frequency: Math.min(fiddle ? 2600 : 5000, freq * (fiddle ? 3.2 : 3)), Q: 0.5 });
-    const env = new GainNode(this.ctx, { gain: 0 });
-    env.gain.setValueAtTime(0, at);
-    env.gain.linearRampToValueAtTime(peak, at + attack);
-    env.gain.setTargetAtTime(peak * 0.8, at + attack, 0.25);
-    env.gain.setTargetAtTime(0, end, 0.07);
-    osc.connect(tone).connect(env).connect(out);
-
-    // Vibrato that comes in after the note starts, like a held breath or bow
-    const lfo = new OscillatorNode(this.ctx, { frequency: fiddle ? 5.6 : 4.8 });
-    const depth = new GainNode(this.ctx, { gain: 0 });
-    depth.gain.setValueAtTime(0, at);
-    depth.gain.linearRampToValueAtTime(freq * (fiddle ? 0.006 : 0.0035), at + Math.min(0.45, seconds));
-    lfo.connect(depth).connect(osc.frequency);
-
-    // A puff of breath (or bow noise) at the start of the note
-    const breath = new AudioBufferSourceNode(this.ctx, { buffer: this.noise });
-    const band = new BiquadFilterNode(this.ctx, { type: 'bandpass', frequency: Math.min(8000, freq * 2), Q: 1.2 });
-    const puff = new GainNode(this.ctx, { gain: 0 });
-    puff.gain.setValueAtTime(peak * (voice === 'flute' ? 0.5 : 0.3), at);
-    puff.gain.exponentialRampToValueAtTime(0.0001, at + 0.12);
-    breath.connect(band).connect(puff).connect(out);
-
-    for (const node of [osc, lfo]) {
-      node.start(at);
-      node.stop(end + 0.5);
-    }
-    breath.start(at, Math.random() * 0.5);
-    breath.stop(at + 0.15);
-  }
-
-  /** A soft frame drum: a low thump and a brush of noise */
-  private playDrum(at: number, velocity: number, out: AudioNode) {
-    const osc = new OscillatorNode(this.ctx, { frequency: 130 });
-    osc.frequency.setValueAtTime(130, at);
-    osc.frequency.exponentialRampToValueAtTime(55, at + 0.2);
-    const thump = new GainNode(this.ctx, { gain: 0 });
-    thump.gain.setValueAtTime(velocity * 0.35, at);
-    thump.gain.exponentialRampToValueAtTime(0.0001, at + 0.45);
-    osc.connect(thump).connect(out);
-    osc.start(at);
-    osc.stop(at + 0.5);
-
-    const hiss = new AudioBufferSourceNode(this.ctx, { buffer: this.noise });
-    const soft = new BiquadFilterNode(this.ctx, { type: 'lowpass', frequency: 900 });
-    const brush = new GainNode(this.ctx, { gain: 0 });
-    brush.gain.setValueAtTime(velocity * 0.08, at);
-    brush.gain.exponentialRampToValueAtTime(0.0001, at + 0.12);
-    hiss.connect(soft).connect(brush).connect(out);
-    hiss.start(at, Math.random() * 0.5);
-    hiss.stop(at + 0.15);
+    // A little unevenness in timing and touch, like a real comb and cylinder
+    const t = at + (ev.part === 'melody' ? 0 : Math.random() * 0.01);
+    const level = new GainNode(this.ctx, { gain: ev.velocity * (0.9 + Math.random() * 0.2) * 0.5 });
+    const src = new AudioBufferSourceNode(this.ctx, { buffer });
+    src.connect(level).connect(this.parts[ev.part]);
+    src.start(t);
   }
 
   /** Fades out, then lets go of its sounds */
@@ -341,7 +212,6 @@ class Performance {
     this.fader.gain.cancelScheduledValues(at);
     this.fader.gain.setValueAtTime(this.fader.gain.value, at);
     this.fader.gain.linearRampToValueAtTime(0, at + FADE_SECONDS);
-    for (const osc of this.drone) osc.stop(at + FADE_SECONDS + 0.1);
     window.setTimeout(() => this.fader.disconnect(), (FADE_SECONDS + LOOKAHEAD_SECONDS + 1) * 1000);
   }
 }
@@ -355,7 +225,6 @@ export class MusicPlayer {
   /** Where every piece plays into: then reverb, limiter and volume */
   private bus: GainNode | null = null;
   private master: GainNode | null = null;
-  private noise: AudioBuffer | null = null;
   private current: Performance | null = null;
   private timer: number | null = null;
   private volume: number;
@@ -366,17 +235,15 @@ export class MusicPlayer {
     this.muted = settings.muted;
   }
 
-  private setUp(): { ctx: AudioContext; bus: GainNode; noise: AudioBuffer } {
-    if (this.ctx && this.bus && this.noise) return { ctx: this.ctx, bus: this.bus, noise: this.noise };
+  private setUp(): { ctx: AudioContext; bus: GainNode } {
+    if (this.ctx && this.bus) return { ctx: this.ctx, bus: this.bus };
     const ctx = new AudioContext();
     const { bus, master } = buildMix(ctx, this.level());
-    const noise = makeNoise(ctx);
     this.ctx = ctx;
     this.bus = bus;
     this.master = master;
-    this.noise = noise;
     this.timer = window.setInterval(() => this.tick(), TICK_MS);
-    return { ctx, bus, noise };
+    return { ctx, bus };
   }
 
   /** Volume 0 to 1, heard on a curve so the slider feels even */
@@ -391,10 +258,10 @@ export class MusicPlayer {
   /** Plays a piece in a loop, fading over from whatever was playing */
   play(music: ThemeMusic) {
     if (this.current?.music === music) return;
-    const { ctx, bus, noise } = this.setUp();
+    const { ctx, bus } = this.setUp();
     const at = ctx.currentTime + 0.05;
     this.current?.stop(at);
-    this.current = new Performance(ctx, bus, music, noise, at);
+    this.current = new Performance(ctx, bus, music, at);
     this.tick();
   }
 
@@ -428,7 +295,7 @@ export class MusicPlayer {
     void this.ctx?.close();
     this.ctx = null;
     this.bus = null;
-    this.noise = null;
+    this.master = null;
     this.current = null;
   }
 }
@@ -437,7 +304,7 @@ export class MusicPlayer {
 export function renderMusic(music: ThemeMusic, seconds: number): Promise<AudioBuffer> {
   const ctx = new OfflineAudioContext(2, Math.ceil(seconds * 44100), 44100);
   const { bus } = buildMix(ctx, 1);
-  new Performance(ctx, bus, music, makeNoise(ctx), 0).schedule(seconds);
+  new Performance(ctx, bus, music, 0).schedule(seconds);
   return ctx.startRendering();
 }
 
