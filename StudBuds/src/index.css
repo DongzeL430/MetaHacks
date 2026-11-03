@@ -133,13 +133,24 @@
     }
   }
 }
-/* Home's live activity feed (WorldChat): game-chat lines that slide in, then fade out. Fixed
-   colors, so it reads the same over every theme and background picture. */
-.chat-line {
-  color: rgb(232 232 232 / 0.95);
-  background-color: rgb(0 0 0 / 0.42);
-  text-shadow: 1px 1px 0 rgb(0 0 0 / 0.55);
-  animation: chat-line 10s ease-in forwards;
+/* Home's live activity feed (WorldChat): game-chat strips. Fixed colors, so it reads the same over
+   every theme and background picture. In the components layer, so utilities (hover) still win. */
+@layer components {
+  .chat-text {
+    color: rgb(232 232 232 / 0.95);
+    text-shadow: 1px 1px 0 rgb(0 0 0 / 0.55);
+  }
+
+  .chat-strip {
+    color: rgb(232 232 232 / 0.95);
+    background-color: rgb(0 0 0 / 0.42);
+    text-shadow: 1px 1px 0 rgb(0 0 0 / 0.55);
+  }
+
+  /* A line that pops up: slides in, then fades out */
+  .chat-line {
+    animation: chat-line 10s ease-in forwards;
+  }
 }
 
 @keyframes chat-line {
