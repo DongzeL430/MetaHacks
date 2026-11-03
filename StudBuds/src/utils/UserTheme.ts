@@ -70,14 +70,19 @@ export function useUserTheme() {
       return;
     }
     let cancelled = false;
-    supabase.storage
-      .from('user-backgrounds')
-      .createSignedUrl(image.path, SIGNED_URL_SECONDS)
-      .then(({ data }) => {
-        if (!cancelled) setImageUrl(data?.signedUrl ?? null);
-      });
+    const refresh = () =>
+      supabase.storage
+        .from('user-backgrounds')
+        .createSignedUrl(image.path, SIGNED_URL_SECONDS)
+        .then(({ data }) => {
+          if (!cancelled) setImageUrl(data?.signedUrl ?? null);
+        });
+    void refresh();
+    // A signed link stops working when it expires, so get a fresh one a few minutes before
+    const timer = window.setInterval(() => void refresh(), (SIGNED_URL_SECONDS - 300) * 1000);
     return () => {
       cancelled = true;
+      window.clearInterval(timer);
     };
   }, [active]);
 
@@ -140,6 +145,9 @@ export function useUserTheme() {
     switchToSaved,
     generate,
     /** Page background CSS: the generated picture if there is one, otherwise `defaultImage` */
-    backgroundStyle: (defaultImage: string) => backgroundStyle(active?.background, imageUrl ?? defaultImage),
+    // The default look always uses the built-in picture, even for the moment before the custom
+    // picture's link is cleared
+    backgroundStyle: (defaultImage: string) =>
+      backgroundStyle(active?.background, active ? (imageUrl ?? defaultImage) : defaultImage),
   };
 }

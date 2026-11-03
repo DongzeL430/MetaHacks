@@ -855,24 +855,51 @@ export default function AppWindow({
     if (frame) frame.inert = inactive;
   }, [inactive, isOpen]);
 
-  // If the page shrinks, pull the window back inside its area
+  // Where the window sits as shares of its area (0 to 1), remembered whenever the user, a tile or
+  // the spawn position places it. When the screen changes size, the window keeps the same spot and
+  // size relative to the desk instead of staying put in pixels.
+  const relativeRef = useRef<{ x: number; y: number; width: number; height: number } | null>(null);
+  // Set when the change came from a screen resize, so the shares aren't rounded off by min sizes
+  const resizedRef = useRef(false);
+  useEffect(() => {
+    if (resizedRef.current) {
+      resizedRef.current = false;
+      return;
+    }
+    const parent = frameRef.current?.parentElement;
+    if (!rect || !parent) {
+      relativeRef.current = null;
+      return;
+    }
+    const box = getContentBox(parent);
+    const areaW = box.right - box.left;
+    const areaH = box.bottom - box.top;
+    if (areaW <= 0 || areaH <= 0) return;
+    relativeRef.current = { x: rect.x / areaW, y: rect.y / areaH, width: rect.width / areaW, height: rect.height / areaH };
+  }, [rect]);
+
+  // When the area changes size, scale the window with it, then keep it inside
   useEffect(() => {
     const parent = frameRef.current?.parentElement;
     if (!parent) return;
 
     const observer = new ResizeObserver(() => {
+      const box = getContentBox(parent);
+      const areaW = box.right - box.left;
+      const areaH = box.bottom - box.top;
+      if (areaW <= 0 || areaH <= 0) return;
+      const share = relativeRef.current;
       setRect((prev) => {
         if (!prev) return prev;
-        const box = getContentBox(parent);
-        const areaW = box.right - box.left;
-        const areaH = box.bottom - box.top;
-        const width = Math.max(minWidth, Math.min(prev.width, areaW));
-        const height = Math.max(minHeight, Math.min(prev.height, areaH));
-        const x = clamp(prev.x, 0, Math.max(0, areaW - width));
-        const y = clamp(prev.y, 0, Math.max(0, areaH - height));
+        const width = Math.round(Math.max(Math.min(minWidth, areaW), Math.min(share ? share.width * areaW : prev.width, areaW)));
+        const height = Math.round(Math.max(Math.min(minHeight, areaH), Math.min(share ? share.height * areaH : prev.height, areaH)));
+        const x = Math.round(clamp(share ? share.x * areaW : prev.x, 0, Math.max(0, areaW - width)));
+        const y = Math.round(clamp(share ? share.y * areaH : prev.y, 0, Math.max(0, areaH - height)));
         const unchanged =
           x === prev.x && y === prev.y && width === prev.width && height === prev.height;
-        return unchanged ? prev : { x, y, width, height };
+        if (unchanged) return prev;
+        resizedRef.current = true;
+        return { x, y, width, height };
       });
     });
 
