@@ -153,7 +153,7 @@ export function welcomeTourSteps(nickname: string): TourStep[] {
       title: 'The lobby browser',
       body: (
         <>
-          <p className="m-0">You’re hosting! 🎉 This is the lobby browser.</p>
+          <p className="m-0">You’re hosting! This is the lobby browser.</p>
           <p className="m-0">
             Each tab is a different session you’re viewing, like tabs in a web browser. Open more from Study Lobbies or
             Sessions, and close them with their ✕.
@@ -326,7 +326,7 @@ export function welcomeTourSteps(nickname: string): TourStep[] {
             background picture and a short tune from it. Themes only change the look and music, never how the app
             works.
           </p>
-          <p className="m-0">That’s the tour. Happy studying! 📚</p>
+          <p className="m-0">That’s the tour. Happy studying!</p>
         </>
       ),
     },

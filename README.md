@@ -32,6 +32,9 @@ After that you land on Home, which works like a small desktop:
 - Inside a lobby you can ask to join, chat live with the group, invite your connections, and connect
   with people you'd like to study with again. Hosts accept requests, lock the session or remove
   someone.
+- **Connections** is your friends list. When you're ready to keep in touch outside StudBuds, turn on
+  "Share my contact" for one person and they'll see the Discord, Instagram or phone you added in
+  your profile. Nobody else does.
 - **Themes** turn a sentence ("rainy afternoon in a Scottish library") into a whole look: Muse
   writes the color palette, Muse Image paints the background, and Muse composes a short music box tune
   for it, which loops quietly while you study (mute and volume are in the nav bar).
@@ -84,6 +87,9 @@ sprites (see `docs/croft-muse-code.md`).
 - Matching never uses who you are: no school ranking, major, year or grade goes into it.
 - Connection declines are silent, and someone you asked to connect with only shows their nickname and
   avatar until they accept.
+- Every card has Report and Block at the bottom. A report takes a reason and an optional note, and
+  only the team reads it. Blocking ends the connection and hides each of you from the other's
+  sessions. Neither one tells the other person, and you can unblock from Profile, Account.
 - Every action that writes something has a daily limit, and Muse calls have their own limits plus a
   shared budget, so nobody can run up costs or flood other students.
 - Row-level security is on for every table. Every change goes through a database function that
