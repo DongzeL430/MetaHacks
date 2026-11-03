@@ -32,6 +32,15 @@ const MAX_HISTORY = 50;
 
 /** The activity list lasts as long as the browser tab, per student (a convenience, so it may be empty) */
 const historyKey = (me: string) => `studbuds:activity:${me}`;
+/** When the student last opened the list: lines after it are unread (the red dot) */
+const readKey = (me: string) => `studbuds:activity-read:${me}`;
+function readLastRead(me: string): number {
+  try {
+    return Number(sessionStorage.getItem(readKey(me))) || 0;
+  } catch {
+    return 0;
+  }
+}
 function readHistory(me: string): ChatLine[] {
   try {
     const saved = JSON.parse(sessionStorage.getItem(historyKey(me)) ?? '[]');
@@ -75,7 +84,8 @@ const cropName = (key: unknown) => (typeof key === 'string' && key in CROPS ? CR
 export function useWorldChat(lobbies: Lobby[], people: Map<string, Person>) {
   const [lines, setLines] = useState<ChatLine[]>([]);
   const [history, setHistory] = useState<ChatLine[]>([]);
-  const [unread, setUnread] = useState(0);
+  // Lines newer than this are unread; kept for the tab, so the red dot survives a reload
+  const [lastRead, setLastRead] = useState(0);
   // In a ref, so `say` (and the live channel that uses it) doesn't change when it loads
   const me = useRef<string | null>(null);
   const recent = useRef(new Map<string, number>());
@@ -86,7 +96,10 @@ export function useWorldChat(lobbies: Lobby[], people: Map<string, Person>) {
       const id = data.user?.id ?? null;
       me.current = id;
       // Lines that came in while the account was loading stay after the saved ones
-      if (id) setHistory((current) => [...readHistory(id), ...current].slice(-MAX_HISTORY));
+      if (id) {
+        setHistory((current) => [...readHistory(id), ...current].slice(-MAX_HISTORY));
+        setLastRead(readLastRead(id));
+      }
     });
   }, []);
 
@@ -104,12 +117,21 @@ export function useWorldChat(lobbies: Lobby[], people: Map<string, Person>) {
         if (me.current) writeHistory(me.current, next);
         return next;
       });
-      setUnread((n) => n + 1);
     },
     [],
   );
 
-  const markRead = useCallback(() => setUnread(0), []);
+  /** Opening the list reads everything in it */
+  const markRead = useCallback(() => {
+    const now = Date.now();
+    setLastRead(now);
+    try {
+      if (me.current) sessionStorage.setItem(readKey(me.current), String(now));
+    } catch {
+      // Not kept this time
+    }
+  }, []);
+  const unread = history.filter((l) => l.at > lastRead).length;
 
   /** A student's nickname, from the database (public.croft_names), never from the event itself */
   const nameOf = useCallback(async (id: string) => {

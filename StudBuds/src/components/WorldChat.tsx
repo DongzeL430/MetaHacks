@@ -5,8 +5,9 @@ import type { ChatLine } from '../lib/worldChat';
  * Home's live activity feed, bottom right, like a game's world chat: light gray text on a
  * half-transparent dark strip, newest at the bottom, each line fading out after a few seconds.
  * Under the lines sits a round button that opens every line since the tab opened, with times.
- * The lines never take clicks, so windows under them stay usable. Colors stay the same in every
- * theme, so it reads over any background picture.
+ * The lines never take clicks, so windows under them stay usable. It sits above full-screen
+ * windows (z 60) and under popups (z 65+). Colors stay the same in every theme, so it reads over
+ * any background picture.
  */
 
 interface WorldChatProps {
@@ -14,7 +15,7 @@ interface WorldChatProps {
   lines: ChatLine[];
   /** Everything since the tab opened, oldest first */
   history: ChatLine[];
-  /** Lines since the list was last opened */
+  /** Lines since the list was last opened: shows the red dot (and the count, for screen readers) */
   unread: number;
   onOpen: () => void;
 }
@@ -58,7 +59,7 @@ export default function WorldChat({ lines, history, unread, onOpen }: WorldChatP
   return (
     <div
       ref={wrapRef}
-      className="pointer-events-none absolute right-2 bottom-2 md:right-3 md:bottom-3 z-40 w-[min(26rem,calc(100%-1rem))] flex flex-col items-end gap-2.5"
+      className="pointer-events-none absolute right-2 bottom-2 md:right-3 md:bottom-3 z-[62] w-[min(26rem,calc(100%-1rem))] flex flex-col items-end gap-2.5"
     >
       {open ? (
         <section
@@ -102,10 +103,13 @@ export default function WorldChat({ lines, history, unread, onOpen }: WorldChatP
         className="chat-text pointer-events-auto relative w-10 h-10 p-0 flex items-center justify-center rounded-full border-0 [border-image:none] bg-black/40 text-[rgb(232_232_232)] hover:bg-black/55"
       >
         <ChatIcon />
+        {/* Unread: a small red dot centered on the button's edge at the upper right (on a 40px
+            circle, that point is about 6px in from the corner). Fixed red, in every theme. */}
         {unread > 0 && !open && (
-          <span aria-hidden="true" className="absolute -top-1 -right-1 min-w-5 h-5 px-1 flex items-center justify-center rounded-full bg-accent text-ink text-xs">
-            {unread > 9 ? '9+' : unread}
-          </span>
+          <span
+            aria-hidden="true"
+            className="absolute top-0 right-0 w-3 h-3 rounded-full bg-[#e5484d] ring-2 ring-black/30 motion-safe:transition-transform motion-safe:duration-200 starting:scale-0"
+          />
         )}
       </button>
     </div>
