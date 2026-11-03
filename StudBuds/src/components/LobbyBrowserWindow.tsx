@@ -215,15 +215,8 @@ export default function LobbyBrowserWindow({
         >
           <legend className="px-1 text-sm">Match lobbies to me</legend>
 
-          <label className={checkboxRow}>
-            <input type="checkbox" checked={filters.mySchool} onChange={(e) => set({ mySchool: e.target.checked })} />
-            <span>
-              Only my school
-              <span className="block text-xs opacity-70">
-                Turn off to see sessions hosted at other schools too.
-              </span>
-            </span>
-          </label>
+          {/* No "Only my school" switch: the database only shows your school's sessions (and
+              linked schools'), so every lobby here already is one */}
 
           <label className={checkboxRow}>
             <input type="checkbox" checked={filters.schedule} onChange={(e) => set({ schedule: e.target.checked })} />
