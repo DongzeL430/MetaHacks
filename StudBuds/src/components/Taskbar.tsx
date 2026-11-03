@@ -160,6 +160,7 @@ function ThemePanel({ active, onSelectDefault, onSelectCustom, onDone }: ThemeMe
     <div
       role="group"
       aria-label="Choose a theme"
+      data-tour="theme-panel"
       className="flex flex-col items-center gap-1 pt-1 border-t border-paper/25 motion-safe:transition motion-safe:duration-150 starting:opacity-0 starting:-translate-y-1"
     >
       <ThemeOption icon={<SunIcon />} label="Default theme" active={active === 'default'} onClick={() => choose(onSelectDefault)} />
@@ -261,9 +262,12 @@ function GearOption({
   active,
   expanded,
   onClick,
+  tour,
 }: {
   icon: ReactNode;
   label: string;
+  /** `data-tour` name, so the welcome tour can point at it */
+  tour?: string;
   /** Highlighted, e.g. one of its windows is open */
   active?: boolean;
   /** Its side panel is showing; leave out for a plain button */
@@ -277,6 +281,7 @@ function GearOption({
       aria-expanded={expanded}
       aria-label={label}
       title={label}
+      data-tour={tour}
       className={[
         'shrink-0 w-10 h-10 p-0 flex items-center justify-center rounded-full',
         'border-0 [border-image:none] text-nav-ink transition-colors duration-150',
@@ -338,7 +343,9 @@ function GearMenu({
   useEffect(() => {
     if (!open) return;
     const onPointer = (e: PointerEvent) => {
-      if (!wrapRef.current?.contains(e.target as Node)) close();
+      // Reading the welcome tour's popup about this menu doesn't close it
+      const target = e.target as Element;
+      if (!wrapRef.current?.contains(target) && !target.closest?.('[data-tour-popup]')) close();
     };
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== 'Escape') return;
@@ -378,6 +385,7 @@ function GearMenu({
         aria-controls={menuId}
         aria-label="Settings"
         title="Settings"
+        data-tour="settings"
         className={[
           'p-0 flex items-center justify-center rounded-full',
           'border-0 [border-image:none] text-nav-ink transition-colors duration-150',
@@ -435,7 +443,7 @@ function GearMenu({
           {theme && (
             // The theme choices stack below the paintbrush, extending the capsule downward
             <div className="flex flex-col items-center gap-1">
-              <GearOption icon={<PaintbrushIcon />} label="Theme" expanded={section === 'theme'} onClick={() => toggleSection('theme')} />
+              <GearOption icon={<PaintbrushIcon />} label="Theme" expanded={section === 'theme'} onClick={() => toggleSection('theme')} tour="theme-button" />
               {section === 'theme' && <ThemePanel {...theme} onDone={close} />}
             </div>
           )}

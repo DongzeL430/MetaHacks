@@ -64,12 +64,16 @@ export function passesFilters(lobby: Lobby, filters: LobbyFilters, ctx: MatchCon
   return true;
 }
 
-/** How many criteria are actually narrowing the list right now (for the Filters button) */
+/**
+ * How many criteria are switched on (for the Filters button). Free time and subjects count only
+ * once the student has saved some, since until then they hide nothing.
+ */
 export function activeFilterCount(filters: LobbyFilters, ctx: MatchContext): number {
   return [
     filters.schedule && ctx.freeSet.size > 0,
     filters.subjects && ctx.subjects.length > 0,
-    filters.size && filters.sizes.length < ALL_SIZES.length,
+    // Ticked counts, like "Only my school", even with every size picked
+    filters.size,
     filters.openSpots,
     filters.hideMine,
     filters.mySchool,

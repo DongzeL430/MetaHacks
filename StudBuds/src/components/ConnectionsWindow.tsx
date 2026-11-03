@@ -51,6 +51,7 @@ export default function ConnectionsWindow({
     <AppWindow
       id={id}
       title="Connections"
+      tourTarget="connections-window"
       accent={WINDOW_ACCENTS.lilac}
       info="Your study buddies, like a friends list. Answer connection requests, see who you’re connected with, and keep track of requests you’ve sent."
       open={open}
@@ -104,7 +105,7 @@ export default function ConnectionsWindow({
                     <span className="flex-1 min-w-0 truncate text-lg">{p.name}</span>
                   </>
                 )}
-                <ConnectControl person={p} status={connections[p.id] ?? 'none'} dispatch={dispatch} />
+                <ConnectControl person={p} status={connections[p.id] ?? 'none'} dispatch={dispatch} canRemove />
               </li>
             ))}
           </ul>

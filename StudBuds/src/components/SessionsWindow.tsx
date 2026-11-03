@@ -122,6 +122,7 @@ export default function SessionsWindow({
     <AppWindow
       id={id}
       title="Sessions"
+      tourTarget="sessions-window"
       accent={WINDOW_ACCENTS.peach}
       info="Every session you’re part of: ones you host, ones you’ve joined, ones waiting for a host to let you in, and invites from your connections. Click one to open its page."
       open={open}
