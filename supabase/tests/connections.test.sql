@@ -1,7 +1,8 @@
 -- Tests for migrations/*_connections.sql.
 -- Everything runs in one transaction that is rolled back, so no test data is left behind.
 -- Students A, B, C, D at Northeastern. Pairing 1 is A with B, pairing 2 is A with C.
--- D was never paired with anyone.
+-- D was never paired with anyone. Blocks and reports go through block_student / report_student
+-- (migrations/*_safety_and_contact_sharing.sql), which need finished surveys.
 
 begin;
 create extension if not exists pgtap with schema extensions;
@@ -13,6 +14,9 @@ insert into auth.users (id, email, raw_user_meta_data) values
   ('b3000000-0000-4000-8000-00000000000b', 'b@northeastern.edu', '{"adult_confirmed": true}'),
   ('c3000000-0000-4000-8000-00000000000c', 'c@northeastern.edu', '{"adult_confirmed": true}'),
   ('d3000000-0000-4000-8000-00000000000d', 'd@northeastern.edu', '{"adult_confirmed": true}');
+update public.profiles set onboarding_status = 'onboarded'
+where id in ('a3000000-0000-4000-8000-00000000000a', 'b3000000-0000-4000-8000-00000000000b',
+             'c3000000-0000-4000-8000-00000000000c', 'd3000000-0000-4000-8000-00000000000d');
 
 insert into public.pairings (user_low, user_high) values
   ('a3000000-0000-4000-8000-00000000000a', 'b3000000-0000-4000-8000-00000000000b'),
@@ -182,18 +186,15 @@ reset role;
 set local role authenticated;
 set local request.jwt.claims to '{"sub": "a3000000-0000-4000-8000-00000000000a", "role": "authenticated"}';
 
-select lives_ok(
-  $$insert into public.blocks (blocked_id) values ('b3000000-0000-4000-8000-00000000000b')$$,
-  'A student can block someone they were paired with'
-);
+select lives_ok($$select public.block_student('b3000000-0000-4000-8000-00000000000b')$$, 'A student can block someone');
 select throws_ok(
   $$insert into public.blocks (blocked_id) values ('d3000000-0000-4000-8000-00000000000d')$$,
   '42501', null,
-  'A student cannot block someone they were never paired with'
+  'Blocks only go through block_student'
 );
 select throws_ok(
-  $$insert into public.blocks (blocked_id) values ('a3000000-0000-4000-8000-00000000000a')$$,
-  '23514', null,
+  $$select public.block_student('a3000000-0000-4000-8000-00000000000a')$$,
+  'P0001', 'Pick someone to block.',
   'A student cannot block themselves'
 );
 
@@ -207,35 +208,29 @@ reset role;
 set local role authenticated;
 set local request.jwt.claims to '{"sub": "a3000000-0000-4000-8000-00000000000a", "role": "authenticated"}';
 
-select lives_ok(
-  $$delete from public.blocks where blocked_id = 'b3000000-0000-4000-8000-00000000000b'$$,
-  'A student can undo a block'
-);
+select lives_ok($$select public.unblock_student('b3000000-0000-4000-8000-00000000000b')$$, 'A student can undo a block');
 
 
 -- Reports --------------------------------------------------------------------------------
 
 select lives_ok(
-  $$insert into public.reports (reported_id, pairing_id, reason, details)
-    values ('b3000000-0000-4000-8000-00000000000b', current_setting('test.p1')::bigint, 'harassment', 'Kept sending rude messages in chat')$$,
-  'A student can report someone they were paired with'
+  $$select public.report_student('b3000000-0000-4000-8000-00000000000b', 'harassment', 'Kept sending rude messages in chat')$$,
+  'A student can report someone'
 );
 select throws_ok(
   $$insert into public.reports (reported_id, reason) values ('d3000000-0000-4000-8000-00000000000d', 'spam')$$,
   '42501', null,
-  'A student cannot report someone they were never paired with'
+  'Reports only go through report_student'
 );
 select throws_ok(
-  $$insert into public.reports (reported_id, pairing_id, reason)
-    values ('b3000000-0000-4000-8000-00000000000b', current_setting('test.p2')::bigint, 'spam')$$,
-  '42501', null,
-  'A report''s pairing must be one with the reported student'
+  $$select public.report_student('a3000000-0000-4000-8000-00000000000a', 'spam')$$,
+  'P0001', 'Pick someone to report.',
+  'A student cannot report themselves'
 );
 select throws_ok(
-  $$insert into public.reports (reported_id, reason, details)
-    values ('b3000000-0000-4000-8000-00000000000b', 'other', repeat('x', 501))$$,
-  '23514', null,
-  'Report notes are capped at 500 characters'
+  $$select public.report_student('b3000000-0000-4000-8000-00000000000b', 'other', repeat('x', 301))$$,
+  'P0001', 'Keep the note to 300 characters.',
+  'Report notes are capped at 300 characters'
 );
 select throws_ok(
   $$update public.reports set status = 'reviewed'$$,
@@ -243,14 +238,13 @@ select throws_ok(
   'Students cannot mark reports as reviewed'
 );
 select lives_ok(
-  $$insert into public.reports (reported_id, reason)
-    select 'b3000000-0000-4000-8000-00000000000b', 'other' from generate_series(1, 29)$$,
-  'A student can file up to 30 reports'
+  $$select public.report_student('b3000000-0000-4000-8000-00000000000b', 'other') from generate_series(1, 19)$$,
+  'A student can file up to 20 reports a day'
 );
 select throws_ok(
-  $$insert into public.reports (reported_id, reason) values ('b3000000-0000-4000-8000-00000000000b', 'other')$$,
-  '23514', null,
-  'The 31st report is rejected'
+  $$select public.report_student('b3000000-0000-4000-8000-00000000000b', 'other')$$,
+  'P0001', 'You’ve sent a lot of reports today. Try again tomorrow.',
+  'The 21st report that day is rejected'
 );
 
 reset role;
@@ -284,7 +278,7 @@ set local role authenticated;
 set local request.jwt.claims to '{"sub": "c3000000-0000-4000-8000-00000000000c", "role": "authenticated"}';
 
 select lives_ok(
-  $$insert into public.reports (reported_id, reason) values ('a3000000-0000-4000-8000-00000000000a', 'inappropriate')$$,
+  $$select public.report_student('a3000000-0000-4000-8000-00000000000a', 'inappropriate')$$,
   'Another student files a report'
 );
 
