@@ -1,0 +1,3 @@
+-- No seed data. The migrations set up everything the app needs (survey questions, schools, Muse
+-- limits), students make the rest in the app, and each file in supabase/tests creates its own
+-- test rows and rolls them back.
