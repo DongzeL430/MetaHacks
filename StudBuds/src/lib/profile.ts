@@ -307,7 +307,23 @@ export function useMyProfile() {
 }
 
 /** Deletes the account and everything tied to it (public.delete_my_account), then signs out here */
+/** The student's avatar and every theme background they generated */
+async function removeMyFiles(): Promise<void> {
+  const { data: session } = await supabase.auth.getSession();
+  const id = session.session?.user.id;
+  if (!id) return;
+  const { data: pub } = await supabase.from('public_profiles').select('avatar_path').eq('id', id).single();
+  if (pub?.avatar_path) await supabase.storage.from('avatars').remove([pub.avatar_path]);
+  const { data: files } = await supabase.storage.from('user-backgrounds').list(id, { limit: 1000 });
+  if (files && files.length > 0) {
+    await supabase.storage.from('user-backgrounds').remove(files.map((f) => `${id}/${f.name}`));
+  }
+}
+
 export async function deleteMyAccount(): Promise<void> {
+  // Stored pictures first, since the database can't remove files. If this fails, the account is
+  // still deleted: a leftover file isn't a reason to keep someone's account.
+  await removeMyFiles().catch((err) => console.warn('pictures not removed', err));
   const { error } = await supabase.rpc('delete_my_account');
   if (error) throw new Error('Your account wasn’t deleted. Try again in a moment.');
   // The account is gone on the server, so only this browser's copy of the session is left
