@@ -133,3 +133,34 @@
     }
   }
 }
+/* Home's live activity feed (WorldChat): game-chat lines that slide in, then fade out. Fixed
+   colors, so it reads the same over every theme and background picture. */
+.chat-line {
+  color: rgb(232 232 232 / 0.95);
+  background-color: rgb(0 0 0 / 0.42);
+  text-shadow: 1px 1px 0 rgb(0 0 0 / 0.55);
+  animation: chat-line 10s ease-in forwards;
+}
+
+@keyframes chat-line {
+  0% {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  3% {
+    opacity: 1;
+    transform: none;
+  }
+  80% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chat-line {
+    animation: none;
+  }
+}

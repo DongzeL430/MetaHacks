@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
 import { WindowLayer, WindowManagerProvider } from './components/AppWindow';
 import Taskbar, { TASKBAR_CLEARANCE } from './components/Taskbar';
@@ -10,6 +10,8 @@ import { DEFAULT_MUSIC, FALLBACK_MUSIC } from './utils/Music';
 import { useThemeMusic } from './utils/MusicPlayer';
 import ProfileEditorWindow from './components/ProfileEditorWindow';
 import CroftWindow from './components/croft/CroftWindow';
+import WorldChat from './components/WorldChat';
+import { useWorldChat } from './lib/worldChat';
 import { CroftVisitContext } from './lib/croft';
 import type { MyProfile } from './dataFiles/StudyData';
 import { ME } from './dataFiles/StudyData';
@@ -159,6 +161,9 @@ export default function HomePage({
     return saved;
   };
   const [study, dispatch] = useStudyState(initialStudyState, onStudyAction, studyState);
+  // The live activity feed at the bottom right: sessions that fit you, and visits and help on your croft
+  const peopleById = useMemo(() => new Map(people.map((p) => [p.id, p])), [people]);
+  const chatLines = useWorldChat(study.lobbies, peopleById);
 
   const pendingRequests = Object.values(study.connections).filter((s) => s === 'received').length;
   // People waiting to join the lobby you host
@@ -241,6 +246,7 @@ export default function HomePage({
         {/* Desk area: windows rest inside this box. `relative` so window layers can cover it.
             It starts empty; windows open from the nav bar. */}
         <div className="relative flex-1 min-h-0 min-w-0">
+          <WorldChat lines={chatLines} />
           {/* All windows on the desk share one stack and one tiling layout */}
           <WindowManagerProvider>
             {/* "Visit croft" on any profile card opens that person's croft */}
