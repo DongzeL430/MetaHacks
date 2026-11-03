@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import type { ReactNode } from 'react';
 import { WindowLayer, WindowManagerProvider } from './components/AppWindow';
-import Taskbar, { TASKBAR_CLEARANCE } from './components/TaskBar';
-import type { TaskbarApp } from './components/TaskBar';
+import Taskbar, { TASKBAR_CLEARANCE } from './components/Taskbar';
+import type { TaskbarApp } from './components/Taskbar';
 import StudyLayout from './components/StudyLayout';
 import ThemePromptWindow from './components/ThemePromptWindow';
 import { useUserTheme } from './utils/UserTheme';

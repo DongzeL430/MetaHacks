@@ -769,6 +769,35 @@ export type Database = {
           },
         ]
       }
+      user_themes: {
+        Row: {
+          theme: Json
+          updated_at: string
+          use_custom: boolean
+          user_id: string
+        }
+        Insert: {
+          theme: Json
+          updated_at?: string
+          use_custom?: boolean
+          user_id?: string
+        }
+        Update: {
+          theme?: Json
+          updated_at?: string
+          use_custom?: boolean
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_themes_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       vibe_decisions: {
         Row: {
           choice: Database["public"]["Enums"]["vibe_choice"]
@@ -816,6 +845,8 @@ export type Database = {
       }
       delete_my_account: { Args: never; Returns: undefined }
       hook_before_user_created: { Args: { event: Json }; Returns: Json }
+      is_lobby_host: { Args: { p_lobby_id: string }; Returns: boolean }
+      is_lobby_member: { Args: { p_lobby_id: string }; Returns: boolean }
       pair_on_cooldown: {
         Args: { student_a: string; student_b: string }
         Returns: boolean

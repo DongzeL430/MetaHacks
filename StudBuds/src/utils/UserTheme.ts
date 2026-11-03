@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
+import type { Json } from '../../../supabase/database.types.ts';
 import { applyThemeColors, backgroundStyle, sanitizeTheme } from './Theme';
 import type { UserTheme } from './Theme';
 
@@ -78,7 +79,8 @@ export function useUserTheme() {
   const persist = useCallback(
     async (theme: UserTheme, custom: boolean) => {
       if (!userId) return;
-      await supabase.from('user_themes').upsert({ user_id: userId, theme, use_custom: custom });
+      // A theme is plain data (sanitizeTheme checked it), so it fits the jsonb column as is
+      await supabase.from('user_themes').upsert({ user_id: userId, theme: theme as unknown as Json, use_custom: custom });
     },
     [userId],
   );

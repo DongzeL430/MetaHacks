@@ -2,7 +2,7 @@ import { useMemo, useRef, useState } from 'react';
 import type { FormEvent, ReactNode } from 'react';
 import AppWindow, { WindowManagerProvider } from './components/AppWindow';
 import AboutYouWindow from './components/AboutYouWindow';
-import Taskbar, { TASKBAR_CLEARANCE } from './components/TaskBar';
+import Taskbar, { TASKBAR_CLEARANCE } from './components/Taskbar';
 import AvailabilityCalendar from './components/AvailabilityCalendar';
 import CoursesSection, {
   cleanAcademics,
