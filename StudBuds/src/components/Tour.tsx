@@ -62,7 +62,11 @@ const sameBox = (a: Box | null, b: Box | null) =>
   a === b ||
   (!!a && !!b && a.top === b.top && a.left === b.left && a.width === b.width && a.height === b.height);
 
-const find = (name: string) => document.querySelector(`[data-tour="${name}"]`);
+/** The first element with this name that's showing (the gear, for one, has a phone-only copy) */
+const find = (name: string) => {
+  const all = Array.from(document.querySelectorAll(`[data-tour="${name}"]`));
+  return all.find((el) => boxOf(el)) ?? all[0] ?? null;
+};
 
 function boxOf(el: Element | null): Box | null {
   if (!el) return null;
@@ -255,6 +259,7 @@ export default function Tour({ steps, onClose }: TourProps) {
 
       <div
         ref={popupRef}
+        data-tour-popup
         role="dialog"
         aria-modal={dimmed && !interactive}
         aria-labelledby="tour-title"
