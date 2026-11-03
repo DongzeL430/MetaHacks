@@ -87,6 +87,41 @@ function cleanText(raw: unknown, max: number): string {
   return typeof raw === 'string' ? raw.trim().replace(/\s+/g, ' ').slice(0, max) : '';
 }
 
+/**
+ * A course title as a catalog writes it: letters, numbers, spaces and the punctuation titles use.
+ * Drops anything else (links, markup, quotes), since titles are shown to classmates and read by
+ * later Muse calls.
+ */
+function cleanTitle(raw: unknown): string {
+  return cleanText(raw, 200)
+    .replace(/\bhttps?:\/\/\S+|\bwww\.\S+/gi, '')
+    .replace(/[^\p{L}\p{M}\p{N} &,:;'’()./+?!-]/gu, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 120);
+}
+
+/** A real web address, http or https */
+function cleanUrl(raw: unknown): string {
+  const text = cleanText(raw, 500);
+  try {
+    const url = new URL(text);
+    return url.protocol === 'https:' || url.protocol === 'http:' ? url.href : '';
+  } catch {
+    return '';
+  }
+}
+
+/** The page is on the school's own website (its domain or a subdomain) */
+function onSchoolSite(source: string, domain: string): boolean {
+  try {
+    const host = new URL(source).hostname.toLowerCase();
+    return host === domain || host.endsWith(`.${domain}`);
+  } catch {
+    return false;
+  }
+}
+
 /** Muse follows the schema, but anything shown to students or saved is checked again here. */
 function cleanCourses(raw: unknown): Course[] {
   if (!Array.isArray(raw)) return [];
@@ -94,11 +129,11 @@ function cleanCourses(raw: unknown): Course[] {
   for (const c of raw.slice(0, MAX_COURSES_PER_MAJOR)) {
     if (typeof c !== 'object' || c === null) continue;
     const code = cleanText(c.code, 40).toUpperCase();
-    const source = cleanText(c.source_url, 500);
-    if (!COURSE_CODE.test(code) || !/^https?:\/\//.test(source)) continue;
+    const source = cleanUrl(c.source_url);
+    if (!COURSE_CODE.test(code) || !source) continue;
     out.push({
       code,
-      title: cleanText(c.title, 120) || code,
+      title: cleanTitle(c.title) || code,
       term: cleanText(c.term, 20) || null,
       source,
     });
@@ -264,7 +299,9 @@ Deno.serve(async (req) => {
         .match(key)
         .gte('searched_at', freshAfter)
         .maybeSingle();
-      return { major, key, cached: cached ? (cached.courses as Course[]) : null };
+      // Saved before titles were cleaned this strictly, so they're cleaned again on the way out
+      const courses = cached ? (cached.courses as Course[]).map((c) => ({ ...c, title: cleanTitle(c.title) || c.code })) : null;
+      return { major, key, cached: courses };
     }),
   );
 
@@ -319,10 +356,13 @@ Deno.serve(async (req) => {
     );
   }
 
-  if (courses.length > 0) {
+  // Only courses read on the school's own website join its shared course list, which matches
+  // classmates' typed course names. Ones from other sites are still suggested to this student.
+  const official = courses.filter((c) => onSchoolSite(c.source, domain));
+  if (official.length > 0) {
     await supabase.rpc('add_found_courses', {
       school: domain,
-      found: courses.map(({ code, title }) => ({ code, title })),
+      found: official.map(({ code, title }) => ({ code, title })),
     });
   }
 
