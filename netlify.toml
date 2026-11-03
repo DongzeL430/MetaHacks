@@ -1,0 +1,17 @@
+# Netlify builds the app in StudBuds/ and serves it as a single-page app.
+# Set VITE_SUPABASE_URL, VITE_SUPABASE_PUBLISHABLE_KEY and VITE_TURNSTILE_SITE_KEY in the site's
+# environment variables (they're public browser keys; never add the secret ones here).
+
+[build]
+  base = "StudBuds"
+  command = "npm run build"
+  publish = "dist"
+
+[build.environment]
+  NODE_VERSION = "20"
+
+# Every path loads the app, so refreshing /login or /survey doesn't 404
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200

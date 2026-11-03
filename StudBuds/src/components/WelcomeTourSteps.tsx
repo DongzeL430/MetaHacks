@@ -9,7 +9,7 @@ import type { TourStep } from './Tour';
 export function welcomeTourSteps(nickname: string): TourStep[] {
   return [
     {
-      title: `Welcome to StudBuds, ${nickname}! 🎉`,
+      title: `Welcome to StudBuds, ${nickname}!`,
       body: (
         <>
           <p className="m-0">Your survey is in, and you’re ready to find study partners.</p>
