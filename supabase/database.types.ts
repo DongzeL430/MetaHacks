@@ -454,6 +454,42 @@ export type Database = {
           },
         ]
       }
+      croft_visits: {
+        Row: {
+          created_at: string
+          owner_id: string
+          visited_on: string
+          visitor_id: string
+        }
+        Insert: {
+          created_at?: string
+          owner_id: string
+          visited_on?: string
+          visitor_id: string
+        }
+        Update: {
+          created_at?: string
+          owner_id?: string
+          visited_on?: string
+          visitor_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "croft_visits_owner_id_fkey"
+            columns: ["owner_id"]
+            isOneToOne: false
+            referencedRelation: "crofts"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "croft_visits_visitor_id_fkey"
+            columns: ["visitor_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       crofts: {
         Row: {
           active_at: string
@@ -568,45 +604,6 @@ export type Database = {
           },
         ]
       }
-      lobby_members: {
-        Row: {
-          id: number
-          joined_at: string
-          lobby_id: string
-          role: Database["public"]["Enums"]["lobby_role"]
-          user_id: string
-        }
-        Insert: {
-          id?: never
-          joined_at?: string
-          lobby_id: string
-          role: Database["public"]["Enums"]["lobby_role"]
-          user_id: string
-        }
-        Update: {
-          id?: never
-          joined_at?: string
-          lobby_id?: string
-          role?: Database["public"]["Enums"]["lobby_role"]
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "lobby_members_lobby_id_fkey"
-            columns: ["lobby_id"]
-            isOneToOne: false
-            referencedRelation: "lobbies"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "lobby_members_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       lobby_invites: {
         Row: {
           created_at: string
@@ -649,6 +646,45 @@ export type Database = {
             columns: ["lobby_id"]
             isOneToOne: false
             referencedRelation: "lobbies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      lobby_members: {
+        Row: {
+          id: number
+          joined_at: string
+          lobby_id: string
+          role: Database["public"]["Enums"]["lobby_role"]
+          user_id: string
+        }
+        Insert: {
+          id?: never
+          joined_at?: string
+          lobby_id: string
+          role: Database["public"]["Enums"]["lobby_role"]
+          user_id: string
+        }
+        Update: {
+          id?: never
+          joined_at?: string
+          lobby_id?: string
+          role?: Database["public"]["Enums"]["lobby_role"]
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lobby_members_lobby_id_fkey"
+            columns: ["lobby_id"]
+            isOneToOne: false
+            referencedRelation: "lobbies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lobby_members_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]
@@ -1430,6 +1466,10 @@ export type Database = {
         Returns: string
       }
       identity_changes_left: { Args: never; Returns: number }
+      invite_to_lobby: {
+        Args: { lobby_id: string; person: string }
+        Returns: undefined
+      }
       is_lobby_host: { Args: { p_lobby_id: string }; Returns: boolean }
       is_lobby_member: { Args: { p_lobby_id: string }; Returns: boolean }
       kick_from_lobby: {
@@ -1443,10 +1483,6 @@ export type Database = {
           code: string
           title: string
         }[]
-      }
-      invite_to_lobby: {
-        Args: { lobby_id: string; person: string }
-        Returns: undefined
       }
       leave_lobby: { Args: { lobby_id: string }; Returns: undefined }
       lobby_matches: {
@@ -1468,8 +1504,8 @@ export type Database = {
           shared_free: Json
         }[]
       }
-      my_community: { Args: never; Returns: string[] }
       muse_uses_left: { Args: { what: string }; Returns: number }
+      my_community: { Args: never; Returns: string[] }
       pair_on_cooldown: {
         Args: { student_a: string; student_b: string }
         Returns: boolean

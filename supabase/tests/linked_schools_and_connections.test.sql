@@ -5,7 +5,7 @@
 begin;
 create extension if not exists pgtap with schema extensions;
 
-select plan(20);
+select plan(21);
 
 insert into auth.users (id, email, raw_user_meta_data) values
   ('a1000000-0000-4000-8000-00000000000a', 'v@vanderbilt.edu', '{"adult_confirmed": true}'),
@@ -29,10 +29,15 @@ select is((select count(*)::integer from public.lobbies where id = '10000000-000
 select lives_ok($$select public.request_join('10000000-0000-4000-8000-000000000001')$$, 'And can ask to join');
 
 set local request.jwt.claims to '{"sub": "c1000000-0000-4000-8000-00000000000c", "role": "authenticated"}';
-select is((select count(*)::integer from public.lobbies where id = '10000000-0000-4000-8000-000000000001'), 1, 'A school that isn''t linked sees it too (filtered out by default in the app)');
+select is((select count(*)::integer from public.lobbies where id = '10000000-0000-4000-8000-000000000001'), 0, 'A school that isn''t linked doesn''t see it');
 select ok(
   not exists (select 1 from public.my_community() d where d in ('rit.edu', 'vanderbilt.edu')),
-  'But it isn''t in their community, so "Only my school" hides it'
+  'And those schools aren''t in its community'
+);
+select throws_ok(
+  $$select public.request_join('10000000-0000-4000-8000-000000000001')$$,
+  'P0001', 'That session isn’t available anymore.',
+  'Or ask to join it'
 );
 
 

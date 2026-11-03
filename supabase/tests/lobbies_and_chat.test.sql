@@ -1,11 +1,12 @@
 -- Tests for migrations/*_lobbies_and_chat.sql.
 -- Everything runs in one transaction that is rolled back, so no test data is left behind.
 -- A hosts. B, C, F and G are classmates at Northeastern, D is at MIT, E hasn't finished the survey.
+-- The live database may hold real lobbies too, so counts look only at this test's session.
 
 begin;
 create extension if not exists pgtap with schema extensions;
 
-select plan(32);
+select plan(33);
 
 insert into auth.users (id, email, raw_user_meta_data) values
   ('a1000000-0000-4000-8000-00000000000a', 'a@northeastern.edu', '{"adult_confirmed": true}'),
@@ -59,7 +60,7 @@ select throws_ok(
 -- Joining ---------------------------------------------------------------------------------------
 
 set local request.jwt.claims to '{"sub": "b2000000-0000-4000-8000-00000000000b", "role": "authenticated"}';
-select is((select count(*)::integer from public.lobbies), 1, 'A classmate sees the session');
+select is((select count(*)::integer from public.lobbies where id = '10000000-0000-4000-8000-000000000001'), 1, 'A classmate sees the session');
 select lives_ok($$select public.request_join('10000000-0000-4000-8000-000000000001')$$, 'A classmate can ask to join');
 select is(
   (select role::text from public.lobby_members where user_id = 'b2000000-0000-4000-8000-00000000000b'),
@@ -69,22 +70,27 @@ select is(
 
 set local request.jwt.claims to '{"sub": "c3000000-0000-4000-8000-00000000000c", "role": "authenticated"}';
 select is(
-  (select count(*)::integer from public.lobby_members where role = 'requested'),
+  (select count(*)::integer from public.lobby_members where lobby_id = '10000000-0000-4000-8000-000000000001' and role = 'requested'),
   0,
   'Another classmate doesn''t see who asked to join'
 );
 select lives_ok($$select public.request_join('10000000-0000-4000-8000-000000000001')$$, 'A second classmate asks to join');
 
 set local request.jwt.claims to '{"sub": "d4000000-0000-4000-8000-00000000000d", "role": "authenticated"}';
-select is((select count(*)::integer from public.lobbies), 1, 'Students at another school see the session too');
+select is((select count(*)::integer from public.lobbies where id = '10000000-0000-4000-8000-000000000001'), 0, 'Students at another school don''t see the session');
 select is(
-  (select count(*)::integer from public.lobby_members),
-  1,
-  'They see who''s in it (the host), but not who asked to join'
+  (select count(*)::integer from public.lobby_members where lobby_id = '10000000-0000-4000-8000-000000000001'),
+  0,
+  'Or who''s in it'
+);
+select throws_ok(
+  $$select public.request_join('10000000-0000-4000-8000-000000000001')$$,
+  'P0001', 'That session isn’t available anymore.',
+  'Or ask to join it'
 );
 
 set local request.jwt.claims to '{"sub": "a7000000-0000-4000-8000-000000000007", "role": "authenticated"}';
-select is((select count(*)::integer from public.lobbies), 0, 'Someone the host blocked doesn''t see the session');
+select is((select count(*)::integer from public.lobbies where id = '10000000-0000-4000-8000-000000000001'), 0, 'Someone the host blocked doesn''t see the session');
 
 set local request.jwt.claims to '{"sub": "e5000000-0000-4000-8000-00000000000e", "role": "authenticated"}';
 select throws_ok(
@@ -94,7 +100,7 @@ select throws_ok(
 );
 
 set local request.jwt.claims to '{"sub": "a1000000-0000-4000-8000-00000000000a", "role": "authenticated"}';
-select is((select count(*)::integer from public.lobby_members where role = 'requested'), 2, 'The host sees both requests');
+select is((select count(*)::integer from public.lobby_members where lobby_id = '10000000-0000-4000-8000-000000000001' and role = 'requested'), 2, 'The host sees both requests');
 select lives_ok(
   $$select public.answer_join('10000000-0000-4000-8000-000000000001', 'b2000000-0000-4000-8000-00000000000b', true)$$,
   'The host accepts one'
