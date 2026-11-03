@@ -153,7 +153,7 @@ export default function AboutYouWindow({
                 </button>
               </div>
               {/* Edge where the footer strip meets the lighter area below it */}
-              <hr className="m-0" />
+              
             </>
           }
         >

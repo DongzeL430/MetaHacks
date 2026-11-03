@@ -1,5 +1,6 @@
 import { useId, useMemo, useState } from 'react';
 import AppWindow, { WINDOW_ACCENTS } from './AppWindow';
+import ChipList from './ChipList';
 import LobbyRow from './LobbyRow';
 import type { Lobby, Person } from '../dataFiles/StudyData';
 import { roleIn } from '../utils/StudyState';
@@ -33,6 +34,8 @@ interface LobbyBrowserWindowProps {
   /** Loads the newest sessions. Shows the Refresh button when given. */
   onRefresh?: () => Promise<void>;
 }
+
+const SUBJECT_CHIP = 'px-1.5 py-0.5 rounded border-2 border-ink/25 text-xs';
 
 const SIZE_CHIP = [
   'inline-flex items-center justify-center w-9 py-0.5 rounded-md border-2 border-ink/45 text-sm',
@@ -237,17 +240,25 @@ export default function LobbyBrowserWindow({
             </span>
           </label>
 
-          <label className={checkboxRow}>
-            <input type="checkbox" checked={filters.subjects} onChange={(e) => set({ subjects: e.target.checked })} />
-            <span>
-              My subjects
-              <span className="block text-xs opacity-70">
-                {subjectsKnown
-                  ? subjects.join(', ')
-                  : 'Your subjects aren’t saved yet, so this doesn’t hide anything for now.'}
+          <div className="flex flex-col gap-1">
+            <label className={checkboxRow}>
+              <input type="checkbox" checked={filters.subjects} onChange={(e) => set({ subjects: e.target.checked })} />
+              <span>
+                My subjects
+                {!subjectsKnown && (
+                  <span className="block text-xs opacity-70">
+                    Your subjects aren’t saved yet, so this doesn’t hide anything for now.
+                  </span>
+                )}
               </span>
-            </span>
-          </label>
+            </label>
+            {/* Outside the label, so opening "+N more" doesn't tick the box. A long list shows a few, the rest in a popup. */}
+            {subjectsKnown && (
+              <div className="pl-6">
+                <ChipList items={subjects} chipClassName={SUBJECT_CHIP} title="Your subjects" empty="" />
+              </div>
+            )}
+          </div>
 
           <div className="flex flex-col gap-1">
             <label className={checkboxRow}>
