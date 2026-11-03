@@ -212,6 +212,11 @@ export default function LobbyView({ lobby, people, connections, dispatch, onOpen
               isMe={p.id === ME}
               status={connections[p.id] ?? 'none'}
               dispatch={dispatch}
+              onKick={
+                role === 'host' && p.id !== lobby.hostId
+                  ? () => dispatch({ type: 'kick', lobbyId: lobby.id, personId: p.id })
+                  : undefined
+              }
             />
           ))}
           {Array.from({ length: Math.max(0, openSpots) }, (_, i) => (

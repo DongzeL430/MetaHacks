@@ -22,7 +22,6 @@ const SECTIONS: { id: Section; label: string }[] = [
 ];
 
 interface ProfileEditorWindowProps {
-  id: string;
   open: boolean;
   onClose: () => void;
   /** The saved profile. Edits stay a draft until Save. */
@@ -106,7 +105,6 @@ function FieldError({ id, children }: { id: string; children: string }) {
  * Changes are a draft until Save; Undo changes goes back to what's saved. Reopening starts fresh.
  */
 export default function ProfileEditorWindow({
-  id,
   open,
   onClose,
   profile,
@@ -118,6 +116,7 @@ export default function ProfileEditorWindow({
   onDeleteAccount,
 }: ProfileEditorWindowProps) {
   const baseId = useId();
+  const titleId = useId();
   const [section, setSection] = useState<Section>('profile');
   const [draft, setDraft] = useState<MyProfile>(profile);
   const [showProblems, setShowProblems] = useState(false);
@@ -226,252 +225,290 @@ export default function ProfileEditorWindow({
   const errorId = (field: string) => `${baseId}-${field}-error`;
   const sectionCounts = showProblems ? problemCounts : {};
 
+  // A click outside is easy to make by accident, so unsaved edits are only dropped on purpose
+  const requestClose = () => {
+    if (dirty && !window.confirm('Close without saving? Your unsaved profile changes will be lost.')) return;
+    onClose();
+  };
+
+  if (!open) return null;
+
   return (
-    <AppWindow
-      id={id}
-      title="Profile"
-      accent={WINDOW_ACCENTS.sand}
-      info="Edit how you show up to other students and what StudBuds uses to match you: your nickname and avatar, your courses and survey answers, your free time, and contact details you can choose to share."
-      open={open}
-      onClose={onClose}
-      controls={{ close: 'enabled', fullscreen: 'enabled' }}
-      minWidth={300}
-      minHeight={320}
-      bodyClassName="p-3 flex flex-col gap-3"
-      footer={
-        <div className="flex flex-wrap items-center gap-2">
-          <p
-            role="status"
-            className={`m-0 flex-1 min-w-[8rem] text-sm ${status?.kind === 'error' ? 'text-danger' : 'opacity-70'}`}
-          >
-            {status?.text ?? (dirty ? 'Unsaved changes' : '')}
-          </p>
-          <button type="button" onClick={undo} disabled={!dirty || saving} className="px-3 py-0.5 text-sm">
-            Undo changes
-          </button>
-          <button type="button" onClick={() => void save()} disabled={!dirty || saving} className="px-3 py-0.5 text-sm">
-            {saving ? 'Saving…' : 'Save'}
-          </button>
-        </div>
-      }
-    >
-      <ViewTabs
-        baseId={baseId}
-        label="Profile sections"
-        // Count badges show which sections still need fixing after a Save attempt
-        tabs={SECTIONS.map((s) => ({ id: s.id, label: s.label, count: sectionCounts[s.id] }))}
-        value={section}
-        onChange={setSection}
+    <>
+      {/* Dims the whole page, nav bar included. Clicking it closes the popup. */}
+      <div
+        aria-hidden="true"
+        onPointerDown={requestClose}
+        className="fixed inset-0 z-[45] bg-ink/25 motion-safe:transition-opacity motion-safe:duration-200 starting:opacity-0"
       />
 
       <div
-        key={section}
-        role="tabpanel"
-        id={viewPanelId(baseId)}
-        aria-labelledby={viewTabId(baseId, section)}
-        className="flex flex-col gap-4 motion-safe:transition-opacity motion-safe:duration-200 starting:opacity-0"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        className="absolute inset-0 z-50 p-3"
+        onPointerDown={(e) => {
+          if (e.target === e.currentTarget) requestClose();
+        }}
+        onKeyDown={(e) => {
+          if (e.key === 'Escape') {
+            e.preventDefault();
+            e.stopPropagation();
+            requestClose();
+          }
+        }}
       >
-        {section === 'profile' && (
-          <>
-            <div className="flex items-center gap-3">
-              {/* The drawing is its own square tile, so it shows as is, without the round frame */}
-              {avatarUrl ? (
-                // doodle.css frames every image; the utilities turn that off here
-                <img
-                  src={avatarUrl}
-                  alt="Your avatar"
-                  className="w-24 h-24 shrink-0 object-contain rounded-none border-0 [border-image:none]"
-                />
-              ) : (
-                <PersonAvatar person={{ id: 'me', name: draft.nickname || '?' }} className="w-20 h-20" />
-              )}
-              <div className="flex flex-col items-start gap-1.5">
-                <p className="m-0 text-sm opacity-70">This is how you appear in lobbies and in the nav bar.</p>
-                {onRedrawAvatar && (
-                  <button
-                    type="button"
-                    onClick={() => void redraw()}
-                    disabled={drawing || outOfChanges}
-                    title="Muse draws a new avatar from your saved nickname"
-                    className="px-3 py-0.5 text-sm"
-                  >
-                    {drawing ? 'Drawing…' : 'Draw a new avatar'}
-                  </button>
-                )}
-              </div>
-            </div>
-            {drawNote && (
-              <p role="status" className={`m-0 text-sm ${drawNote.kind === 'error' ? 'text-danger' : 'opacity-70'}`}>
-                {drawNote.text}
+        <AppWindow
+          title="Profile"
+          titleId={titleId}
+          accent={WINDOW_ACCENTS.sand}
+          info="Edit how you show up to other students and what StudBuds uses to match you: your nickname and avatar, your courses and survey answers, your free time, and contact details you can choose to share."
+          onClose={requestClose}
+          excludeFromLayout
+          controls={{ close: 'enabled', fullscreen: 'enabled', pin: 'hidden' }}
+          initialSize={({ width, height }) => ({
+            width: Math.min(width * 0.95, 760),
+            height: Math.min(height * 0.92, 720),
+          })}
+          minWidth={300}
+          minHeight={320}
+          bodyClassName="p-3 flex flex-col gap-3"
+          footer={
+            <div className="flex flex-wrap items-center gap-2">
+              <p
+                role="status"
+                className={`m-0 flex-1 min-w-[8rem] text-sm ${status?.kind === 'error' ? 'text-danger' : 'opacity-70'}`}
+              >
+                {status?.text ?? (dirty ? 'Unsaved changes' : '')}
               </p>
-            )}
-
-            <div className={LABEL}>
-              <label htmlFor={`${baseId}-nickname`} className="text-sm">
-                Nickname
-              </label>
-              <input
-                id={`${baseId}-nickname`}
-                type="text"
-                value={draft.nickname}
-                onChange={(e) => update({ nickname: e.target.value })}
-                onKeyDown={(e) => e.key === 'Enter' && e.preventDefault()}
-                maxLength={PROFILE_LIMITS.nicknameMax}
-                autoComplete="off"
-                aria-invalid={!!shown.nickname || undefined}
-                aria-describedby={shown.nickname ? errorId('nickname') : undefined}
-                style={shown.nickname ? { outline: '2px dashed var(--color-danger-strong)', outlineOffset: -8 } : undefined}
-                className={INPUT}
-              />
-              {shown.nickname && <FieldError id={errorId('nickname')}>{shown.nickname}</FieldError>}
-              <span className="text-xs opacity-70">
-                Classmates see this, so skip your real name. Saving a new one uses a daily change; then “Draw a
-                new avatar” to match it.
-              </span>
+              <button type="button" onClick={undo} disabled={!dirty || saving} className="px-3 py-0.5 text-sm">
+                Undo changes
+              </button>
+              <button type="button" onClick={() => void save()} disabled={!dirty || saving} className="px-3 py-0.5 text-sm">
+                {saving ? 'Saving…' : 'Save'}
+              </button>
             </div>
-
-            <p className="m-0 text-sm opacity-70">{changesNote}</p>
-          </>
-        )}
-
-        {section === 'courses' && (
-          <CoursesSection
-            value={asAcademics(draft.courses)}
-            onChange={(next) => update({ courses: next.courses })}
-            missing={showProblems ? courseProblem?.missing : undefined}
-            notice="When you save, Muse matches new course names to your school’s catalog."
+          }
+        >
+          <ViewTabs
+            baseId={baseId}
+            label="Profile sections"
+            // Count badges show which sections still need fixing after a Save attempt
+            tabs={SECTIONS.map((s) => ({ id: s.id, label: s.label, count: sectionCounts[s.id] }))}
+            value={section}
+            onChange={setSection}
           />
-        )}
 
-        {section === 'answers' && (
-          <>
-            <p className="m-0 text-sm opacity-70">Your pre-survey answers. Matching uses them to find study partners.</p>
-            {SURVEY_SECTIONS.map((s) => (
-              <section key={s.id} className="flex flex-col gap-1">
-                <h3 className="m-0 px-2 text-xl">{s.title}</h3>
-                <MultipleChoiceSection
-                  section={s}
-                  values={draft.answers}
-                  missing={showProblems ? unanswered : undefined}
-                  onAnswer={(questionId, option) => update({ answers: { ...draft.answers, [questionId]: option } })}
-                />
-              </section>
-            ))}
-          </>
-        )}
-
-        {section === 'schedule' && (
-          <>
-            <p className="m-0 text-sm opacity-70">
-              Drag across the times you’re usually free. Lobby filters and the host form use this.
-            </p>
-            <AvailabilityCalendar
-              key={calendarKey}
-              defaultValue={draft.availability}
-              onChange={(availability) => update({ availability })}
-            />
-          </>
-        )}
-
-        {section === 'contact' && (
-          <>
-            <p className="m-0 text-sm opacity-70">
-              All optional. These are never shown on your card; they’re only shared with someone if you choose to.
-            </p>
-            {(
-              [
-                { key: 'discord', label: 'Discord', placeholder: 'yourname', max: PROFILE_LIMITS.discordMax, type: 'text' },
-                { key: 'instagram', label: 'Instagram', placeholder: '@yourname', max: PROFILE_LIMITS.instagramMax + 1, type: 'text' },
-                { key: 'phone', label: 'Phone', placeholder: '(555) 123-4567', max: PROFILE_LIMITS.phoneMax, type: 'tel' },
-              ] as const
-            ).map((f) => (
-              <div key={f.key} className={LABEL}>
-                <label htmlFor={`${baseId}-${f.key}`} className="text-sm">
-                  {f.label} <span className="opacity-60">(optional)</span>
-                </label>
-                <input
-                  id={`${baseId}-${f.key}`}
-                  type={f.type}
-                  value={draft.contact[f.key]}
-                  onChange={(e) => updateContact({ [f.key]: e.target.value })}
-                  onKeyDown={(e) => e.key === 'Enter' && e.preventDefault()}
-                  placeholder={f.placeholder}
-                  maxLength={f.max}
-                  autoComplete="off"
-                  aria-invalid={!!shown[f.key] || undefined}
-                  aria-describedby={shown[f.key] ? errorId(f.key) : undefined}
-                  style={shown[f.key] ? { outline: '2px dashed var(--color-danger-strong)', outlineOffset: -8 } : undefined}
-                  className={INPUT}
-                />
-                {shown[f.key] && <FieldError id={errorId(f.key)}>{shown[f.key]!}</FieldError>}
-              </div>
-            ))}
-          </>
-        )}
-
-        {section === 'account' && (
-          <>
-            {onLogOut && (
-              <div className="flex flex-col items-start gap-1">
-                <button type="button" onClick={onLogOut} className="px-4 py-1">
-                  Log out
-                </button>
-              </div>
-            )}
-
-            {onDeleteAccount && (
-              <div className="flex flex-col gap-2 pt-3 border-t-2 border-ink/15">
-                {confirmingDelete ? (
-                  <>
-                    <p className="m-0 text-sm">This deletes your account and everything tied to you. It can’t be undone.</p>
-                    <label className="flex flex-col gap-1 text-sm">
-                      Type DELETE to confirm:
-                      <input
-                        type="text"
-                        value={deleteText}
-                        onChange={(e) => setDeleteText(e.target.value)}
-                        onKeyDown={(e) => e.key === 'Enter' && e.preventDefault()}
-                        autoComplete="off"
-                        className={INPUT}
-                      />
-                    </label>
-                    {deleteError && (
-                      <p role="alert" className="m-0 text-sm text-danger">
-                        {deleteError}
-                      </p>
+          <div
+            key={section}
+            role="tabpanel"
+            id={viewPanelId(baseId)}
+            aria-labelledby={viewTabId(baseId, section)}
+            className="flex flex-col gap-4 motion-safe:transition-opacity motion-safe:duration-200 starting:opacity-0"
+          >
+            {section === 'profile' && (
+              <>
+                <div className="flex items-center gap-3">
+                  {/* The drawing is its own square tile, so it shows as is, without the round frame */}
+                  {avatarUrl ? (
+                    // doodle.css frames every image; the utilities turn that off here
+                    <img
+                      src={avatarUrl}
+                      alt="Your avatar"
+                      className="w-24 h-24 shrink-0 object-contain rounded-none border-0 [border-image:none]"
+                    />
+                  ) : (
+                    <PersonAvatar person={{ id: 'me', name: draft.nickname || '?' }} className="w-20 h-20" />
+                  )}
+                  <div className="flex flex-col items-start gap-1.5">
+                    <p className="m-0 text-sm opacity-70">This is how you appear in lobbies and in the nav bar.</p>
+                    {onRedrawAvatar && (
+                      <button
+                        type="button"
+                        onClick={() => void redraw()}
+                        disabled={drawing || outOfChanges}
+                        title="Muse draws a new avatar from your saved nickname"
+                        className="px-3 py-0.5 text-sm"
+                      >
+                        {drawing ? 'Drawing…' : 'Draw a new avatar'}
+                      </button>
                     )}
-                    <div className="flex gap-2">
-                      <button
-                        type="button"
-                        onClick={() => void deleteAccount()}
-                        disabled={deleteText !== 'DELETE' || deleting}
-                        className="px-3 py-0.5 text-sm"
-                      >
-                        {deleting ? 'Deleting…' : 'Delete my account'}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setConfirmingDelete(false);
-                          setDeleteText('');
-                          setDeleteError('');
-                        }}
-                        className="px-3 py-0.5 text-sm"
-                      >
-                        Cancel
-                      </button>
-                    </div>
-                  </>
-                ) : (
-                  <button type="button" onClick={() => setConfirmingDelete(true)} className="self-start px-3 py-0.5 text-sm">
-                    Delete my account
-                  </button>
+                  </div>
+                </div>
+                {drawNote && (
+                  <p role="status" className={`m-0 text-sm ${drawNote.kind === 'error' ? 'text-danger' : 'opacity-70'}`}>
+                    {drawNote.text}
+                  </p>
                 )}
-              </div>
+
+                <div className={LABEL}>
+                  <label htmlFor={`${baseId}-nickname`} className="text-sm">
+                    Nickname
+                  </label>
+                  <input
+                    id={`${baseId}-nickname`}
+                    type="text"
+                    value={draft.nickname}
+                    onChange={(e) => update({ nickname: e.target.value })}
+                    onKeyDown={(e) => e.key === 'Enter' && e.preventDefault()}
+                    maxLength={PROFILE_LIMITS.nicknameMax}
+                    autoComplete="off"
+                    aria-invalid={!!shown.nickname || undefined}
+                    aria-describedby={shown.nickname ? errorId('nickname') : undefined}
+                    style={shown.nickname ? { outline: '2px dashed var(--color-danger-strong)', outlineOffset: -8 } : undefined}
+                    className={INPUT}
+                  />
+                  {shown.nickname && <FieldError id={errorId('nickname')}>{shown.nickname}</FieldError>}
+                  <span className="text-xs opacity-70">
+                    Classmates see this, so skip your real name. Saving a new one uses a daily change; then “Draw a
+                    new avatar” to match it.
+                  </span>
+                </div>
+
+                <p className="m-0 text-sm opacity-70">{changesNote}</p>
+              </>
             )}
-          </>
-        )}
+
+            {section === 'courses' && (
+              <CoursesSection
+                value={asAcademics(draft.courses)}
+                onChange={(next) => update({ courses: next.courses })}
+                missing={showProblems ? courseProblem?.missing : undefined}
+                notice="When you save, Muse matches new course names to your school’s catalog."
+              />
+            )}
+
+            {section === 'answers' && (
+              <>
+                <p className="m-0 text-sm opacity-70">Your pre-survey answers. Matching uses them to find study partners.</p>
+                {SURVEY_SECTIONS.map((s) => (
+                  <section key={s.id} className="flex flex-col gap-1">
+                    <h3 className="m-0 px-2 text-xl">{s.title}</h3>
+                    <MultipleChoiceSection
+                      section={s}
+                      values={draft.answers}
+                      missing={showProblems ? unanswered : undefined}
+                      onAnswer={(questionId, option) => update({ answers: { ...draft.answers, [questionId]: option } })}
+                    />
+                  </section>
+                ))}
+              </>
+            )}
+
+            {section === 'schedule' && (
+              <>
+                <p className="m-0 text-sm opacity-70">
+                  Drag across the times you’re usually free. Lobby filters and the host form use this.
+                </p>
+                <AvailabilityCalendar
+                  key={calendarKey}
+                  defaultValue={draft.availability}
+                  onChange={(availability) => update({ availability })}
+                />
+              </>
+            )}
+
+            {section === 'contact' && (
+              <>
+                <p className="m-0 text-sm opacity-70">
+                  All optional. These are never shown on your card; they’re only shared with someone if you choose to.
+                </p>
+                {(
+                  [
+                    { key: 'discord', label: 'Discord', placeholder: 'yourname', max: PROFILE_LIMITS.discordMax, type: 'text' },
+                    { key: 'instagram', label: 'Instagram', placeholder: '@yourname', max: PROFILE_LIMITS.instagramMax + 1, type: 'text' },
+                    { key: 'phone', label: 'Phone', placeholder: '(555) 123-4567', max: PROFILE_LIMITS.phoneMax, type: 'tel' },
+                  ] as const
+                ).map((f) => (
+                  <div key={f.key} className={LABEL}>
+                    <label htmlFor={`${baseId}-${f.key}`} className="text-sm">
+                      {f.label} <span className="opacity-60">(optional)</span>
+                    </label>
+                    <input
+                      id={`${baseId}-${f.key}`}
+                      type={f.type}
+                      value={draft.contact[f.key]}
+                      onChange={(e) => updateContact({ [f.key]: e.target.value })}
+                      onKeyDown={(e) => e.key === 'Enter' && e.preventDefault()}
+                      placeholder={f.placeholder}
+                      maxLength={f.max}
+                      autoComplete="off"
+                      aria-invalid={!!shown[f.key] || undefined}
+                      aria-describedby={shown[f.key] ? errorId(f.key) : undefined}
+                      style={shown[f.key] ? { outline: '2px dashed var(--color-danger-strong)', outlineOffset: -8 } : undefined}
+                      className={INPUT}
+                    />
+                    {shown[f.key] && <FieldError id={errorId(f.key)}>{shown[f.key]!}</FieldError>}
+                  </div>
+                ))}
+              </>
+            )}
+
+            {section === 'account' && (
+              <>
+                {onLogOut && (
+                  <div className="flex flex-col items-start gap-1">
+                    <button type="button" onClick={onLogOut} className="px-4 py-1">
+                      Log out
+                    </button>
+                  </div>
+                )}
+
+                {onDeleteAccount && (
+                  <div className="flex flex-col gap-2 pt-3 border-t-2 border-ink/15">
+                    {confirmingDelete ? (
+                      <>
+                        <p className="m-0 text-sm">This deletes your account and everything tied to you. It can’t be undone.</p>
+                        <label className="flex flex-col gap-1 text-sm">
+                          Type DELETE to confirm:
+                          <input
+                            type="text"
+                            value={deleteText}
+                            onChange={(e) => setDeleteText(e.target.value)}
+                            onKeyDown={(e) => e.key === 'Enter' && e.preventDefault()}
+                            autoComplete="off"
+                            className={INPUT}
+                          />
+                        </label>
+                        {deleteError && (
+                          <p role="alert" className="m-0 text-sm text-danger">
+                            {deleteError}
+                          </p>
+                        )}
+                        <div className="flex gap-2">
+                          <button
+                            type="button"
+                            onClick={() => void deleteAccount()}
+                            disabled={deleteText !== 'DELETE' || deleting}
+                            className="px-3 py-0.5 text-sm"
+                          >
+                            {deleting ? 'Deleting…' : 'Delete my account'}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setConfirmingDelete(false);
+                              setDeleteText('');
+                              setDeleteError('');
+                            }}
+                            className="px-3 py-0.5 text-sm"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </>
+                    ) : (
+                      <button type="button" onClick={() => setConfirmingDelete(true)} className="self-start px-3 py-0.5 text-sm">
+                        Delete my account
+                      </button>
+                    )}
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        </AppWindow>
       </div>
-    </AppWindow>
+    </>
   );
 }

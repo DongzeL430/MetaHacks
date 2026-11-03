@@ -176,6 +176,9 @@ export function useStudyData() {
             accept: action.type === 'accept-join',
           });
           break;
+        case 'kick':
+          result = await supabase.rpc('kick_from_lobby', { lobby_id: action.lobbyId, student: toId(action.personId) });
+          break;
         case 'connect':
           result = await supabase.rpc('connect_with', { person: toId(action.personId) });
           break;

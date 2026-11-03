@@ -13,6 +13,8 @@ interface ConnectionsWindowProps {
   people: Person[];
   connections: Record<string, ConnectionStatus>;
   dispatch: StudyDispatch;
+  /** Opens someone's profile (their avatar and name are a button) */
+  onViewProfile?: (personId: string) => void;
 }
 
 type View = 'received' | 'connected' | 'sent';
@@ -26,8 +28,17 @@ const VIEWS: { id: View; label: string; empty: string }[] = [
 /**
  * Friend-request style connections, split into views like a nav bar:
  * Requests to answer, people you're Connected with, and requests you've Sent.
+ * Click someone's avatar or name to see their profile.
  */
-export default function ConnectionsWindow({ id, open, onClose, people, connections, dispatch }: ConnectionsWindowProps) {
+export default function ConnectionsWindow({
+  id,
+  open,
+  onClose,
+  people,
+  connections,
+  dispatch,
+  onViewProfile,
+}: ConnectionsWindowProps) {
   const baseId = useId();
   const listFor = (view: View) => people.filter((p) => connections[p.id] === view);
 
@@ -75,8 +86,24 @@ export default function ConnectionsWindow({ id, open, onClose, people, connectio
                 key={p.id}
                 className="list-none flex items-center gap-3 p-3 rounded-md border-2 border-ink/25 bg-paper"
               >
-                <PersonAvatar person={p} className="w-10 h-10" />
-                <span className="flex-1 min-w-0 truncate text-lg">{p.name}</span>
+                {onViewProfile ? (
+                  <button
+                    type="button"
+                    onClick={() => onViewProfile(p.id)}
+                    aria-label={`View ${p.name}’s profile`}
+                    title="View profile"
+                    // [border-image:none]: its own look, not a doodle button; the dashed ring shows hover
+                    className="flex-1 min-w-0 flex items-center gap-3 p-1 -m-1 rounded-md border-0 [border-image:none] bg-transparent text-left cursor-pointer outline-2 outline-offset-2 outline-transparent hover:outline-dashed hover:outline-ink"
+                  >
+                    <PersonAvatar person={p} className="w-10 h-10 shrink-0" />
+                    <span className="min-w-0 truncate text-lg">{p.name}</span>
+                  </button>
+                ) : (
+                  <>
+                    <PersonAvatar person={p} className="w-10 h-10" />
+                    <span className="flex-1 min-w-0 truncate text-lg">{p.name}</span>
+                  </>
+                )}
                 <ConnectControl person={p} status={connections[p.id] ?? 'none'} dispatch={dispatch} />
               </li>
             ))}

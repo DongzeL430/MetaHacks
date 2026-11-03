@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import PersonAvatar from './PersonAvatar';
 import type { ConnectionStatus, Person } from '../dataFiles/StudyData';
 import type { StudyDispatch } from '../utils/StudyState';
@@ -72,10 +73,40 @@ interface PersonCardProps {
   isMe?: boolean;
   status: ConnectionStatus;
   dispatch: StudyDispatch;
+  /** Shown to the host on everyone else's card: removes them from the session */
+  onKick?: () => void;
+}
+
+/** The host's Remove button, which asks once before removing someone for good */
+function KickControl({ name, onKick }: { name: string; onKick: () => void }) {
+  const [confirming, setConfirming] = useState(false);
+  if (!confirming) {
+    return (
+      <button
+        type="button"
+        onClick={() => setConfirming(true)}
+        aria-label={`Remove ${name} from this session`}
+        className={`${SMALL_BUTTON} self-start`}
+      >
+        Remove
+      </button>
+    );
+  }
+  return (
+    <div role="group" aria-label={`Remove ${name}?`} className="flex flex-wrap items-center gap-2 text-sm">
+      <span>Remove {name}? They can’t ask to join this session again.</span>
+      <button type="button" onClick={onKick} className={SMALL_BUTTON}>
+        Remove
+      </button>
+      <button type="button" onClick={() => setConfirming(false)} className={SMALL_BUTTON} autoFocus>
+        Keep
+      </button>
+    </div>
+  );
 }
 
 /** A filled lobby slot: who they are, what they need help with, when you're both free, what they've taken */
-export default function PersonCard({ person, isHost = false, isMe = false, status, dispatch }: PersonCardProps) {
+export default function PersonCard({ person, isHost = false, isMe = false, status, dispatch, onKick }: PersonCardProps) {
   const blocks = toDayBlocks(person.sharedSlots);
 
   return (
@@ -141,6 +172,8 @@ export default function PersonCard({ person, isHost = false, isMe = false, statu
           </div>
         </>
       )}
+
+      {onKick && !isMe && <KickControl name={person.name} onKick={onKick} />}
     </article>
   );
 }

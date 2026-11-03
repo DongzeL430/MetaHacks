@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type { ReactNode } from 'react';
-import { WindowLayer, WindowManagerProvider } from './components/AppWindow';
+import { WindowManagerProvider } from './components/AppWindow';
 import Taskbar, { TASKBAR_CLEARANCE } from './components/Taskbar';
 import type { TaskbarApp } from './components/Taskbar';
 import StudyLayout from './components/StudyLayout';
@@ -234,22 +234,20 @@ export default function HomePage({
               onSessionsClose={() => setSessionsOpen(false)}
               onRefresh={onRefreshStudy}
             />
-
-            <WindowLayer>
-              <ProfileEditorWindow
-                id="profile"
-                open={profileOpen}
-                onClose={() => setProfileOpen(false)}
-                profile={profile}
-                onSave={saveProfile}
-                avatarUrl={avatarUrl}
-                changesLeft={identityChangesLeft}
-                onRedrawAvatar={onRedrawAvatar}
-                onLogOut={onLogOut}
-                onDeleteAccount={onDeleteAccount}
-              />
-            </WindowLayer>
           </WindowManagerProvider>
+
+          {/* Popup from the avatar and name in the nav bar */}
+          <ProfileEditorWindow
+            open={profileOpen}
+            onClose={() => setProfileOpen(false)}
+            profile={profile}
+            onSave={saveProfile}
+            avatarUrl={avatarUrl}
+            changesLeft={identityChangesLeft}
+            onRedrawAvatar={onRedrawAvatar}
+            onLogOut={onLogOut}
+            onDeleteAccount={onDeleteAccount}
+          />
 
           {/* Popup from the star in the theme menu */}
           <ThemePromptWindow

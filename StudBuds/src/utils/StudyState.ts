@@ -19,6 +19,7 @@ export type StudyAction =
   | { type: 'leave'; lobbyId: string }
   | { type: 'accept-join'; lobbyId: string; personId: string }
   | { type: 'decline-join'; lobbyId: string; personId: string }
+  | { type: 'kick'; lobbyId: string; personId: string }
   | { type: 'connect'; personId: string }
   | { type: 'cancel-connect'; personId: string }
   | { type: 'accept-connect'; personId: string }
@@ -85,6 +86,11 @@ export function studyReducer(state: StudyState, action: StudyAction): StudyState
       );
     case 'decline-join':
       return editLobby(action.lobbyId, (l) => ({ ...l, requestIds: without(l.requestIds, action.personId) }));
+    case 'kick':
+      // Only the host can remove someone, and never themselves
+      return editLobby(action.lobbyId, (l) =>
+        l.hostId === ME && action.personId !== ME ? { ...l, memberIds: without(l.memberIds, action.personId) } : l,
+      );
     case 'connect':
       return setConnection(action.personId, 'sent');
     case 'cancel-connect':
