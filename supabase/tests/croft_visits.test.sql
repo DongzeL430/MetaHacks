@@ -5,7 +5,7 @@
 begin;
 create extension if not exists pgtap with schema extensions;
 
-select plan(5);
+select plan(6);
 
 insert into auth.users (id, email, raw_user_meta_data) values
   ('a1000000-0000-4000-8000-00000000000a', 'a@vanderbilt.edu', '{"adult_confirmed": true}'),
@@ -55,6 +55,15 @@ select is(
 );
 
 reset role;
+
+reset role;
+select is(
+  (select string_agg(a.attname, ',') from pg_index i
+     join pg_attribute a on a.attrelid = i.indrelid and a.attnum = any(i.indkey)
+   where i.indrelid = 'public.croft_visits'::regclass and i.indisprimary),
+  'id',
+  'A deleted visit sends only its id over Realtime, never who visited whom'
+);
 
 select * from finish();
 rollback;

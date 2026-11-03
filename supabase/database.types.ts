@@ -490,18 +490,21 @@ export type Database = {
       croft_visits: {
         Row: {
           created_at: string
+          id: number
           owner_id: string
           visited_on: string
           visitor_id: string
         }
         Insert: {
           created_at?: string
+          id?: never
           owner_id: string
           visited_on?: string
           visitor_id: string
         }
         Update: {
           created_at?: string
+          id?: never
           owner_id?: string
           visited_on?: string
           visitor_id?: string
