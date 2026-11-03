@@ -12,6 +12,8 @@ export interface StudyState {
 export type StudyAction =
   | { type: 'host'; lobby: Lobby }
   | { type: 'close-lobby'; lobbyId: string }
+  | { type: 'lock-lobby'; lobbyId: string }
+  | { type: 'unlock-lobby'; lobbyId: string }
   | { type: 'request-join'; lobbyId: string }
   | { type: 'cancel-join'; lobbyId: string }
   | { type: 'leave'; lobbyId: string }
@@ -25,12 +27,14 @@ export type StudyAction =
 export type StudyDispatch = (action: StudyAction) => void;
 
 /** How the current user relates to a lobby */
-export type LobbyRole = 'host' | 'member' | 'requested' | 'full' | 'open';
+export type LobbyRole = 'host' | 'member' | 'requested' | 'locked' | 'full' | 'open';
 
 export function roleIn(lobby: Lobby): LobbyRole {
   if (lobby.hostId === ME) return 'host';
   if (lobby.memberIds.includes(ME)) return 'member';
   if (lobby.requestIds.includes(ME)) return 'requested';
+  // Not taking new requests: same as full for everyone outside it
+  if (lobby.locked) return 'locked';
   if (lobby.memberIds.length >= lobby.maxSize) return 'full';
   return 'open';
 }
@@ -53,6 +57,12 @@ export function studyReducer(state: StudyState, action: StudyAction): StudyState
       return { ...state, lobbies: [action.lobby, ...state.lobbies] };
     case 'close-lobby':
       return { ...state, lobbies: state.lobbies.filter((l) => l.id !== action.lobbyId) };
+    case 'lock-lobby':
+    case 'unlock-lobby':
+      // Only the host can lock or unlock their own lobby
+      return editLobby(action.lobbyId, (l) =>
+        l.hostId === ME ? { ...l, locked: action.type === 'lock-lobby' } : l,
+      );
     case 'request-join':
       return editLobby(action.lobbyId, (l) =>
         roleIn(l) === 'open' ? { ...l, requestIds: [...l.requestIds, ME] } : l,

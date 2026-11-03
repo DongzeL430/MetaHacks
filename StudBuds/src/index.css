@@ -7,6 +7,52 @@
   --font-sans: 'Short Stack', cursive;
 }
 
+/*
+ * THEME COLORS: the default look. Each one is a Tailwind color (bg-paper, text-ink, border-ink/40…)
+ * and a CSS variable (var(--color-paper)). A custom theme overrides these variables at runtime
+ * (see src/utils/Theme.ts), so everything using them recolors at once, with no code changes.
+ * `static` makes Tailwind always output every variable, even ones only used from TypeScript.
+ */
+@theme static {
+  /* Lines and text */
+  --color-ink: #3c3c3c;
+  --color-ink-strong: #2b2b2b;
+  /* Page and window fills */
+  --color-paper: #fdf7f1;
+  --color-surface: #fffdfa;
+  --color-sand: #eadbc8;
+  --color-sand-soft: #f6ede2;
+  /* Nav bar and tab bars, and the light text on them */
+  --color-nav: #6b5e54;
+  --color-nav-ink: #fdf7f1;
+  /* Highlights */
+  --color-accent: #f2a65a;
+  --color-info: #a9c7e8;
+  /* Calendar: free and busy time */
+  --color-free: #9fd6a6;
+  --color-busy: #f2a99e;
+  --color-busy-strong: #e0745f;
+  /* Warnings and errors */
+  --color-danger: #a8402c;
+  --color-danger-strong: #c4553f;
+  --color-danger-soft: #f2c9c4;
+  /* Window title bars, one per kind of window */
+  --color-title-sky: #bfd8ee;
+  --color-title-mint: #c6e5c9;
+  --color-title-peach: #f6cfa8;
+  --color-title-lilac: #d9cbee;
+  --color-title-butter: #f2e2a6;
+  --color-title-rose: #f2c9c4;
+}
+
+/* doodle.css sets its own page and text colors; follow the theme instead */
+@layer components {
+  .doodle {
+    background-color: var(--color-paper);
+    color: var(--color-ink);
+  }
+}
+
 /* Form controls don't inherit font by default */
 @layer base {
   .doodle,
@@ -19,4 +65,71 @@
 .doodle :is(button, textarea, input, select):focus-visible {
   outline: 2px dashed;
   outline-offset: -8px;
+}
+
+/*
+ * Doodle button animations: hovering lifts the button, tilts it a little (buttons side by side
+ * tilt opposite ways) and draws the same dashed border inputs get when focused; pressing squishes it.
+ *
+ * Only for buttons still using doodle.css's hand-drawn border. Buttons that draw their own look
+ * have [border-image:none] in their classes (window title buttons, nav links, tabs, chips) and
+ * keep their own effects. Doodle drop-downs (data-doodle-field) are form fields, so they're skipped too.
+ * Same layer as doodle.css, so any Tailwind class on a button still wins.
+ * The focus rule above is unlayered, so a focused button always shows its dashes.
+ */
+@layer components {
+  .doodle button:not([class*='border-image:none']):not([data-doodle-field]) {
+    /* Invisible until hover; the dashes slide inward as they appear */
+    outline: 2px dashed transparent;
+    outline-offset: -4px;
+    transition:
+      transform 220ms cubic-bezier(0.34, 1.56, 0.64, 1),
+      outline-color 150ms ease-out,
+      outline-offset 180ms ease-out;
+  }
+
+  .doodle button:not([class*='border-image:none']):not([data-doodle-field]):enabled:hover {
+    transform: translateY(-2px) rotate(-1.5deg);
+    outline-color: currentColor;
+    outline-offset: -8px; /* same spot as the focus dashes */
+    cursor: pointer;
+  }
+
+  .doodle button:not([class*='border-image:none']):not([data-doodle-field]):enabled:nth-of-type(even):hover {
+    transform: translateY(-2px) rotate(1.5deg);
+  }
+
+  .doodle button:not([class*='border-image:none']):not([data-doodle-field]):enabled:active {
+    transform: translateY(1px) scale(0.96);
+    transition-duration: 70ms;
+  }
+
+  .doodle button:not([class*='border-image:none']):not([data-doodle-field]):disabled {
+    cursor: not-allowed;
+  }
+
+  /* Doodle drop-downs: the same dashed hover border as buttons and focused inputs, without the tilt */
+  .doodle button[data-doodle-field] {
+    outline: 2px dashed transparent;
+    outline-offset: -4px;
+    transition:
+      outline-color 150ms ease-out,
+      outline-offset 180ms ease-out;
+  }
+
+  .doodle button[data-doodle-field]:enabled:hover {
+    outline-color: currentColor;
+    outline-offset: -8px;
+    cursor: pointer;
+  }
+
+  /* Reduced motion: keep the dashes, skip the movement */
+  @media (prefers-reduced-motion: reduce) {
+    .doodle button:not([class*='border-image:none']):not([data-doodle-field]),
+    .doodle button:not([class*='border-image:none']):not([data-doodle-field]):enabled:hover,
+    .doodle button:not([class*='border-image:none']):not([data-doodle-field]):enabled:active {
+      transform: none;
+      transition: outline-color 150ms ease-out;
+    }
+  }
 }

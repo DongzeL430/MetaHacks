@@ -3,6 +3,7 @@ import { WindowLayer, useWindowManager } from './AppWindow';
 import BrowserWindow from './BrowserWindow';
 import ConnectionsWindow from './ConnectionsWindow';
 import HostSessionWindow from './HostSessionWindow';
+import type { NewLobbyDetails } from './HostSessionWindow';
 import LobbyBrowserWindow from './LobbyBrowserWindow';
 import LobbyView from './LobbyView';
 import ChatWindow from './ChatWindow';
@@ -32,6 +33,8 @@ interface StudyLayoutProps {
   myAvailability?: string[];
   /** The user's subjects (e.g. their courses), used by the lobby browser's "My subjects" filter */
   mySubjects?: string[];
+  /** Places offered when hosting (public cafes, libraries…). Leave out for the defaults. */
+  locationSuggestions?: string[];
   state: StudyState;
   dispatch: StudyDispatch;
   /** Lobby list window, driven by its taskbar button */
@@ -61,6 +64,7 @@ export default function StudyLayout({
   people,
   myAvailability,
   mySubjects,
+  locationSuggestions,
   state,
   dispatch,
   lobbiesOpen,
@@ -120,7 +124,7 @@ export default function StudyLayout({
     setHostOpen(true);
   };
 
-  const create = (subject: string, maxSize: number, timeSlots: string[]) => {
+  const create = ({ subject, maxSize, location, timeSlots }: NewLobbyDetails) => {
     const lobby: Lobby = {
       id: `lobby-${Date.now().toString(36)}`,
       hostId: ME,
@@ -129,6 +133,7 @@ export default function StudyLayout({
       memberIds: [ME],
       requestIds: [],
       timeSlots,
+      location,
     };
     dispatch({ type: 'host', lobby });
     setHostOpen(false);
@@ -234,6 +239,7 @@ export default function StudyLayout({
         open={hostOpen}
         onClose={() => setHostOpen(false)}
         availability={myAvailability}
+        locationSuggestions={locationSuggestions}
         onCreate={create}
       />
     </>

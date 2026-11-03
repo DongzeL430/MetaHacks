@@ -11,7 +11,7 @@ export interface LobbyFilters {
   size: boolean;
   /** Group sizes to show when `size` is on (host included) */
   sizes: number[];
-  /** Hide lobbies with no open spots */
+  /** Hide lobbies you can't request to join: no open spots, or locked by the host */
   openSpots: boolean;
   /** Hide lobbies you host, joined or asked to join (they're always in Sessions too) */
   hideMine: boolean;
@@ -56,7 +56,7 @@ export function passesFilters(lobby: Lobby, filters: LobbyFilters, ctx: MatchCon
   if (filters.schedule && ctx.freeSet.size > 0 && !fitsSchedule(lobby, ctx.freeSet)) return false;
   if (filters.subjects && ctx.subjects.length > 0 && !matchesSubjects(lobby, ctx.subjects)) return false;
   if (filters.size && !filters.sizes.includes(lobby.maxSize)) return false;
-  if (filters.openSpots && lobby.memberIds.length >= lobby.maxSize) return false;
+  if (filters.openSpots && (lobby.memberIds.length >= lobby.maxSize || lobby.locked)) return false;
   return true;
 }
 

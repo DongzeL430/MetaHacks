@@ -33,9 +33,9 @@ interface LobbyBrowserWindowProps {
 }
 
 const SIZE_CHIP = [
-  'inline-flex items-center justify-center w-9 py-0.5 rounded-md border-2 border-[#3c3c3c]/45 text-sm',
-  'cursor-pointer select-none transition-colors hover:bg-[#EADBC8]/60',
-  'has-checked:bg-[#F2A65A] has-checked:border-[#3c3c3c]',
+  'inline-flex items-center justify-center w-9 py-0.5 rounded-md border-2 border-ink/45 text-sm',
+  'cursor-pointer select-none transition-colors hover:bg-sand/60',
+  'has-checked:bg-accent has-checked:border-ink',
   'has-disabled:opacity-40 has-disabled:cursor-not-allowed',
   'has-focus-visible:outline-2 has-focus-visible:outline-dashed has-focus-visible:outline-offset-2',
 ].join(' ');
@@ -195,7 +195,7 @@ export default function LobbyBrowserWindow({
 
           <label className={checkboxRow}>
             <input type="checkbox" checked={filters.openSpots} onChange={(e) => set({ openSpots: e.target.checked })} />
-            <span>Only lobbies with open spots</span>
+            <span>Only lobbies I can request to join</span>
           </label>
 
           <label className={checkboxRow}>

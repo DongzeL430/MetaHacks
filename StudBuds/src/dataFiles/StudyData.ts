@@ -36,10 +36,29 @@ export interface Lobby {
   requestIds: string[];
   /** When the session meets: one block of weekly slots ("wed|14:00", "wed|14:30", …) on one day */
   timeSlots: string[];
+  /** Where it meets: a public spot from the suggestions or anything the host typed */
+  location: string;
+  /** The host stopped taking new join requests. Requests already waiting stay. */
+  locked?: boolean;
 }
 
 /** Friend-request style: 'sent' = you asked them, 'received' = they asked you */
 export type ConnectionStatus = 'none' | 'sent' | 'received' | 'connected';
+
+/**
+ * Places offered while hosting: public cafes and libraries. Hosts can also type their own.
+ * Placeholder names for now; swap in real spots for your school (from your database,
+ * or a maps service like Google Places or OpenStreetMap).
+ */
+export const LOCATION_SUGGESTIONS = [
+  'Main Library',
+  'Science and Engineering Library',
+  'Student Union Café',
+  'Campus Starbucks',
+  'Law Library Reading Room',
+  'Public Library (Downtown Branch)',
+  'Online (video call)',
+];
 
 /** Suggestions offered while typing a subject when hosting */
 export const SUBJECT_SUGGESTIONS = [
@@ -109,6 +128,7 @@ export const SAMPLE_LOBBIES: Lobby[] = [
     memberIds: ['maya-ortiz', 'priya-shah'],
     requestIds: [],
     timeSlots: slotsBetween('wed', '14:00', '16:00'),
+    location: 'Student Union Café',
   },
   {
     id: 'lobby-linalg',
@@ -118,6 +138,7 @@ export const SAMPLE_LOBBIES: Lobby[] = [
     memberIds: ['devin-park', 'priya-shah', 'sam-oconnor'],
     requestIds: [],
     timeSlots: slotsBetween('thu', '11:00', '12:30'),
+    location: 'Main Library',
   },
   {
     id: 'lobby-stats',
@@ -127,6 +148,7 @@ export const SAMPLE_LOBBIES: Lobby[] = [
     memberIds: ['priya-shah'],
     requestIds: [],
     timeSlots: slotsBetween('fri', '13:00', '14:00'),
+    location: 'Online (video call)',
   },
   // One you host, with people waiting, so the host view has something to show
   {
@@ -138,6 +160,7 @@ export const SAMPLE_LOBBIES: Lobby[] = [
     // More than 3 waiting, so the "View all" button shows
     requestIds: ['sam-oconnor', 'maya-ortiz', 'devin-park', 'priya-shah'],
     timeSlots: slotsBetween('mon', '09:00', '10:30'),
+    location: 'Science and Engineering Library',
   },
 ];
 
@@ -157,3 +180,36 @@ export const SAMPLE_CONNECTIONS: Record<string, ConnectionStatus> = {
   'maya-ortiz': 'connected',
   'devin-park': 'received',
 };
+
+/* ------------------------------------------------------------------ *
+ * The signed-in user's own profile, edited in the Profile window
+ * ------------------------------------------------------------------ */
+
+/** Avatar animals to pick from */
+export const AVATAR_ANIMALS = ['Penguin', 'Cat', 'Fox', 'Frog', 'Bunny', 'Bear', 'Owl', 'Otter'];
+
+export const PROFILE_LIMITS = {
+  nicknameMin: 2,
+  nicknameMax: 24,
+  /** Most entries in each subject list */
+  maxTags: 12,
+  tagMax: 60,
+  discordMax: 40,
+  instagramMax: 30,
+  phoneMax: 20,
+} as const;
+
+export interface MyProfile {
+  /** Shown to others in lobbies and the nav bar */
+  nickname: string;
+  /** One of AVATAR_ANIMALS */
+  animal: string;
+  /** Subjects you'd like help with */
+  seekingHelpWith: string[];
+  /** Courses you've taken */
+  coursesTaken: string[];
+  /** Weekly free slots ("mon|09:30"), the same as the pre-survey calendar */
+  availability: string[];
+  /** Only shared with someone when you choose to, never shown on your public card */
+  contact: { discord: string; instagram: string; phone: string };
+}

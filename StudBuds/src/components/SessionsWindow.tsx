@@ -47,9 +47,11 @@ export default function SessionsWindow({ id, open, onClose, lobbies, people, ope
   const list = listFor(view);
 
   const noteFor = (lobby: Lobby) => {
-    if (view === 'hosting' && lobby.requestIds.length > 0) {
+    if (view === 'hosting') {
       const n = lobby.requestIds.length;
-      return `${n} ${n === 1 ? 'person' : 'people'} waiting to join`;
+      const waiting = n > 0 ? `${n} ${n === 1 ? 'person' : 'people'} waiting to join` : '';
+      if (lobby.locked) return waiting ? `Locked · ${waiting}` : 'Locked: not taking new requests';
+      return waiting || undefined;
     }
     if (view === 'requested') return 'Waiting for the host to let you in';
     return undefined;

@@ -6,11 +6,12 @@ import type { LobbyRole } from '../utils/StudyState';
 import { describeSlots } from '../utils/ScheduleBlocks';
 
 export const LOBBY_STATUS: Record<LobbyRole, { label: string; className: string }> = {
-  host: { label: 'Hosting', className: 'bg-[#F2A65A]/45' },
-  member: { label: 'Joined', className: 'bg-[#9FD6A6]/60' },
-  requested: { label: 'Requested', className: 'bg-[#A9C7E8]/60' },
-  full: { label: 'Full', className: 'bg-[#3c3c3c]/15' },
-  open: { label: 'Open', className: 'bg-[#FDF7F1] border-2 border-[#3c3c3c]/30' },
+  host: { label: 'Hosting', className: 'bg-accent/45' },
+  member: { label: 'Joined', className: 'bg-free/60' },
+  requested: { label: 'Requested', className: 'bg-info/60' },
+  locked: { label: 'Locked', className: 'bg-ink/15' },
+  full: { label: 'Full', className: 'bg-ink/15' },
+  open: { label: 'Open', className: 'bg-paper border-2 border-ink/30' },
 };
 
 interface LobbyRowProps {
@@ -36,12 +37,12 @@ export default function LobbyRow({ lobby, people, isOpenTab, onOpen, tags = [], 
       <button
         type="button"
         onClick={() => onOpen(lobby.id)}
-        aria-label={`${lobby.subject}, hosted by ${host?.name ?? 'someone'}${when ? `, ${describeSlots(lobby.timeSlots)}` : ''}, ${lobby.memberIds.length} of ${lobby.maxSize} spots, ${status.label}${tags.length ? `, ${tags.join(', ')}` : ''}`}
+        aria-label={`${lobby.subject}, hosted by ${host?.name ?? 'someone'}${when ? `, ${describeSlots(lobby.timeSlots)}` : ''}${lobby.location ? `, at ${lobby.location}` : ''}, ${lobby.memberIds.length} of ${lobby.maxSize} spots, ${status.label}${tags.length ? `, ${tags.join(', ')}` : ''}`}
         className={[
           'w-full p-3 flex items-center gap-3 text-left rounded-md',
-          'border-2 [border-image:none] bg-[#FDF7F1] transition-colors',
-          'hover:bg-[#EADBC8]/60 hover:border-[#3c3c3c]/70',
-          isOpenTab ? 'border-[#3c3c3c]/70' : 'border-[#3c3c3c]/25',
+          'border-2 [border-image:none] bg-paper transition-colors',
+          'hover:bg-sand/60 hover:border-ink/70',
+          isOpenTab ? 'border-ink/70' : 'border-ink/25',
         ].join(' ')}
       >
         {host && <PersonAvatar person={host} className="w-11 h-11" />}
@@ -50,11 +51,12 @@ export default function LobbyRow({ lobby, people, isOpenTab, onOpen, tags = [], 
           <span className="text-lg leading-tight truncate">{lobby.subject}</span>
           <span className="text-xs opacity-70 truncate">Host: {host?.name ?? 'Unknown'}</span>
           {when && <span className="text-xs truncate">{when}</span>}
-          {note && <span className="text-xs text-[#A8402C] truncate">{note}</span>}
+          {lobby.location && <span className="text-xs truncate opacity-80">At {lobby.location}</span>}
+          {note && <span className="text-xs text-danger truncate">{note}</span>}
           {tags.length > 0 && (
             <span className="flex flex-wrap gap-1 mt-0.5">
               {tags.map((tag) => (
-                <span key={tag} className="px-1.5 rounded bg-[#9FD6A6]/45 text-[11px]">
+                <span key={tag} className="px-1.5 rounded bg-free/45 text-[11px]">
                   {tag}
                 </span>
               ))}

@@ -1,19 +1,20 @@
 import { useState } from 'react';
 import type { ReactNode } from 'react';
-import { WindowManagerProvider } from './components/AppWindow';
+import { WindowLayer, WindowManagerProvider } from './components/AppWindow';
 import Taskbar, { TASKBAR_CLEARANCE } from './components/TaskBar';
 import type { TaskbarApp } from './components/TaskBar';
 import StudyLayout from './components/StudyLayout';
+import ThemePromptWindow from './components/ThemePromptWindow';
+import { useUserTheme } from './utils/UserTheme';
+import ProfileEditorWindow from './components/ProfileEditorWindow';
+import type { MyProfile } from './dataFiles/StudyData';
 import { ME } from './dataFiles/StudyData';
 import type { Person } from './dataFiles/StudyData';
 import { useStudyState } from './utils/StudyState';
 import type { StudyAction, StudyState } from './utils/StudyState';
 // Same background picture as the auth page.
+// The default background picture. A custom theme can swap it, tint it, or move its focus point.
 import defaultbg from './assets/defaultbg.png';
-
-// Which part of the picture stays in view when it has to be cropped (CSS background-position).
-// 'center bottom' keeps the ground visible and trims the sky or sides first.
-const BG_FOCUS = 'center bottom';
 
 /* Taskbar icons (drawn at 24x24, sized by the taskbar) */
 const SessionsIcon = () => (
@@ -56,10 +57,16 @@ interface HomePageProps {
   myAvailability?: string[];
   /** The user's subjects (e.g. courses from the pre-survey), used by the lobby browser's "My subjects" filter */
   mySubjects?: string[];
+  /** Places offered when hosting a session (public cafes, libraries…). Leave out for the defaults. */
+  locationSuggestions?: string[];
   /** Lobbies and connection statuses to start with */
   initialStudyState?: StudyState;
   /** Every lobby / connection action the user takes, e.g. to send to your backend */
   onStudyAction?: (action: StudyAction) => void;
+  /** Starting values for the profile editor beyond the props above (animal, courses, contact…) */
+  initialProfile?: Partial<MyProfile>;
+  /** Saves the edited profile, e.g. to your backend. Throw to show an error in the window. */
+  onSaveProfile?: (profile: MyProfile) => void | Promise<void>;
 }
 
 export default function HomePage({
@@ -70,12 +77,35 @@ export default function HomePage({
   people = [],
   myAvailability,
   mySubjects,
+  locationSuggestions,
   initialStudyState = EMPTY_STUDY_STATE,
   onStudyAction,
+  initialProfile,
+  onSaveProfile,
 }: HomePageProps) {
   const [lobbiesOpen, setLobbiesOpen] = useState(false);
   const [connectionsOpen, setConnectionsOpen] = useState(false);
   const [sessionsOpen, setSessionsOpen] = useState(false);
+  // Theme: 'default' (sun) or 'custom' (star). The star opens the prompt window.
+  // The user's theme: loaded from Supabase, applied to the whole page, saved when it changes
+  const theme = useUserTheme();
+  const [themePromptOpen, setThemePromptOpen] = useState(false);
+
+  // The user's own profile. Saving it updates the nav bar, lobby filters and host form right away.
+  const [profileOpen, setProfileOpen] = useState(false);
+  const [profile, setProfile] = useState<MyProfile>(() => ({
+    nickname: userName,
+    animal: 'Penguin',
+    seekingHelpWith: mySubjects ?? [],
+    coursesTaken: [],
+    availability: myAvailability ?? [],
+    contact: { discord: '', instagram: '', phone: '' },
+    ...initialProfile,
+  }));
+  const saveProfile = async (next: MyProfile) => {
+    await onSaveProfile?.(next); // if this throws, the window shows the error and keeps the draft
+    setProfile(next);
+  };
   const [study, dispatch] = useStudyState(initialStudyState, onStudyAction);
 
   const pendingRequests = Object.values(study.connections).filter((s) => s === 'received').length;
@@ -117,13 +147,29 @@ export default function HomePage({
   return (
     // overflow-clip: a window dragged past the edge (or springing back) never adds page scrollbars
     <div className="doodle w-full h-dvh flex flex-col overflow-clip">
-      <Taskbar userName={userName} avatar={avatar} right={taskbarRight} apps={taskbarApps} />
+      <Taskbar
+        userName={profile.nickname}
+        profile={{ open: profileOpen, onClick: () => setProfileOpen((o) => !o) }}
+        avatar={avatar}
+        right={taskbarRight}
+        apps={taskbarApps}
+        theme={{
+          // The star shows as selected while its prompt is open
+          active: themePromptOpen ? 'custom' : theme.choice,
+          onSelectDefault: () => {
+            theme.switchToDefault();
+            setThemePromptOpen(false);
+          },
+          onSelectCustom: () => setThemePromptOpen(true),
+        }}
+      />
 
       {/* The picture is this container's own background, so only the area under the taskbar gets it
           and children keep their own backgrounds on top. */}
       <main
-        className={`flex-1 min-h-0 flex flex-col px-2 pb-2 md:px-3 md:pb-3 bg-cover bg-no-repeat ${TASKBAR_CLEARANCE}`}
-        style={{ backgroundImage: `url(${defaultbg})`, backgroundPosition: BG_FOCUS }}
+        className={`flex-1 min-h-0 flex flex-col px-2 pb-2 md:px-3 md:pb-3 ${TASKBAR_CLEARANCE}`}
+        // Built only from checked theme values: the default picture, or the user's own generated one
+        style={theme.backgroundStyle(defaultbg)}
       >
         {/* Desk area: windows rest inside this box. `relative` so window layers can cover it.
             It starts empty; windows open from the nav bar. */}
@@ -131,10 +177,12 @@ export default function HomePage({
           {/* All windows on the desk share one stack and one tiling layout */}
           <WindowManagerProvider>
             <StudyLayout
-              me={{ name: userName, avatar: avatarUrl }}
+              me={{ name: profile.nickname, avatar: avatarUrl }}
               people={people}
-              myAvailability={myAvailability}
-              mySubjects={mySubjects}
+              myAvailability={profile.availability}
+              // The "My subjects" lobby filter matches both lists
+              mySubjects={[...profile.seekingHelpWith, ...profile.coursesTaken]}
+              locationSuggestions={locationSuggestions}
               state={study}
               dispatch={dispatch}
               lobbiesOpen={lobbiesOpen}
@@ -144,7 +192,31 @@ export default function HomePage({
               sessionsOpen={sessionsOpen}
               onSessionsClose={() => setSessionsOpen(false)}
             />
+
+            <WindowLayer>
+              <ProfileEditorWindow
+                id="profile"
+                open={profileOpen}
+                onClose={() => setProfileOpen(false)}
+                profile={profile}
+                onSave={saveProfile}
+              />
+            </WindowLayer>
           </WindowManagerProvider>
+
+          {/* Popup from the star in the theme menu */}
+          <ThemePromptWindow
+            open={themePromptOpen}
+            onClose={() => setThemePromptOpen(false)}
+            onGenerate={async (prompt) => {
+              await theme.generate(prompt);
+            }}
+            savedThemeName={theme.choice === 'default' ? theme.savedTheme?.name : undefined}
+            onUseSaved={() => {
+              theme.switchToSaved();
+              setThemePromptOpen(false);
+            }}
+          />
         </div>
       </main>
     </div>

@@ -1,3 +1,4 @@
+import { useEffect, useId, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 
 /*
@@ -37,7 +38,7 @@ export interface TaskbarApp {
 }
 
 interface TaskbarProps {
-  /** The user's name, shown next to the avatar*/
+  /** The user's name, shown next to the avatar */
   userName?: string;
   /** Replaces the default drawing in the round badge. Size it with w-full h-full. */
   avatar?: ReactNode;
@@ -50,8 +51,136 @@ interface TaskbarProps {
   visibleApps?: string[];
   /** Optional extra content at the right end of the bar (step counter, clock, etc.) */
   right?: ReactNode;
+  /**
+   * Shows the paintbrush button at the very right of the bar. Clicking it drops down a small tall
+   * capsule with a sun (default theme) above a star (custom theme). `active` highlights the current one.
+   */
+  theme?: ThemeMenuProps;
+  /**
+   * Makes the avatar and name clickable, e.g. to open the profile editor.
+   * `open` makes it look pressed while that window is open.
+   */
+  profile?: { open?: boolean; onClick: () => void };
   /** Extra classes for the outer header */
   className?: string;
+}
+
+export type ThemeChoice = 'default' | 'custom';
+
+interface ThemeMenuProps {
+  active: ThemeChoice;
+  onSelectDefault: () => void;
+  onSelectCustom: () => void;
+}
+
+function SunIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="w-5 h-5 md:w-[22px] md:h-[22px]" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+      <circle cx="12" cy="12" r="4" fill="currentColor" />
+      <path d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5.3 5.3l1.4 1.4M17.3 17.3l1.4 1.4M5.3 18.7l1.4-1.4M17.3 6.7l1.4-1.4" />
+    </svg>
+  );
+}
+
+function StarIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="w-5 h-5 md:w-[22px] md:h-[22px]" fill="currentColor" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" aria-hidden="true">
+      <path d="M12 3.2l2.6 5.5 6 .7-4.4 4.1 1.2 5.9L12 16.5l-5.4 2.9 1.2-5.9-4.4-4.1 6-.7z" />
+    </svg>
+  );
+}
+
+/** A round white-icon button inside the theme drop-down */
+function ThemeOption({ icon, label, active, onClick }: { icon: ReactNode; label: string; active: boolean; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={active}
+      aria-label={label}
+      title={label}
+      className={[
+        'shrink-0 w-10 h-10 p-0 flex items-center justify-center rounded-full',
+        'border-0 [border-image:none] text-white transition-colors duration-150',
+        active ? 'bg-paper/25' : 'bg-transparent hover:bg-paper/15',
+      ].join(' ')}
+    >
+      {icon}
+    </button>
+  );
+}
+
+/** The paintbrush button and the small sun / star capsule it drops down */
+function ThemeMenu({ active, onSelectDefault, onSelectCustom }: ThemeMenuProps) {
+  const menuId = useId();
+  const wrapRef = useRef<HTMLDivElement>(null);
+  const [open, setOpen] = useState(false);
+
+  // Close on a click anywhere else, or Escape
+  useEffect(() => {
+    if (!open) return;
+    const onPointer = (e: PointerEvent) => {
+      if (!wrapRef.current?.contains(e.target as Node)) setOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setOpen(false);
+    };
+    document.addEventListener('pointerdown', onPointer);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('pointerdown', onPointer);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [open]);
+
+  const choose = (select: () => void) => {
+    select();
+    setOpen(false);
+  };
+
+  return (
+    <div ref={wrapRef} className="relative shrink-0">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        aria-expanded={open}
+        aria-controls={menuId}
+        aria-label="Theme"
+        title="Theme"
+        className={[
+          'w-10 h-10 md:w-11 md:h-11 p-0 flex items-center justify-center rounded-full',
+          'border-0 [border-image:none] text-nav-ink transition-colors duration-150',
+          open ? 'bg-paper/25' : 'bg-paper/10 hover:bg-paper/20',
+        ].join(' ')}
+      >
+        <PaintbrushIcon />
+      </button>
+
+      {open && (
+        <div
+          id={menuId}
+          role="group"
+          aria-label="Choose a theme"
+          // A tall capsule centered under the paintbrush: sun on top, star below
+          className="absolute left-1/2 -translate-x-1/2 top-full mt-3 flex flex-col items-center gap-1 p-1.5 rounded-full bg-nav shadow-[0_10px_24px_-10px_rgba(40,30,20,0.6)] motion-safe:transition motion-safe:duration-150 starting:opacity-0 starting:-translate-y-1"
+        >
+          <ThemeOption icon={<SunIcon />} label="Default theme" active={active === 'default'} onClick={() => choose(onSelectDefault)} />
+          <ThemeOption icon={<StarIcon />} label="Custom theme" active={active === 'custom'} onClick={() => choose(onSelectCustom)} />
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** Paintbrush, drawn at 24x24 */
+function PaintbrushIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="w-5 h-5 md:w-6 md:h-6" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M20.5 3.5 12.8 11.2" strokeWidth="2.4" />
+      <path d="M10.4 9.6l4 4" />
+      <path d="M10.6 11.4c-2.1-.3-3.9.9-4.3 3.1-.3 1.8-1.2 3.1-2.8 3.7 2.6 1.3 6.3.7 7.9-1.4 1.1-1.5 1-3.4-.8-5.4z" fill="currentColor" />
+    </svg>
+  );
 }
 
 function DefaultAvatar({ label }: { label: string }) {
@@ -76,9 +205,9 @@ function TaskbarAppLink({ app }: { app: TaskbarApp }) {
       title={app.label}
       className={[
         'shrink-0 flex items-center gap-2 rounded-full px-3 sm:px-4 py-2 text-base md:text-lg',
-        'border-0 [border-image:none] text-[#FDF7F1] transition-colors duration-150',
+        'border-0 [border-image:none] text-nav-ink transition-colors duration-150',
         'disabled:opacity-45 disabled:cursor-not-allowed',
-        app.open ? 'bg-[#FDF7F1]/25' : 'bg-transparent enabled:hover:bg-[#FDF7F1]/15',
+        app.open ? 'bg-paper/25' : 'bg-transparent enabled:hover:bg-paper/15',
       ].join(' ')}
     >
       {app.icon && (
@@ -97,6 +226,8 @@ export default function Taskbar({
   apps = [],
   visibleApps,
   right,
+  theme,
+  profile,
   className = '',
 }: TaskbarProps) {
   const shownApps = apps.filter((app) => !app.hidden && (!visibleApps || visibleApps.includes(app.id)));
@@ -107,23 +238,63 @@ export default function Taskbar({
     <header
       className={`pointer-events-none absolute inset-x-0 top-0 z-20 flex justify-center px-3 pt-3 md:px-6 md:pt-5 ${className}`}
     >
-      <div className="pointer-events-auto w-full max-w-4xl flex items-center gap-1 sm:gap-2 p-1.5 md:p-2 rounded-full bg-[#6B5E54] text-[#FDF7F1] shadow-[0_14px_30px_-12px_rgba(40,30,20,0.55)]">
-        {/* Left: avatar badge with the user's name right next to it, in one light pill */}
-        <div className="shrink-0 min-w-0 max-w-[55%] sm:max-w-[16rem] flex items-center gap-2 rounded-full bg-[#FDF7F1] text-[#2b2b2b] p-1 pr-4">
-          <div className="shrink-0 w-9 h-9 md:w-10 md:h-10 p-1 rounded-full bg-[#EADBC8] overflow-hidden">
-            {avatar ?? <DefaultAvatar label={`${userName}'s avatar`} />}
-          </div>
-          <p className="m-0 min-w-0 truncate text-base md:text-lg">{userName}</p>
-        </div>
+      <div
+        className={[
+          'pointer-events-auto w-full max-w-4xl flex items-center gap-1 sm:gap-2 p-1.5 md:p-2 rounded-full',
+          'bg-nav text-nav-ink shadow-[0_14px_30px_-12px_rgba(40,30,20,0.55)]',
+          // Slides down from above the screen when the page loads (skipped with reduced motion)
+          'motion-safe:transition-[translate,opacity] motion-safe:duration-700 motion-safe:ease-[cubic-bezier(0.22,1,0.36,1)]',
+          'starting:-translate-y-[calc(100%+2rem)] starting:opacity-0',
+        ].join(' ')}
+      >
+        {/* Left: avatar badge with the user's name right next to it, in one light pill.
+            A button when `profile` is given (opens the profile editor), plain otherwise. */}
+        {(() => {
+          const pill = [
+            'shrink-0 min-w-0 max-w-[55%] sm:max-w-[16rem] flex items-center gap-2 rounded-full bg-paper text-ink-strong p-1 pr-4',
+            'motion-safe:transition-opacity motion-safe:duration-500 motion-safe:delay-300 starting:opacity-0',
+          ].join(' ');
+          const contents = (
+            <>
+              <span className="shrink-0 w-9 h-9 md:w-10 md:h-10 p-1 rounded-full bg-sand overflow-hidden flex">
+                {avatar ?? <DefaultAvatar label={`${userName}'s avatar`} />}
+              </span>
+              <span className="min-w-0 truncate text-base md:text-lg">{userName}</span>
+            </>
+          );
+          return profile ? (
+            <button
+              type="button"
+              onClick={profile.onClick}
+              aria-pressed={profile.open ?? false}
+              aria-label={`${userName}: ${profile.open ? 'close' : 'edit'} your profile`}
+              title="Edit your profile"
+              // [border-image:none]: its own look, not a doodle button; the dashed ring shows hover
+              className={`${pill} border-0 [border-image:none] text-left outline-2 outline-offset-2 outline-transparent hover:outline-dashed hover:outline-nav-ink ${
+                profile.open ? 'outline-dashed outline-nav-ink' : ''
+              }`}
+            >
+              {contents}
+            </button>
+          ) : (
+            <div className={pill}>{contents}</div>
+          );
+        })()}
 
         {/* Middle: app links. Scrolls sideways if there are more than fit. */}
-        <nav aria-label="Apps" className="flex-1 min-w-0 flex items-center gap-1 overflow-x-auto px-1 sm:px-2">
+        <nav
+          aria-label="Apps"
+          className="flex-1 min-w-0 flex items-center gap-1 overflow-x-auto px-1 sm:px-2 motion-safe:transition-opacity motion-safe:duration-500 motion-safe:delay-[400ms] starting:opacity-0"
+        >
           {shownApps.map((app) => (
             <TaskbarAppLink key={app.id} app={app} />
           ))}
         </nav>
 
         {right && <div className="shrink-0 hidden sm:flex items-center gap-3 px-3 text-sm">{right}</div>}
+
+        {/* Very right: theme menu */}
+        {theme && <ThemeMenu {...theme} />}
       </div>
     </header>
   );
