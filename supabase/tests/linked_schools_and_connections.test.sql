@@ -45,10 +45,9 @@ select is(
   'pending',
   'V sees it as pending'
 );
-select throws_ok(
+select lives_ok(
   $$select public.connect_with('c1000000-0000-4000-8000-00000000000c')$$,
-  'P0001', 'You can’t connect with this student.',
-  'Students at schools that aren''t linked can''t connect'
+  'Students at schools that aren''t linked can connect too'
 );
 select throws_ok(
   $$insert into public.connections (requester_id, addressee_id) values ('a1000000-0000-4000-8000-00000000000a', 'a2000000-0000-4000-8000-00000000000a')$$,
@@ -70,7 +69,8 @@ select lives_ok($$select public.answer_connection('a1000000-0000-4000-8000-00000
 
 set local request.jwt.claims to '{"sub": "a1000000-0000-4000-8000-00000000000a", "role": "authenticated"}';
 select is(
-  (select status from public.connections where requester_id = 'a1000000-0000-4000-8000-00000000000a'),
+  (select status from public.connections
+   where requester_id = 'a1000000-0000-4000-8000-00000000000a' and addressee_id = 'b1000000-0000-4000-8000-00000000000b'),
   'connected',
   'Now both are connected'
 );
