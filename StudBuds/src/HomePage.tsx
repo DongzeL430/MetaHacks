@@ -230,11 +230,13 @@ export default function HomePage({
             onGenerate={async (prompt) => {
               await theme.generate(prompt);
             }}
-            savedThemeName={theme.choice === 'default' ? theme.savedTheme?.name : undefined}
-            onUseSaved={() => {
-              theme.switchToSaved();
+            themes={theme.library}
+            activeThemeId={theme.activeThemeId}
+            onUseTheme={(id) => {
+              theme.switchToLibraryTheme(id);
               setThemePromptOpen(false);
             }}
+            onDeleteTheme={theme.deleteLibraryTheme}
             themesLeft={theme.themesLeft}
           />
         </div>

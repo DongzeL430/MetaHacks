@@ -638,6 +638,35 @@ export type Database = {
           },
         ]
       }
+      saved_themes: {
+        Row: {
+          created_at: string
+          id: string
+          theme: Json
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          theme: Json
+          user_id?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          theme?: Json
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "saved_themes_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       study_session_members: {
         Row: {
           account_deleted: boolean | null
@@ -959,24 +988,34 @@ export type Database = {
       }
       user_themes: {
         Row: {
+          saved_theme_id: string | null
           theme: Json
           updated_at: string
           use_custom: boolean
           user_id: string
         }
         Insert: {
+          saved_theme_id?: string | null
           theme: Json
           updated_at?: string
           use_custom?: boolean
           user_id?: string
         }
         Update: {
+          saved_theme_id?: string | null
           theme?: Json
           updated_at?: string
           use_custom?: boolean
           user_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "user_themes_saved_theme_id_fkey"
+            columns: ["saved_theme_id"]
+            isOneToOne: false
+            referencedRelation: "saved_themes"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "user_themes_user_id_fkey"
             columns: ["user_id"]

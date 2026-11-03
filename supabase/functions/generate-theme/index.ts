@@ -375,5 +375,23 @@ Deno.serve(async (req) => {
     note = 'Custom background images are coming soon. Your colors are ready.';
   }
 
-  return json({ theme, note, themesLeft: claim.left });
+  // Kept in the student's theme library and switched on here, on the server, so a new theme is
+  // never lost if the browser doesn't get to save it
+  const { data: kept, error: libraryError } = await admin
+    .from('saved_themes')
+    .insert({ user_id: user.id, theme })
+    .select('id')
+    .single();
+  if (libraryError) {
+    console.error('theme library save failed', libraryError.message);
+    if (libraryError.message.startsWith('You can add at most')) {
+      note = 'Your theme library is full, so this one isn’t kept there. Delete an old theme to keep new ones.';
+    }
+  }
+  const { error: currentError } = await admin
+    .from('user_themes')
+    .upsert({ user_id: user.id, theme, use_custom: true, saved_theme_id: kept?.id ?? null });
+  if (currentError) console.error('current theme save failed', currentError.message);
+
+  return json({ theme, note, themesLeft: claim.left, savedThemeId: kept?.id ?? null });
 });
