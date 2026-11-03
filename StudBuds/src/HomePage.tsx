@@ -162,7 +162,7 @@ export default function HomePage({
   const [study, dispatch] = useStudyState(initialStudyState, onStudyAction, studyState);
   // The live activity feed at the bottom right: sessions that fit you, and visits and help on your croft
   const peopleById = useMemo(() => new Map(people.map((p) => [p.id, p])), [people]);
-  const chatLines = useWorldChat(study.lobbies, peopleById);
+  const chat = useWorldChat(study.lobbies, peopleById);
 
   const pendingRequests = Object.values(study.connections).filter((s) => s === 'received').length;
   // People waiting to join the lobby you host
@@ -253,7 +253,7 @@ export default function HomePage({
         {/* Desk area: windows rest inside this box. `relative` so window layers can cover it.
             It starts empty; windows open from the nav bar. */}
         <div className="relative flex-1 min-h-0 min-w-0">
-          <WorldChat lines={chatLines} />
+          <WorldChat lines={chat.lines} history={chat.history} unread={chat.unread} onOpen={chat.markRead} />
           {/* All windows on the desk share one stack and one tiling layout */}
           <WindowManagerProvider>
             {/* "Visit croft" on any profile card opens that person's croft */}
@@ -276,8 +276,12 @@ export default function HomePage({
                 onRefresh={onRefreshStudy}
               />
 
+              {/* One layer per window: windows in a shared layer stack below each other, so the
+                  visited croft landed under the desk, out of sight */}
               <WindowLayer>
                 <CroftWindow id="croft" open={croftOpen} onClose={() => setCroftOpen(false)} ownerId={null} />
+              </WindowLayer>
+              <WindowLayer>
                 <CroftWindow
                   id="croft-visit"
                   open={visitingId !== null}
