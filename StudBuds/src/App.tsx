@@ -9,11 +9,14 @@ import { finishOnboarding, saveAnswers, saveAvailability } from './lib/onboardin
 import { findCourses, matchCourses, saveAcademics } from './lib/courses.ts';
 import { deleteMyAccount, useMyProfile } from './lib/profile.ts';
 import { useStudyData } from './lib/study.ts';
+import { prefetchStudySpots, useStudySpots } from './lib/spots.ts';
 import { SURVEY_SECTIONS } from './dataFiles/SurveySections.ts';
 
 /** The pre-survey, saving each page as the student goes */
 function SurveyPage() {
   const navigate = useNavigate();
+  // At sign-up, Muse starts finding this school's study spots (once per school) for the host form
+  useEffect(() => prefetchStudySpots(), []);
   return (
     <PreSurveyFlow
       onAvailabilitySubmit={(slots) => saveAvailability(slots)}
@@ -34,6 +37,7 @@ function SurveyPage() {
 function Home() {
   const me = useMyProfile();
   const study = useStudyData();
+  const studySpots = useStudySpots();
   const location = useLocation();
   const openLobbies = (location.state as { openLobbies?: boolean } | null)?.openLobbies ?? false;
 
@@ -65,6 +69,7 @@ function Home() {
         ) : undefined
       }
       people={study.people}
+      locationSuggestions={studySpots}
       myAvailability={me.availability}
       mySubjects={[...new Set([...me.seekingHelpWith, ...me.coursesTaken])]}
       initialStudyState={study.state}

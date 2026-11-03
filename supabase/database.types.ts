@@ -786,6 +786,32 @@ export type Database = {
           },
         ]
       }
+      study_spots: {
+        Row: {
+          searched_at: string
+          spots: Json
+          university_domain: string
+        }
+        Insert: {
+          searched_at?: string
+          spots: Json
+          university_domain: string
+        }
+        Update: {
+          searched_at?: string
+          spots?: Json
+          university_domain?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "study_spots_university_domain_fkey"
+            columns: ["university_domain"]
+            isOneToOne: true
+            referencedRelation: "universities"
+            referencedColumns: ["domain"]
+          },
+        ]
+      }
       survey_answers: {
         Row: {
           answered_at: string
