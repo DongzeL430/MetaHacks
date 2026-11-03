@@ -384,6 +384,7 @@ export type Database = {
       public_profiles: {
         Row: {
           animal: string
+          avatar_path: string | null
           created_at: string
           equipped_accessories: Json
           id: string
@@ -392,6 +393,7 @@ export type Database = {
         }
         Insert: {
           animal?: string
+          avatar_path?: string | null
           created_at?: string
           equipped_accessories?: Json
           id: string
@@ -400,6 +402,7 @@ export type Database = {
         }
         Update: {
           animal?: string
+          avatar_path?: string | null
           created_at?: string
           equipped_accessories?: Json
           id?: string
@@ -867,6 +870,7 @@ export type Database = {
       delete_my_account: { Args: never; Returns: undefined }
       finish_onboarding: { Args: never; Returns: undefined }
       hook_before_user_created: { Args: { event: Json }; Returns: Json }
+      identity_changes_left: { Args: never; Returns: number }
       is_lobby_host: { Args: { p_lobby_id: string }; Returns: boolean }
       is_lobby_member: { Args: { p_lobby_id: string }; Returns: boolean }
       known_courses_for: {
