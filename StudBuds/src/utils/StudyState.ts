@@ -1,4 +1,4 @@
-import { useCallback, useReducer, useRef } from 'react';
+import { useCallback, useEffect, useReducer, useRef } from 'react';
 import { ME } from '../dataFiles/StudyData';
 import type { ConnectionStatus, Lobby } from '../dataFiles/StudyData';
 
@@ -95,14 +95,24 @@ export function studyReducer(state: StudyState, action: StudyAction): StudyState
   }
 }
 
+/** The reducer plus one internal action: replacing everything with the backend's copy */
+const withSync = (state: StudyState, action: StudyAction | { type: 'sync'; state: StudyState }): StudyState =>
+  action.type === 'sync' ? action.state : studyReducer(state, action);
+
 /**
  * Lobby + connection state. Updates locally right away, and passes every action to onAction
- * (e.g. to send it to your backend).
+ * (e.g. to send it to your backend). When `server` is given, each new copy of it replaces the
+ * local state, so what the backend says (including other students' changes) wins.
  */
-export function useStudyState(initial: StudyState, onAction?: (action: StudyAction) => void) {
-  const [state, localDispatch] = useReducer(studyReducer, initial);
+export function useStudyState(initial: StudyState, onAction?: (action: StudyAction) => void, server?: StudyState) {
+  const [state, localDispatch] = useReducer(withSync, initial);
   const onActionRef = useRef(onAction);
   onActionRef.current = onAction;
+
+  // Each new copy from the backend replaces what's shown; it isn't passed to onAction
+  useEffect(() => {
+    if (server) localDispatch({ type: 'sync', state: server });
+  }, [server]);
 
   const dispatch = useCallback<StudyDispatch>((action) => {
     localDispatch(action);

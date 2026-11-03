@@ -1,28 +1,16 @@
 import { useCallback, useEffect, useState } from 'react';
 import { callFunction } from './edgeFunctions.ts';
 import { saveAvailability } from './onboarding.ts';
+import { rangesToSlots } from './slots.ts';
 import { supabase } from './supabase.ts';
 import type { MyProfile } from '../dataFiles/StudyData';
 
-const DAY_KEYS = ['', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
-// Matches the availability calendar's slot length
-const SLOT_MINUTES = 30;
-const pad = (n: number) => String(n).padStart(2, '0');
-const minutesOf = (time: string) => Number(time.slice(0, 2)) * 60 + Number(time.slice(3, 5));
-
-/** Saved weekly ranges (Monday 09:00 to 10:00) back to calendar slots ("mon|09:00", "mon|09:30") */
-function rangesToSlots(rows: { weekday: number; starts_at: string; ends_at: string }[]): string[] {
-  const slots: string[] = [];
-  for (const r of rows) {
-    for (let m = minutesOf(r.starts_at); m < minutesOf(r.ends_at); m += SLOT_MINUTES) {
-      slots.push(`${DAY_KEYS[r.weekday]}|${pad(Math.floor(m / 60))}:${pad(m % 60)}`);
-    }
-  }
-  return slots.sort();
-}
-
-const avatarUrlOf = (path: string | null) =>
+/** Public link to an avatar Muse drew (the avatars bucket is public; file names are random) */
+export const avatarUrlOf = (path: string | null | undefined) =>
   path ? supabase.storage.from('avatars').getPublicUrl(path).data.publicUrl : undefined;
+
+/** "CS 2500 · Fundamentals of CS 1", or just the code when there's no title */
+const courseLabel = (c: { code: string; title: string | null }) => (c.title ? `${c.code} · ${c.title}` : c.code);
 
 /**
  * Contact handles in the database's formats: Instagram without the @, Discord in lowercase,
@@ -69,6 +57,10 @@ export function useMyProfile() {
   const [availability, setAvailability] = useState<string[]>([]);
   const [contact, setContact] = useState<MyProfile['contact']>({ discord: '', instagram: '', phone: '' });
   const [changesLeft, setChangesLeft] = useState<number | null>(null);
+  // Own course names (typed ones included, since only they see these): finished ones, and the
+  // ones rated 1 or 2, which classmates see as "Looking for help with"
+  const [coursesTaken, setCoursesTaken] = useState<string[]>([]);
+  const [seekingHelpWith, setSeekingHelpWith] = useState<string[]>([]);
 
   useEffect(() => {
     let cancelled = false;
@@ -76,13 +68,20 @@ export function useMyProfile() {
       const { data: auth } = await supabase.auth.getUser();
       const id = auth.user?.id;
       if (!id) return;
-      const [pub, priv, slots, left] = await Promise.all([
+      const [pub, priv, slots, left, courses] = await Promise.all([
         supabase.from('public_profiles').select('nickname, avatar_path').eq('id', id).single(),
         supabase.from('profiles').select('instagram, discord, phone').eq('id', id).single(),
         supabase.from('availability_slots').select('weekday, starts_at, ends_at'),
         supabase.rpc('identity_changes_left'),
+        supabase.from('user_courses').select('status, confidence, custom_name, courses(code, title)'),
       ]);
       if (cancelled) return;
+      const named = (courses.data ?? []).map((c) => ({
+        ...c,
+        label: c.courses ? courseLabel(c.courses) : (c.custom_name ?? ''),
+      }));
+      setCoursesTaken(named.filter((c) => c.status === 'completed' && c.label).map((c) => c.label));
+      setSeekingHelpWith(named.filter((c) => c.confidence <= 2 && c.label).map((c) => c.label));
       setNickname(pub.data?.nickname ?? '');
       setAvatarPath(pub.data?.avatar_path ?? null);
       setContact({
@@ -150,6 +149,8 @@ export function useMyProfile() {
     availability,
     contact,
     changesLeft,
+    coursesTaken,
+    seekingHelpWith,
     redrawAvatar,
     save,
   };

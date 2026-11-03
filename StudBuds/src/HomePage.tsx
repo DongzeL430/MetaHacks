@@ -61,6 +61,8 @@ interface HomePageProps {
   locationSuggestions?: string[];
   /** Lobbies and connection statuses to start with */
   initialStudyState?: StudyState;
+  /** The backend's live copy of lobbies and connections. Each new copy replaces what's shown. */
+  studyState?: StudyState;
   /** Every lobby / connection action the user takes, e.g. to send to your backend */
   onStudyAction?: (action: StudyAction) => void;
   /** Starting values for the profile editor beyond the props above (animal, courses, contact…) */
@@ -86,6 +88,7 @@ export default function HomePage({
   mySubjects,
   locationSuggestions,
   initialStudyState = EMPTY_STUDY_STATE,
+  studyState,
   onStudyAction,
   initialProfile,
   onSaveProfile,
@@ -117,7 +120,7 @@ export default function HomePage({
     await onSaveProfile?.(next); // if this throws, the window shows the error and keeps the draft
     setProfile(next);
   };
-  const [study, dispatch] = useStudyState(initialStudyState, onStudyAction);
+  const [study, dispatch] = useStudyState(initialStudyState, onStudyAction, studyState);
 
   const pendingRequests = Object.values(study.connections).filter((s) => s === 'received').length;
   // People waiting to join the lobby you host

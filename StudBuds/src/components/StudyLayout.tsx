@@ -126,7 +126,8 @@ export default function StudyLayout({
 
   const create = ({ subject, maxSize, location, timeSlots }: NewLobbyDetails) => {
     const lobby: Lobby = {
-      id: `lobby-${Date.now().toString(36)}`,
+      // A real id now, so the open tab keeps pointing at this lobby once the backend saves it
+      id: crypto.randomUUID(),
       hostId: ME,
       subject,
       maxSize,
@@ -240,6 +241,8 @@ export default function StudyLayout({
         onClose={() => setHostOpen(false)}
         availability={myAvailability}
         locationSuggestions={locationSuggestions}
+        // The student's own courses, when known, instead of the generic list
+        subjectSuggestions={mySubjects && mySubjects.length > 0 ? mySubjects : undefined}
         onCreate={create}
       />
     </>
