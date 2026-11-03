@@ -31,7 +31,9 @@ export type StudyAction =
   | { type: 'accept-connect'; personId: string }
   | { type: 'decline-connect'; personId: string }
   /** Ends a connection, from either side */
-  | { type: 'remove-connect'; personId: string };
+  | { type: 'remove-connect'; personId: string }
+  /** Blocks someone: ends the connection, invites and places in each other's sessions. Silent. */
+  | { type: 'block'; personId: string };
 
 export type StudyDispatch = (action: StudyAction) => void;
 
@@ -124,6 +126,21 @@ export function studyReducer(state: StudyState, action: StudyAction): StudyState
       return setConnection(action.personId, 'none');
     case 'accept-connect':
       return setConnection(action.personId, 'connected');
+    case 'block': {
+      // Their sessions disappear, and they leave yours; anything else settles on the reload
+      const id = action.personId;
+      const connections = { ...state.connections };
+      delete connections[id];
+      return {
+        connections,
+        invites: state.invites.filter((i) => i.inviterId !== id && i.inviteeId !== id),
+        lobbies: state.lobbies
+          .filter((l) => l.hostId !== id)
+          .map((l) =>
+            l.hostId === ME ? { ...l, memberIds: without(l.memberIds, id), requestIds: without(l.requestIds, id) } : l,
+          ),
+      };
+    }
   }
 }
 

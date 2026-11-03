@@ -343,6 +343,7 @@ export default function HomePage({
             onRedrawAvatar={onRedrawAvatar}
             onLogOut={onLogOut}
             onDeleteAccount={onDeleteAccount}
+            onUnblocked={() => void onRefreshStudy?.()}
           />
 
           {/* Popup from the star in the theme menu */}

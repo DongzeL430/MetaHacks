@@ -1,9 +1,11 @@
-import { useState } from 'react';
+import { useId, useState } from 'react';
 import ChipList from './ChipList';
 import PersonAvatar from './PersonAvatar';
 import { ME } from '../dataFiles/StudyData';
 import type { ConnectionStatus, Person } from '../dataFiles/StudyData';
 import { useVisitCroft } from '../lib/croft';
+import { REPORT_NOTE_MAX, REPORT_REASONS, reportStudent } from '../lib/safety';
+import type { ReportReason } from '../lib/safety';
 import type { StudyDispatch } from '../utils/StudyState';
 import { toDayBlocks } from '../utils/ScheduleBlocks';
 
@@ -208,6 +210,159 @@ function KickControl({ name, onKick }: { name: string; onKick: () => void }) {
   );
 }
 
+/** Small text buttons, quieter than the card's real actions */
+const QUIET_BUTTON =
+  'p-0 border-0 [border-image:none] bg-transparent text-xs underline underline-offset-2 opacity-70 hover:opacity-100 cursor-pointer';
+const SAFETY_PANEL = 'flex flex-col gap-2 p-2.5 rounded-md border-2 border-dashed border-ink/30 text-sm';
+
+type SafetyStep = 'closed' | 'report' | 'reported' | 'block' | 'blocked';
+
+/**
+ * Report and Block, at the bottom of someone's card. Reporting picks a reason and an optional
+ * note for the StudBuds team; blocking asks once. Neither is ever shown to the other student.
+ */
+function SafetyControl({ person, dispatch }: { person: Person; dispatch: StudyDispatch }) {
+  const baseId = useId();
+  const [step, setStep] = useState<SafetyStep>('closed');
+  const [reason, setReason] = useState<ReportReason | null>(null);
+  const [note, setNote] = useState('');
+  const [sending, setSending] = useState(false);
+  const [error, setError] = useState('');
+
+  const close = () => {
+    setStep('closed');
+    setReason(null);
+    setNote('');
+    setError('');
+  };
+
+  const send = async () => {
+    if (!reason || sending) return;
+    setSending(true);
+    setError('');
+    const failed = await reportStudent(person.id, reason, note);
+    setSending(false);
+    if (failed) setError(failed);
+    else setStep('reported');
+  };
+
+  const block = () => {
+    dispatch({ type: 'block', personId: person.id });
+    setStep('blocked');
+  };
+
+  switch (step) {
+    case 'closed':
+      return (
+        <div className="flex justify-end gap-3">
+          <button type="button" onClick={() => setStep('report')} className={QUIET_BUTTON} aria-label={`Report ${person.name}`}>
+            Report
+          </button>
+          <button type="button" onClick={() => setStep('block')} className={QUIET_BUTTON} aria-label={`Block ${person.name}`}>
+            Block
+          </button>
+        </div>
+      );
+
+    case 'report':
+      return (
+        <form
+          className={SAFETY_PANEL}
+          onSubmit={(e) => {
+            e.preventDefault();
+            void send();
+          }}
+        >
+          <fieldset className="m-0 p-0 border-0 flex flex-col gap-1">
+            <legend className="mb-1 p-0 font-bold">Why are you reporting {person.name}?</legend>
+            {REPORT_REASONS.map((r) => (
+              <label key={r.id} className="flex items-center gap-2">
+                <input
+                  type="radio"
+                  name={`${baseId}-reason`}
+                  value={r.id}
+                  checked={reason === r.id}
+                  onChange={() => setReason(r.id)}
+                />
+                {r.label}
+              </label>
+            ))}
+          </fieldset>
+          <label className="flex flex-col gap-1">
+            <span>
+              Anything we should know? <span className="opacity-60">(optional)</span>
+            </span>
+            <textarea
+              rows={3}
+              value={note}
+              maxLength={REPORT_NOTE_MAX}
+              onChange={(e) => setNote(e.target.value)}
+              className="w-full px-2 py-1 resize-y"
+            />
+            <span className="self-end text-xs opacity-60">
+              {note.length}/{REPORT_NOTE_MAX}
+            </span>
+          </label>
+          <p className="m-0 text-xs opacity-70">Only the StudBuds team reads reports. {person.name} isn’t told.</p>
+          {error && (
+            <p role="alert" className="m-0 text-danger">
+              {error}
+            </p>
+          )}
+          <div className="flex flex-wrap gap-2">
+            <button type="submit" disabled={!reason || sending} className={SMALL_BUTTON}>
+              {sending ? 'Sending…' : 'Send report'}
+            </button>
+            <button type="button" onClick={close} className={SMALL_BUTTON}>
+              Cancel
+            </button>
+          </div>
+        </form>
+      );
+
+    case 'reported':
+      return (
+        <div role="status" className={SAFETY_PANEL}>
+          <p className="m-0">Thanks. Your report is with the StudBuds team.</p>
+          <p className="m-0 text-xs opacity-70">You can also block {person.name} so you stop seeing each other.</p>
+          <div className="flex flex-wrap gap-2">
+            <button type="button" onClick={() => setStep('block')} className={SMALL_BUTTON}>
+              Block {person.name}
+            </button>
+            <button type="button" onClick={close} className={SMALL_BUTTON}>
+              Done
+            </button>
+          </div>
+        </div>
+      );
+
+    case 'block':
+      return (
+        <div role="group" aria-label={`Block ${person.name}?`} className={SAFETY_PANEL}>
+          <p className="m-0">
+            Block {person.name}? Your connection ends and neither of you will see the other’s sessions. They aren’t
+            told, and you can unblock them in Profile › Account.
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <button type="button" onClick={block} className={SMALL_BUTTON}>
+              Block
+            </button>
+            <button type="button" onClick={close} className={SMALL_BUTTON} autoFocus>
+              Keep
+            </button>
+          </div>
+        </div>
+      );
+
+    case 'blocked':
+      return (
+        <p role="status" className="m-0 text-sm opacity-80">
+          {person.name} is blocked. You can undo it in Profile › Account.
+        </p>
+      );
+  }
+}
+
 /** A filled lobby slot: who they are, what they need help with, when you're both free, what they've taken */
 export default function PersonCard({
   person,
@@ -281,6 +436,8 @@ export default function PersonCard({
           {showCroft && <VisitCroftButton person={person} onVisit={onVisitCroft} />}
         </div>
       )}
+
+      {!isMe && <SafetyControl person={person} dispatch={dispatch} />}
     </article>
   );
 }

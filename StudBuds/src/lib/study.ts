@@ -242,6 +242,9 @@ export function useStudyData() {
         case 'remove-connect':
           result = await supabase.rpc('remove_connection', { person: toId(action.personId) });
           break;
+        case 'block':
+          result = await supabase.rpc('block_student', { person: toId(action.personId) });
+          break;
       }
 
       if (result?.error) {

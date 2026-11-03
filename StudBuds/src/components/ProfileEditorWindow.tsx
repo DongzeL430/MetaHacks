@@ -6,6 +6,7 @@ import type { AcademicProfile, CourseEntry } from './CoursesSection';
 import MultipleChoiceSection from './MultipleChoiceSection';
 import PersonAvatar from './PersonAvatar';
 import ViewTabs, { viewPanelId, viewTabId } from './ViewTabs';
+import BlockedStudents from './BlockedStudents';
 import { PROFILE_LIMITS } from '../dataFiles/StudyData';
 import type { MyProfile } from '../dataFiles/StudyData';
 import { SURVEY_SECTIONS } from '../dataFiles/SurveySections';
@@ -40,6 +41,8 @@ interface ProfileEditorWindowProps {
   onLogOut?: () => void;
   /** Deletes the account. Throw to show an error. */
   onDeleteAccount?: () => Promise<void>;
+  /** After an unblock, reloads the lobby lists so that student's sessions show again */
+  onUnblocked?: () => void;
 }
 
 const LABEL = 'flex flex-col gap-1';
@@ -114,6 +117,7 @@ export default function ProfileEditorWindow({
   onRedrawAvatar,
   onLogOut,
   onDeleteAccount,
+  onUnblocked,
 }: ProfileEditorWindowProps) {
   const baseId = useId();
   const titleId = useId();
@@ -411,7 +415,8 @@ export default function ProfileEditorWindow({
             {section === 'contact' && (
               <>
                 <p className="m-0 text-sm opacity-70">
-                  All optional. These are never shown on your card; they’re only shared with someone if you choose to.
+                  All optional. These are never shown on your card. To share them with a connection, turn on Share
+                  my contact next to them in Connections.
                 </p>
                 {(
                   [
@@ -453,6 +458,8 @@ export default function ProfileEditorWindow({
                     </button>
                   </div>
                 )}
+
+                <BlockedStudents active={open && section === 'account'} onUnblocked={onUnblocked} />
 
                 {onDeleteAccount && (
                   <div className="flex flex-col gap-2 pt-3 border-t-2 border-ink/15">
