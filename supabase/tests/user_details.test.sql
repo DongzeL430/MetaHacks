@@ -5,16 +5,16 @@
 begin;
 create extension if not exists pgtap with schema extensions;
 
-select plan(41);
+select plan(43);
 
 insert into auth.users (id, email, raw_user_meta_data) values
   ('a1000000-0000-4000-8000-00000000000a', 'a@northeastern.edu', '{"adult_confirmed": true}'),
   ('b2000000-0000-4000-8000-00000000000b', 'b@northeastern.edu', '{"adult_confirmed": true}'),
   ('c3000000-0000-4000-8000-00000000000c', 'c@mit.edu', '{"adult_confirmed": true}');
 
-insert into public.survey_questions (prompt, option_a, option_b, category, source, approved) values
-  ('test: Silent library or cafe noise?', 'Silent library', 'Cafe noise', 'studying', 'team', true),
-  ('test: unreviewed AI question', 'One', 'Two', 'studying', 'ai', false);
+insert into public.survey_questions (key, kind, category, position, prompt, options, source, approved) values
+  ('testNoise', 'this_or_that', 'test', 98, 'test: Silent library or cafe noise?', array['Silent library', 'Cafe noise'], 'team', true),
+  ('testUnreviewed', 'this_or_that', 'test', 99, 'test: unreviewed AI question', array['One', 'Two'], 'ai', false);
 
 insert into public.interests (slug, label)
 select 'test-interest-' || g, 'Test interest ' || g from generate_series(1, 11) as g;
@@ -58,17 +58,26 @@ select throws_ok($$insert into public.courses (code) values ('LIMIT 15')$$, '235
 
 -- Courses the student takes or took
 select lives_ok(
-  $$insert into public.user_courses (course_id) select id from public.courses where code = 'CS 2500'$$,
+  $$insert into public.user_courses (course_id, confidence) select id, 3 from public.courses where code = 'CS 2500'$$,
   'A student can add a course they are taking, without a grade'
 );
-select throws_ok(
-  $$insert into public.user_courses (course_id, status) select id, 'completed' from public.courses where code = 'LIMIT 1'$$,
-  '23514', null,
-  'A completed course needs a grade'
+select lives_ok(
+  $$insert into public.user_courses (course_id, status, confidence) select id, 'completed', 4 from public.courses where code = 'LIMIT 1'$$,
+  'A completed course does not need a grade'
 );
 select lives_ok(
-  $$insert into public.user_courses (course_id, status, grade) select id, 'completed', 'A-' from public.courses where code = 'LIMIT 1'$$,
+  $$insert into public.user_courses (course_id, status, grade, confidence) select id, 'completed', 'A-', 5 from public.courses where code = 'LIMIT 5'$$,
   'A completed course with a grade is accepted'
+);
+select throws_ok(
+  $$insert into public.user_courses (course_id, status) select id, 'completed' from public.courses where code = 'LIMIT 6'$$,
+  '23502', null,
+  'Every course needs a confidence rating'
+);
+select throws_ok(
+  $$insert into public.user_courses (course_id, confidence) select id, 6 from public.courses where code = 'LIMIT 6'$$,
+  '23514', null,
+  'Confidence is 1 to 5'
 );
 select throws_ok(
   $$insert into public.user_courses (course_id, status) select id, 'planned' from public.courses where code = 'LIMIT 3'$$,
@@ -81,12 +90,12 @@ select throws_ok(
   'Transferred courses are not a status'
 );
 select throws_ok(
-  $$insert into public.user_courses (course_id) select id from public.courses where code = 'CS 2500'$$,
+  $$insert into public.user_courses (course_id, confidence) select id, 2 from public.courses where code = 'CS 2500'$$,
   '23505', null,
   'The same course cannot be added twice'
 );
 select throws_ok(
-  $$insert into public.user_courses (user_id, course_id) select 'b2000000-0000-4000-8000-00000000000b', id from public.courses where code = 'LIMIT 2'$$,
+  $$insert into public.user_courses (user_id, course_id, confidence) select 'b2000000-0000-4000-8000-00000000000b', id, 3 from public.courses where code = 'LIMIT 2'$$,
   '42501', null,
   'A student cannot add courses for someone else'
 );
@@ -129,23 +138,23 @@ select is(
 );
 select lives_ok(
   $$insert into public.survey_answers (question_id, choice)
-    select id, 'a' from public.survey_questions where prompt = 'test: Silent library or cafe noise?'$$,
+    select id, 1 from public.survey_questions where prompt = 'test: Silent library or cafe noise?'$$,
   'A student can answer an approved question'
 );
 select lives_ok(
-  $$update public.survey_answers set choice = 'b'
+  $$update public.survey_answers set choice = 2
     where question_id = (select id from public.survey_questions where prompt = 'test: Silent library or cafe noise?')$$,
   'A student can change their answer'
 );
 select throws_ok(
-  $$update public.survey_answers set choice = 'c'
+  $$update public.survey_answers set choice = 3
     where question_id = (select id from public.survey_questions where prompt = 'test: Silent library or cafe noise?')$$,
-  '23514', null,
-  'Answers can only be a or b'
+  '42501', null,
+  'An answer must be one of the question''s options'
 );
 select throws_ok(
   $$insert into public.survey_answers (question_id, choice)
-    values (current_setting('test.unapproved_question')::bigint, 'a')$$,
+    values (current_setting('test.unapproved_question')::bigint, 1)$$,
   '42501', null,
   'A student cannot answer an unapproved question'
 );
@@ -246,7 +255,7 @@ select is(
   'A student at another school does not see Northeastern courses'
 );
 select throws_ok(
-  $$insert into public.user_courses (course_id) values (current_setting('test.cs2500')::bigint)$$,
+  $$insert into public.user_courses (course_id, confidence) values (current_setting('test.cs2500')::bigint, 3)$$,
   '42501', null,
   'A student at another school cannot add a Northeastern course, even knowing its id'
 );

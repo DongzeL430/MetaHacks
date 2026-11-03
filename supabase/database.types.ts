@@ -551,19 +551,19 @@ export type Database = {
       survey_answers: {
         Row: {
           answered_at: string
-          choice: string
+          choice: number
           question_id: number
           user_id: string
         }
         Insert: {
           answered_at?: string
-          choice: string
+          choice: number
           question_id: number
           user_id?: string
         }
         Update: {
           answered_at?: string
-          choice?: string
+          choice?: number
           question_id?: number
           user_id?: string
         }
@@ -589,30 +589,42 @@ export type Database = {
           approved: boolean
           category: string
           created_at: string
+          flexible_option: number | null
           id: number
-          option_a: string
-          option_b: string
+          key: string
+          kind: string
+          options: string[]
+          position: number
           prompt: string
+          scale: string
           source: Database["public"]["Enums"]["content_source"]
         }
         Insert: {
           approved?: boolean
           category: string
           created_at?: string
+          flexible_option?: number | null
           id?: never
-          option_a: string
-          option_b: string
+          key: string
+          kind: string
+          options: string[]
+          position: number
           prompt: string
+          scale?: string
           source?: Database["public"]["Enums"]["content_source"]
         }
         Update: {
           approved?: boolean
           category?: string
           created_at?: string
+          flexible_option?: number | null
           id?: never
-          option_a?: string
-          option_b?: string
+          key?: string
+          kind?: string
+          options?: string[]
+          position?: number
           prompt?: string
+          scale?: string
           source?: Database["public"]["Enums"]["content_source"]
         }
         Relationships: []
@@ -670,23 +682,32 @@ export type Database = {
       }
       user_courses: {
         Row: {
-          course_id: number
+          confidence: number
+          course_id: number | null
           created_at: string
+          custom_name: string | null
           grade: Database["public"]["Enums"]["letter_grade"] | null
+          id: number
           status: Database["public"]["Enums"]["course_status"]
           user_id: string
         }
         Insert: {
-          course_id: number
+          confidence: number
+          course_id?: number | null
           created_at?: string
+          custom_name?: string | null
           grade?: Database["public"]["Enums"]["letter_grade"] | null
+          id?: never
           status?: Database["public"]["Enums"]["course_status"]
           user_id?: string
         }
         Update: {
-          course_id?: number
+          confidence?: number
+          course_id?: number | null
           created_at?: string
+          custom_name?: string | null
           grade?: Database["public"]["Enums"]["letter_grade"] | null
+          id?: never
           status?: Database["public"]["Enums"]["course_status"]
           user_id?: string
         }
@@ -844,19 +865,31 @@ export type Database = {
         Returns: undefined
       }
       delete_my_account: { Args: never; Returns: undefined }
+      finish_onboarding: { Args: never; Returns: undefined }
       hook_before_user_created: { Args: { event: Json }; Returns: Json }
       is_lobby_host: { Args: { p_lobby_id: string }; Returns: boolean }
       is_lobby_member: { Args: { p_lobby_id: string }; Returns: boolean }
+      known_courses_for: {
+        Args: { majors: string[]; school: string }
+        Returns: {
+          classmates: number
+          code: string
+          title: string
+        }[]
+      }
       pair_on_cooldown: {
         Args: { student_a: string; student_b: string }
         Returns: boolean
       }
+      save_my_answers: { Args: { answers: Json }; Returns: undefined }
+      save_my_courses: { Args: { courses: Json }; Returns: undefined }
     }
     Enums: {
       accessory_slot: "head" | "face" | "neck" | "held"
       content_source: "team" | "ai"
       course_status: "taking" | "completed"
       letter_grade:
+        | "A+"
         | "A"
         | "A-"
         | "B+"
@@ -869,7 +902,19 @@ export type Database = {
         | "D"
         | "D-"
         | "F"
+        | "E"
         | "P"
+        | "NP"
+        | "S"
+        | "U"
+        | "CR"
+        | "NC"
+        | "H"
+        | "HP"
+        | "LP"
+        | "W"
+        | "I"
+        | "AU"
       onboarding_status: "new" | "onboarded"
       program_kind: "major" | "minor"
       report_reason:
@@ -1012,6 +1057,7 @@ export const Constants = {
       content_source: ["team", "ai"],
       course_status: ["taking", "completed"],
       letter_grade: [
+        "A+",
         "A",
         "A-",
         "B+",
@@ -1024,7 +1070,19 @@ export const Constants = {
         "D",
         "D-",
         "F",
+        "E",
         "P",
+        "NP",
+        "S",
+        "U",
+        "CR",
+        "NC",
+        "H",
+        "HP",
+        "LP",
+        "W",
+        "I",
+        "AU",
       ],
       onboarding_status: ["new", "onboarded"],
       program_kind: ["major", "minor"],
