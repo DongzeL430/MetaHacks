@@ -133,7 +133,7 @@ export default function ThemePromptWindow({
           title="Custom theme"
           titleId={titleId}
           accent={WINDOW_ACCENTS.lilac}
-          info="Describe a look and StudBuds makes a theme from it. Your theme only changes colors and styling, never how the app works. Pick the sun in the theme menu to go back to the default look."
+          info="Describe a look and StudBuds makes a theme from it: colors, a background picture and a short music box tune. Your theme only changes colors, styling and music, never how the app works. Pick the sun in the theme menu to go back to the default look."
           onClose={onClose}
           excludeFromLayout
           controls={{ close: 'enabled', fullscreen: 'hidden', pin: 'hidden' }}
@@ -161,7 +161,8 @@ export default function ThemePromptWindow({
             <h2 className="m-0 text-xl">Make StudBuds your own</h2>
             <p className="m-0 text-sm opacity-80">
               Describe how you want the app to look: colors, a mood, a season, anything. We’ll turn it into a theme
-              for you. You can always switch back to the default look with the sun in the theme menu.
+              for you, with a background and a music box tune of its own. You can always switch back to the default
+              look with the sun in the theme menu.
             </p>
           </div>
 
