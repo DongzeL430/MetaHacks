@@ -1,3 +1,5 @@
+<p align="center"><img src="StudBuds/public/logo.png" alt="The StudBuds bear, reading on a green blanket" width="160"></p>
+
 # StudBuds
 
 Finding someone to study with in college is weirdly hard. Group chats are noisy, asking a stranger

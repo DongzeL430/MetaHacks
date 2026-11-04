@@ -4,6 +4,7 @@ import AuthPage from './AuthPage.tsx';
 import HomePage from './HomePage.tsx';
 import PreSurveyFlow from './PresurveyFlow.tsx';
 import RequireAuth from './RequireAuth.tsx';
+import Logo from './components/Logo.tsx';
 import Tour, { useFirstTimeTour } from './components/Tour.tsx';
 import type { TourStep } from './components/Tour.tsx';
 import { supabase } from './lib/supabase.ts';
@@ -50,7 +51,8 @@ function SurveyPage() {
   }, []);
   if (saved === null) {
     return (
-      <main className="doodle min-h-dvh flex items-center justify-center p-6">
+      <main className="doodle min-h-dvh flex flex-col items-center justify-center gap-3 p-6">
+        <Logo className="w-28 h-28" />
         <p role="status" className="m-0 text-lg">
           Loading your survey…
         </p>
@@ -111,6 +113,7 @@ function Home() {
     const trouble = (!study.ready && !!study.error) || me.failed;
     return (
       <main className="doodle min-h-dvh flex flex-col items-center justify-center gap-3 p-6 text-center">
+        <Logo className="w-28 h-28" />
         <p role="status" className="m-0 text-lg">
           {trouble ? 'Can’t reach StudBuds right now. Trying again…' : 'Loading StudBuds…'}
         </p>
