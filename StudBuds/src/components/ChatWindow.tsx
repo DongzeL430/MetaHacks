@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import AppWindow, { WINDOW_ACCENTS } from './AppWindow';
 import { LIST_WINDOW_SIZE } from './SessionsWindow';
 import PersonAvatar from './PersonAvatar';
+import { ME } from '../dataFiles/StudyData';
 import type { Lobby, Person } from '../dataFiles/StudyData';
 import { CHAT_LIMITS, useLobbyChat } from '../utils/LobbyChat';
 
@@ -118,7 +119,11 @@ export default function ChatWindow({ id, lobby, people, onClose }: ChatWindowPro
         <ol aria-label="Messages" aria-live="polite" className="m-0 p-0 list-none flex flex-col gap-1.5">
           {chat.messages.map((m, i) => {
             const mine = m.sender_id === chat.myId;
-            const author = people.get(m.sender_id) ?? { id: m.sender_id, name: mine ? 'You' : 'Someone' };
+            // Your own profile is kept under ME, not your user id, so look yourself up there
+            const author = (mine ? people.get(ME) : people.get(m.sender_id)) ?? {
+              id: m.sender_id,
+              name: mine ? 'You' : 'Someone',
+            };
             const startsGroup = i === 0 || chat.messages[i - 1].sender_id !== m.sender_id;
             return (
               <li
