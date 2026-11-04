@@ -8,6 +8,7 @@ import ThemePromptWindow from './components/ThemePromptWindow';
 import { useUserTheme } from './utils/UserTheme';
 import { FALLBACK_MUSIC, defaultMusicFor } from './utils/Music';
 import { useThemeMusic } from './utils/MusicPlayer';
+import { useSheepSounds } from './utils/SheepSounds';
 import ProfileEditorWindow from './components/ProfileEditorWindow';
 import Tour from './components/Tour';
 import { welcomeTourSteps } from './components/WelcomeTourSteps';
@@ -156,6 +157,8 @@ export default function HomePage({
   const music = useThemeMusic(
     theme.choice === 'custom' ? (theme.savedTheme?.music ?? FALLBACK_MUSIC) : defaultMusicFor(defaultBackgroundName),
   );
+  // Now and then a sheep, while a croft is open: on the music's volume and mute, much quieter
+  useSheepSounds(croftOpen || visitingId !== null, { volume: music.volume, muted: music.muted });
 
   // The user's own profile. Saving it updates the nav bar, lobby filters and host form right away.
   const [profile, setProfile] = useState<MyProfile>(() => ({
