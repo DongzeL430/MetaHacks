@@ -87,8 +87,9 @@ export default function CroftField({ tiles, now, selected, onSelect }: CroftFiel
             {name && (
               <span
                 className={[
-                  'max-w-full inline-flex items-center gap-0.5 px-px @[16rem]:px-1 py-px rounded-sm border text-ink',
-                  'text-[8px] @[16rem]:text-[10px] leading-tight [overflow-wrap:anywhere]',
+                  'max-w-full inline-flex items-center gap-0.5 px-px @[16rem]:px-0.5 @[24rem]:px-1 py-px rounded-sm border text-ink',
+                  // Text grows with the field: 8px on a 320px phone, 9px on most phones, 10px on wider windows
+                  'text-[8px] @[16rem]:text-[9px] @[24rem]:text-[10px] leading-tight [overflow-wrap:anywhere]',
                   stage === 'ready'
                     ? 'croft-sway font-bold'
                     : stage === 'seed'
