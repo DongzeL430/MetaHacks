@@ -28,8 +28,10 @@ After that you land on Home, which works like a small desktop:
 
 - **Study Lobbies** lists sessions other students are hosting, best fit first. Each one says why it's
   there: "Covers a course you want help with", "Similar study habits", "You agreed on 6 of 8 quick
-  picks". It starts with your own school. Turn off "Only my school" in Filters to see sessions at
-  other schools too.
+  picks". On top of that ranking, Muse looks at your best few against how you like to study and
+  marks up to three as "Muse's pick", with a reason, like "In your free time on Tuesday, and a
+  small group". It starts with your own school. Turn off "Only my school" in Filters to see
+  sessions at other schools too.
 - **Host a session** picks a subject, a time and a place. The places are real study spots at your
   school that Muse found on your school's own website.
 - Inside a lobby you can ask to join, chat live with the group, invite your connections, and connect
@@ -85,6 +87,7 @@ daily budget before it's made.
 | Nickname and avatar | Muse Spark 1.3, Muse Image | Checks a new nickname, then draws an avatar of it in one consistent hand-drawn style, and checks the picture |
 | Study spots | Muse Spark 1.3 + web search | Finds real places to study on your school's own website, once per school |
 | Session subjects | Muse Spark 1.3 | Links a free-form subject ("orgo midterm cram") to the course it's about, so it reaches the right people |
+| Muse's picks | Muse Spark 1.3 | Looks at your best-ranked sessions against how you like to study (time of day, length, place, group size) and puts its three best first, with a reason each. It sees no hosts, names, ratings or anyone else's answers |
 | Themes | Muse Spark 1.3, Muse Image | Writes a readable color palette, paints and checks a background, composes a tune |
 
 ## Privacy and safety choices
@@ -113,7 +116,7 @@ codes, Cloudflare Turnstile), Postgres with row-level security, Realtime for cha
 storage, and the Deno Edge Functions that call Muse. The music is synthesized in the browser with the
 Web Audio API from the score Muse writes, and so are the croft's sheep bleats. The croft's pixel art
 (the farm, every crop at each stage of growth, the decorations) is drawn in code, with no image
-files. The database has nearly 400 pgTAP checks in `supabase/tests`.
+files. The database has more than 400 pgTAP checks in `supabase/tests`.
 
 ## Running it yourself
 

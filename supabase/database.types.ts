@@ -797,6 +797,35 @@ export type Database = {
           },
         ]
       }
+      match_picks_cache: {
+        Row: {
+          candidates_key: string
+          created_at: string
+          picks: Json
+          user_id: string
+        }
+        Insert: {
+          candidates_key: string
+          created_at?: string
+          picks: Json
+          user_id: string
+        }
+        Update: {
+          candidates_key?: string
+          created_at?: string
+          picks?: Json
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "match_picks_cache_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       pairings: {
         Row: {
           agreements: number | null
@@ -1541,6 +1570,10 @@ export type Database = {
           seeking_help_with: string[]
           shared_free: Json
         }[]
+      }
+      match_candidates: {
+        Args: { my_school_only?: boolean; take?: number; viewer: string }
+        Returns: Json
       }
       muse_uses_left: { Args: { what: string }; Returns: number }
       my_blocks: {

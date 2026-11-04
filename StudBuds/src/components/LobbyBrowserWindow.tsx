@@ -2,6 +2,7 @@ import { useId, useMemo, useState } from 'react';
 import AppWindow, { WINDOW_ACCENTS } from './AppWindow';
 import ChipList from './ChipList';
 import LobbyRow from './LobbyRow';
+import { useMusePicks } from '../lib/matchPicks';
 import type { Lobby, Person } from '../dataFiles/StudyData';
 import { roleIn } from '../utils/StudyState';
 import {
@@ -94,15 +95,25 @@ export default function LobbyBrowserWindow({
     const role = roleIn(l);
     return role === 'host' || role === 'member' || role === 'requested';
   };
+  // Muse's picks: up to three sessions it thinks suit you best, asked again when the sessions change
+  const lobbiesKey = lobbies
+    .filter((l) => !isMine(l))
+    .map((l) => `${l.id}:${l.memberIds.length}:${l.locked ? 1 : 0}`)
+    .sort()
+    .join(',');
+  const picks = useMusePicks(open, filters.mySchool, lobbiesKey);
+  const pickRank = (l: Lobby) => picks.get(l.id)?.rank ?? Number.MAX_SAFE_INTEGER;
+
   const q = query.trim().toLowerCase();
   const shown = lobbies
     .filter((l) => !q || l.subject.toLowerCase().includes(q))
     // Your own lobbies skip the matching criteria; only "Hide lobbies I'm in" removes them
     .filter((l) => (isMine(l) ? !filters.hideMine : passesFilters(l, filters, ctx)))
-    // Yours first, then the hosts who fit you best (public.lobby_matches); unranked ones last
+    // Yours first, then Muse's picks, then the hosts who fit you best (public.lobby_matches); unranked ones last
     .sort(
       (a, b) =>
         Number(isMine(b)) - Number(isMine(a)) ||
+        pickRank(a) - pickRank(b) ||
         (a.match?.place ?? Number.MAX_SAFE_INTEGER) - (b.match?.place ?? Number.MAX_SAFE_INTEGER),
     );
 
@@ -138,7 +149,7 @@ export default function LobbyBrowserWindow({
       id={id}
       title="Study Lobbies"
       accent={WINDOW_ACCENTS.sky}
-      info="Browse study sessions other students are hosting, best fit first: hosts with your courses, study habits and quick picks come to the top, and nobody’s ratings or answers are shown. Use Filters to match lobbies to your free time, subjects and group size, or host your own."
+      info="Browse study sessions other students are hosting, best fit first: hosts with your courses, study habits and quick picks come to the top, and nobody’s ratings or answers are shown. Use Filters to match lobbies to your free time, subjects and group size, or host your own. Muse also looks at your best few against how you like to study, and marks its picks."
       open={open}
       onClose={onClose}
       controls={{ close: 'enabled', fullscreen: 'enabled' }}
@@ -338,6 +349,7 @@ export default function LobbyBrowserWindow({
                 isOpenTab={openTabIds.includes(lobby.id)}
                 onOpen={onOpenLobby}
                 tags={tagsFor(lobby)}
+                musePick={isMine(lobby) ? undefined : picks.get(lobby.id)?.reason}
               />
             ))}
           </ul>

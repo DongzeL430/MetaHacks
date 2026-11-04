@@ -27,10 +27,12 @@ interface LobbyRowProps {
   note?: string;
   /** Buttons under the row, e.g. Accept / Decline for an invite */
   actions?: ReactNode;
+  /** Muse picked this session for you, and why */
+  musePick?: string;
 }
 
 /** One lobby in a list: host, subject, when it meets, spots, and your status. Click to open it. */
-export default function LobbyRow({ lobby, people, isOpenTab, onOpen, tags = [], note, actions }: LobbyRowProps) {
+export default function LobbyRow({ lobby, people, isOpenTab, onOpen, tags = [], note, actions, musePick }: LobbyRowProps) {
   const status = LOBBY_STATUS[roleIn(lobby)];
   const host = people.get(lobby.hostId);
   const when = describeSlots(lobby.timeSlots, { short: true });
@@ -40,7 +42,7 @@ export default function LobbyRow({ lobby, people, isOpenTab, onOpen, tags = [], 
       <button
         type="button"
         onClick={() => onOpen(lobby.id)}
-        aria-label={`${lobby.subject}, hosted by ${host?.name ?? 'someone'}${when ? `, ${describeSlots(lobby.timeSlots)}` : ''}${lobby.location ? `, at ${lobby.location}` : ''}, ${lobby.memberIds.length} of ${lobby.maxSize} spots, ${status.label}${tags.length ? `, ${tags.join(', ')}` : ''}`}
+        aria-label={`${lobby.subject}, hosted by ${host?.name ?? 'someone'}${when ? `, ${describeSlots(lobby.timeSlots)}` : ''}${lobby.location ? `, at ${lobby.location}` : ''}, ${lobby.memberIds.length} of ${lobby.maxSize} spots, ${status.label}${musePick ? `, Muse’s pick: ${musePick}` : ''}${tags.length ? `, ${tags.join(', ')}` : ''}`}
         className={[
           'w-full p-3 flex items-center gap-3 text-left rounded-md',
           'border-2 [border-image:none] bg-paper transition-colors',
@@ -56,6 +58,12 @@ export default function LobbyRow({ lobby, people, isOpenTab, onOpen, tags = [], 
           {when && <span className="text-xs truncate">{when}</span>}
           {lobby.location && <span className="text-xs truncate opacity-80">At {lobby.location}</span>}
           {note && <span className="text-xs text-danger truncate">{note}</span>}
+          {musePick && (
+            <span className="flex items-start gap-1.5 mt-0.5 text-xs">
+              <span className="shrink-0 px-1.5 rounded border border-ink/40 bg-sand font-bold leading-snug">Muse’s pick</span>
+              <span className="min-w-0 leading-snug">{musePick}</span>
+            </span>
+          )}
           {tags.length > 0 && (
             <span className="flex flex-wrap gap-1 mt-0.5">
               {tags.map((tag) => (
