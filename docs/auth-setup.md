@@ -71,7 +71,7 @@ set -a; source .env; set +a
 
 The Gmail and Turnstile settings read their secrets from `.env`. Pushing without it sends empty values, which breaks sign-up emails and the CAPTCHA.
 
-`site_url` is `http://localhost:5173`, Vite's dev server. Once the app has a real URL, change it, or confirmation links will point at localhost.
+`site_url` is the live site, `https://studbudstm.netlify.app`, and `http://localhost:5173` (Vite's dev server) is in `additional_redirect_urls`. Emails carry only a code, so this mostly matters for Supabase's default redirects. On the hosted project, the same two values live in the dashboard under Authentication, URL Configuration.
 
 ## Bot protection and email
 

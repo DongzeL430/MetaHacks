@@ -7,7 +7,7 @@ after class is awkward, and most "study buddy" apps want your name, photo and ma
 you anyone. StudBuds goes the other way. You're a nickname and a drawing, and the app puts the
 sessions most likely to suit you at the top.
 
-**Live site:** _(Netlify link goes here)_
+**Live site:** [studbudstm.netlify.app](https://studbudstm.netlify.app)
 
 We built StudBuds for the Meta Global AI Developer Hackathon (https://cerebralvalley.ai/e/meta-ai-developer-hackathon). Everything in this repo was made during
 the hackathon.
@@ -55,7 +55,7 @@ After that you land on Home, which works like a small desktop:
 
 ## Try it
 
-1. Open the site and sign up with your `.edu` email. You'll get an 8-digit code by email (no links,
+1. Open [the site](https://studbudstm.netlify.app) and sign up with your `.edu` email. You'll get an 8-digit code by email (no links,
    so school mail scanners can't use it up).
 2. Go through the survey. Try the schedule screenshot on the calendar page and "Auto-fill courses" on
    the courses page if you want to see Muse at work.
@@ -148,5 +148,5 @@ project.
 `VITE_` variables. Then add the site's domain to the Cloudflare Turnstile widget's allowed hostnames,
 and set it as the Site URL in Supabase (Authentication, URL Configuration).
 
-For link previews (Devpost, Slack, texts) to show the bear, change `og:image` in
-`StudBuds/index.html` to the full address, like `https://your-site.netlify.app/og-image.png`.
+Link previews (Devpost, Slack, texts) use the site's full address in `StudBuds/index.html`
+(`og:url` and `og:image`), so change both if the site moves.
