@@ -147,11 +147,13 @@ export default function LobbyBrowserWindow({
       minHeight={280}
       bodyClassName="p-3 flex flex-col gap-3"
     >
-      {/* SEARCH + FILTERS + HOST */}
+      {/* SEARCH + FILTERS + HOST
+          Buttons keep their size and wrap to the next row as a whole; only the search box narrows.
+          16rem fits the search and "Filters (N)" side by side, even at the window's smallest. */}
       <div className="flex flex-wrap items-center gap-2">
         {/* Search and filters together, so the welcome tour can point at both */}
-        <div data-tour="lobby-search" className="flex-1 min-w-[14rem] flex items-center gap-2">
-          <label className="flex-1 min-w-[10rem]">
+        <div data-tour="lobby-search" className="flex-1 min-w-[16rem] flex items-center gap-2">
+          <label className="flex-1 min-w-0">
             <span className="sr-only">Search lobbies by subject</span>
             <input
               type="search"
@@ -168,7 +170,7 @@ export default function LobbyBrowserWindow({
             onClick={() => setShowFilters((s) => !s)}
             aria-expanded={showFilters}
             aria-controls={panelId}
-            className="px-3 py-1"
+            className="shrink-0 whitespace-nowrap px-3 py-1"
           >
             Filters{activeCount > 0 ? ` (${activeCount})` : ''}
           </button>
@@ -183,9 +185,9 @@ export default function LobbyBrowserWindow({
                 ? `Updated ${refreshedAt.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}. Load the newest sessions.`
                 : 'Load the newest sessions'
             }
-            className="px-3 py-1 flex items-center gap-1.5"
+            className="shrink-0 whitespace-nowrap px-3 py-1 flex items-center gap-1.5"
           >
-            <svg viewBox="0 0 20 20" className={`w-4 h-4 ${refreshing ? 'motion-safe:animate-spin' : ''}`} aria-hidden="true">
+            <svg viewBox="0 0 20 20" className={`w-4 h-4 shrink-0 ${refreshing ? 'motion-safe:animate-spin' : ''}`} aria-hidden="true">
               <path
                 d="M16 10a6 6 0 1 1-1.8-4.3M16 3.5v3.2h-3.2"
                 fill="none"
@@ -204,7 +206,7 @@ export default function LobbyBrowserWindow({
           disabled={hostLimitReached}
           data-tour="host-button"
           title={hostLimitReached ? 'You’re hosting as many sessions as you can. Close one under Sessions to host another.' : undefined}
-          className="px-3 py-1"
+          className="shrink-0 whitespace-nowrap px-3 py-1"
         >
           + Host a session
         </button>
