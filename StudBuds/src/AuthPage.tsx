@@ -7,7 +7,8 @@ import { supabase } from './lib/supabase.ts';
 import Turnstile from './Turnstile.tsx';
 // This session's default background picture, shared with Home
 import { defaultBackground as defaultbg } from './utils/DefaultBackground.ts';
-import Logo from './components/Logo.tsx';
+import BearLogo from './components/BearLogo';
+
 
 // Which part of the picture stays in view when it has to be cropped (CSS background-position).
 // 'center bottom' keeps the ground visible and trims the sky or sides first.
@@ -348,10 +349,10 @@ export default function AuthPage() {
               'md:p-8 md:border-l-2 md:border-black md:shadow-[-10px_0_30px_rgba(60,60,60,0.22)]',
             ].join(' ')}
           >
-          {/* LOGO */}
+          {/* Logo */}
           <div className="flex flex-row items-center gap-3">
-            <Logo className="w-16 h-16 md:w-20 md:h-20" />
-            <h3 className="m-0">StudBuds</h3>
+            <BearLogo size={76} className="shrink-0" />
+            <h3 className="m-0 text-3xl">StudBuds</h3>
           </div>
 
           {/* Fades and rises in just after the section arrives. Vertically centered in the full-height panel. */}
