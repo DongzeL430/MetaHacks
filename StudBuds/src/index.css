@@ -260,3 +260,15 @@
     display: none;
   }
 }
+
+/*
+ * The production build's CSS minifier turns Tailwind's [border-image:none] into an empty
+ * "border-image:", which browsers ignore, so on the live site doodle.css's hand-drawn border came
+ * back on every button meant to draw its own look (the window "i", title buttons, tabs, chips).
+ * The longhand survives minifying. Same layer as Tailwind's utilities, so it still beats doodle.css.
+ */
+@layer utilities {
+  [class*='[border-image:none]'] {
+    border-image-source: none;
+  }
+}

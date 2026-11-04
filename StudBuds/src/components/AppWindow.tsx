@@ -487,6 +487,36 @@ const SURFACE_INSET = 4;
  * inset could line a fill up with it everywhere.) Uneven corner radii keep the hand-drawn feel.
  * Change the radii to make it more or less wobbly.
  */
+/**
+ * The bold hand-drawn line under the title bar (and above a footer). It's doodle.css's own line
+ * (doodle.css/hr.svg), drawn inline and stretched to the window's full width. As an <hr> it was a
+ * border-image, which some browsers slice differently, leaving gaps at both ends of wide windows.
+ * Stays 3px thick at any width, and follows the theme's ink color.
+ */
+const DIVIDER_PATH =
+  'M 0,1049.7325 L 1.6677144,1049.7325 c 5.1049374,-0.2298 16.4304496,-0.1081 33.9763996,0.365 17.54595,0.4731 31.345838,0.661 41.399638,0.5635 10.053825,-0.097 15.895737,-0.1068 17.525725,-0.028 1.629986,0.079 9.715583,0.1012 24.256823,0.068 14.5412,-0.034 24.65852,-0.1442 30.35192,-0.3319 5.69349,-0.1878 10.54195,-0.286 14.54538,-0.2949 4.00355,-0.01 9.81015,-0.1846 17.4199,-0.5274 7.60977,-0.3428 12.92342,-0.4862 15.94107,-0.4299 3.01768,0.056 7.35064,0.2821 12.9988,0.6778 5.64828,0.3959 15.35577,0.4631 29.12259,0.2017 13.76686,-0.2614 23.86426,-0.2958 30.29228,-0.1033 6.42805,0.1925 17.02211,0.3082 31.7823,0.347 14.76018,0.039 28.36995,-4e-4 40.82932,-0.1174 12.45943,-0.117 22.04856,-0.3147 28.76761,-0.5927 6.71908,-0.2781 14.7894,-0.3299 24.21095,-0.1558 9.42173,0.1741 26.80245,0.1938 52.14224,0.059 25.33989,-0.1347 43.50105,-0.1743 54.4835,-0.1186 10.98258,0.056 23.80371,-0.052 38.46334,-0.3235 14.65971,-0.2713 25.89123,-0.4016 33.69451,-0.3908 7.80333,0.011 17.77897,0.2387 29.92697,0.6836 12.14804,0.4448 19.34437,0.6107 21.58889,0.4974 2.24461,-0.1133 7.24313,-0.2041 14.99548,-0.2723 h 6';
+
+function WindowDivider() {
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox="0 1046.9554 642.05107 5.4068151"
+      preserveAspectRatio="none"
+      className="block shrink-0 w-full h-1.5 text-ink"
+    >
+      <path
+        d={DIVIDER_PATH}
+        fill="none"
+        stroke="currentColor"
+        strokeWidth={3}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        vectorEffect="non-scaling-stroke"
+      />
+    </svg>
+  );
+}
+
 const FRAME = 'border-[2.5px] border-ink rounded-[14px_7px_16px_8px/8px_16px_7px_14px]';
 
 /** While dragging, keep at least this much of the window on screen so it can always be grabbed again */
@@ -1163,14 +1193,14 @@ export default function AppWindow({
         </div>
 
         {/* Divider between the title bar and the window contents, edge to edge */}
-        <hr className="m-0 shrink-0" />
+        <WindowDivider />
 
         {/* contain-content: typing or scrolling in here never makes the browser redraw anything outside the window */}
         <div className={`flex-1 min-h-0 overflow-auto contain-content ${BODY_BG} ${bodyClassName}`}>{children}</div>
 
         {footer && (
           <>
-            <hr className="m-0 shrink-0" />
+            <WindowDivider />
             <div className={`shrink-0 bg-sand-soft ${footerClassName}`}>{footer}</div>
           </>
         )}
