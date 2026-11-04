@@ -9,7 +9,7 @@ sessions most likely to suit you at the top.
 
 **Live site:** _(Netlify link goes here)_
 
-We built StudBuds for the Meta Global AI Developer Hackathon. Everything in this repo was made during
+We built StudBuds for the Meta Global AI Developer Hackathon (https://cerebralvalley.ai/e/meta-ai-developer-hackathon). Everything in this repo was made during
 the hackathon.
 
 ## What it does
