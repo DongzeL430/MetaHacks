@@ -4,17 +4,17 @@ import { useEffect, useRef } from 'react';
  * Soft sheep bleats for the croft, made live with the Web Audio API (no sound files, like the
  * theme music). A bleat is a buzzy voice shaped into a "mehh": it opens from a closed "m", wobbles
  * like a sheep's voice does, and falls a little at the end, all filtered soft so it never sounds
- * harsh. They're rare and quiet: one every 25 to 50 seconds, now and then answered by another
+ * harsh. They're quiet and spaced out: one every 7 to 10 seconds, now and then answered by another
  * sheep, well under the music and on the same volume and mute.
  */
 
 /** How loud the bleats are next to the music, at the same volume setting */
 export const SHEEP_LEVEL = 0.16;
 /** Seconds between bleats */
-const GAP_MIN = 25;
-const GAP_MAX = 50;
+const GAP_MIN = 7;
+const GAP_MAX = 10;
 /** Chance that another sheep answers, a moment later */
-const ANSWER_CHANCE = 0.3;
+const ANSWER_CHANCE = 0.15;
 
 export interface Bleat {
   /** Voice pitch in Hz */
@@ -151,7 +151,7 @@ class Flock {
     this.running = true;
     this.wake();
     // The first bleat comes a little after opening, not right away
-    this.next(between(4, 9));
+    this.next(between(3, 6));
   }
 
   stop() {
