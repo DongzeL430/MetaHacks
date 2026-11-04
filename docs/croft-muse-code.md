@@ -44,24 +44,28 @@ icons.
 - `CroftWindow.tsx`: the window. Your own croft has two tabs:
   - **My croft:** the field, the selected tile's actions, the shop pickers, who helped (with a
     Thank button) and the thank-yous you got;
-  - **Village:** this week in the valley, and the school's crofts with Visit.
+  - **Village:** this week in the valley, and crofts from every school with Visit.
 - **"Here now":** at the top of the window, the people on the croft at this moment.
-- `CroftField.tsx`: the field. This is the main thing to redraw.
+- `CroftScene.tsx`: already drawn. The pixel strip above the field (hills, thatched cottage, rowan
+  tree, well), the meadow, the dry-stone wall, the grass and soil tile textures, and
+  `CROFT_COLORS`, the croft's fixed palette. Use those colors for your sprites.
+- `CroftField.tsx`: the field. Crops and decorations still show as small name labels (with a
+  water drop for dry seeds, a progress bar while growing, and a gold glow and sway when ready).
+  Your sprites replace those labels.
 - **Opening it:** the game is under "Upcoming" in the nav bar, then Croft.
 
 ## What to draw
 
-1. **Tiles:** grass and tilled soil.
-2. **Crops:** six crops at four stages each: oats, kale, leeks, barley, beans and flax, each as
-   a seed, sprout, growing and ready.
-3. **Decorations:** wicker fence, herb bed, beehive skep, lantern, rowan tree, standing stone and
+Already done in `CroftScene.tsx` and `CroftField.tsx`: the grass and soil tiles, the farm around
+the field (strip, meadow, wall), the selected tile's highlight and the ready crop's cue. What's
+left:
+
+1. **Crops:** six crops at four stages each: oats, kale, leeks, barley, beans and flax, each as
+   a seed, sprout, growing and ready. Replace the name label on the tile; keep the progress bar.
+2. **Decorations:** wicker fence, herb bed, beehive skep, lantern, rowan tree, standing stone and
    sheep.
-4. **The farm around the field:** a thatched cottage, a dry-stone wall, a well and hills behind
-   it. Use a strip above the field or a frame around it.
-5. **The village list:** a small croft icon per row, or a status picture for seeds that need
+3. **The village list:** a small croft icon per row, or a status picture for seeds that need
    water. Keep the Visit buttons.
-6. **The selected tile:** it needs a highlight, and a ready crop needs a small cue that it can be
-   harvested.
 
 ## Art rules
 

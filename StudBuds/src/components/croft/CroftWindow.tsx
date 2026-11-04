@@ -3,6 +3,7 @@ import AppWindow, { WINDOW_ACCENTS } from '../AppWindow';
 import PersonAvatar from '../PersonAvatar';
 import ViewTabs, { viewPanelId, viewTabId } from '../ViewTabs';
 import CroftField, { describeTile } from './CroftField';
+import CroftScene from './CroftScene';
 import { CROPS, DECORATIONS, croftName, cropStage } from '../../dataFiles/Croft';
 import type { CropKey, DecorationKey, VillageCroft } from '../../dataFiles/Croft';
 import { useCroft, useCroftPresence, useNow, useVillage, useVisitCroft } from '../../lib/croft';
@@ -153,7 +154,9 @@ export default function CroftWindow({ id, open, onClose, ownerId }: CroftWindowP
 
   const croftPanel = croft && (
     <>
-      <CroftField tiles={croft.tiles} now={now} selected={selected} onSelect={setSelected} />
+      <CroftScene>
+        <CroftField tiles={croft.tiles} now={now} selected={selected} onSelect={setSelected} />
+      </CroftScene>
 
       <section aria-label="Selected tile" className="flex flex-col gap-2">
         {tile && <p className="m-0 text-sm">{describeTile(tile, now)}</p>}
