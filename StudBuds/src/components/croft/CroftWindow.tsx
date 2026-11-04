@@ -215,7 +215,7 @@ export default function CroftWindow({ id, open, onClose, ownerId }: CroftWindowP
       {village.crofts === null ? (
         <p className="m-0 text-sm opacity-70">Finding your neighbors…</p>
       ) : village.crofts.length === 0 ? (
-        <p className="m-0 text-sm opacity-70">No one else at your school has a croft yet.</p>
+        <p className="m-0 text-sm opacity-70">No one else has a croft yet.</p>
       ) : (
         <ul className="m-0 p-0 flex flex-col gap-2">
           {village.crofts.map((c) => (
@@ -244,7 +244,7 @@ export default function CroftWindow({ id, open, onClose, ownerId }: CroftWindowP
       id={id}
       title={croft ? croftName(croft.ownerName) : 'Croft'}
       accent={WINDOW_ACCENTS.mint}
-      info="A small farm of your own. Till, sow, water and harvest; crops keep growing while you’re away. Classmates can visit your croft from your profile card or the village, and water one crop a day for you."
+      info="A small farm of your own. Till, sow, water and harvest; crops keep growing while you’re away. Other students, at any school, can visit your croft from your profile card or the village, and water one crop a day for you."
       open={open}
       onClose={onClose}
       controls={{ close: 'enabled', fullscreen: 'enabled' }}

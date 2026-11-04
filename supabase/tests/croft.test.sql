@@ -1,7 +1,8 @@
 -- Tests for migrations/*_croft.sql.
 -- Everything runs in one transaction that is rolled back, so no test data is left behind.
 -- now() is fixed inside a transaction, so growing times compare exactly.
--- A farms; B (Vanderbilt) and C (RIT, a linked school) visit; N is at a school that isn't linked.
+-- A farms; B (Vanderbilt) and C (RIT, a linked school) visit; N is at a school that isn't linked,
+-- and can visit too since crofts work across schools.
 
 begin;
 create extension if not exists pgtap with schema extensions;
@@ -132,10 +133,9 @@ select is(
 );
 
 set local request.jwt.claims to '{"sub": "c1000000-0000-4000-8000-00000000000c", "role": "authenticated"}';
-select throws_ok(
+select lives_ok(
   $$select public.croft_view('a1000000-0000-4000-8000-00000000000a')$$,
-  'P0001', 'That croft isn’t open to you.',
-  'A school that isn''t linked can''t visit'
+  'A student at another school can visit too (migrations/*_crofts_across_schools.sql)'
 );
 select throws_ok(
   $$select * from public.crofts$$,

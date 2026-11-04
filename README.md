@@ -48,8 +48,8 @@ After that you land on Home, which works like a small desktop:
   for it, which loops quietly while you study. The theme picker and the music controls are in the
   gear menu at the right end of the nav bar.
 - **Croft**, under "Upcoming" in the same gear menu, is a tiny Celtic farm of your own. You plant
-  and harvest, visit classmates' crofts from their profile cards or the village list, and water one
-  crop a day for them. It's there to make the site feel like a place with people in it.
+  and harvest, visit other students' crofts (at any school) from their profile cards or the village
+  list, and water one crop a day for them. It's there to make the site feel like a place with people in it.
 - The **activity feed** at the bottom right pops up quiet messages as things happen: a new session
   that fits you, someone visiting or watering your croft.
 

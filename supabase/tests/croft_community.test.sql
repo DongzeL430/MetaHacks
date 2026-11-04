@@ -1,13 +1,14 @@
 -- Tests for migrations/*_croft_community.sql.
 -- Everything runs in one transaction that is rolled back, so no test data is left behind.
 -- A and B play (Vanderbilt); D is at Vanderbilt but never opened the game; N is at a school that
--- isn't linked. The live database may hold real crofts too, so checks look only at these students,
--- and the valley's counts are compared with where they started.
+-- isn't linked, and still sees and visits all of it, since crofts work across schools
+-- (migrations/*_crofts_across_schools.sql). The live database may hold real crofts too, so checks
+-- look only at these students, and the valley's counts are compared with where they started.
 
 begin;
 create extension if not exists pgtap with schema extensions;
 
-select plan(20);
+select plan(21);
 
 insert into auth.users (id, email, raw_user_meta_data) values
   ('a1000000-0000-4000-8000-00000000000a', 'a@vanderbilt.edu', '{"adult_confirmed": true}'),
@@ -130,15 +131,17 @@ select is(
 
 set local request.jwt.claims to '{"sub": "c1000000-0000-4000-8000-00000000000c", "role": "authenticated"}';
 select is(
-  public.croft_valley(),
-  current_setting('test.valley_n')::jsonb,
-  'A school that isn''t linked has its own valley: nothing here changed it'
+  (select jsonb_build_array(
+     (v ->> 'harvests')::integer - (b ->> 'harvests')::integer,
+     (v ->> 'helps')::integer - (b ->> 'helps')::integer,
+     (v ->> 'crofts')::integer - (b ->> 'crofts')::integer)
+   from public.croft_valley() v, (select current_setting('test.valley_n')::jsonb) x(b)),
+  '[1, 1, 2]'::jsonb,
+  'A student at another school shares the same valley'
 );
-select is(
-  (select count(*)::integer from public.croft_village()
-   where owner_id in ('a1000000-0000-4000-8000-00000000000a', 'b1000000-0000-4000-8000-00000000000b')),
-  0,
-  'And its own village'
+select ok(
+  exists (select 1 from public.croft_village() where owner_id = 'a1000000-0000-4000-8000-00000000000a'),
+  'And sees A in the village'
 );
 
 
@@ -146,17 +149,17 @@ select is(
 
 set local request.jwt.claims to '{"sub": "b1000000-0000-4000-8000-00000000000b", "role": "authenticated"}';
 select is(
-  (select array_agg(id) from public.croft_names(array['a1000000-0000-4000-8000-00000000000a', 'c1000000-0000-4000-8000-00000000000c']::uuid[])),
-  array['a1000000-0000-4000-8000-00000000000a']::uuid[],
-  'Names come back only for students in the same community'
+  (select array_agg(id order by id) from public.croft_names(array['a1000000-0000-4000-8000-00000000000a', 'c1000000-0000-4000-8000-00000000000c']::uuid[])),
+  array['a1000000-0000-4000-8000-00000000000a', 'c1000000-0000-4000-8000-00000000000c']::uuid[],
+  'Names come back for visitors from any school'
 );
 select ok(
   private.croft_topic_allowed('croft:a1000000-0000-4000-8000-00000000000a'),
   'B may join the presence channel of A''s croft'
 );
 select ok(
-  not private.croft_topic_allowed('croft:c1000000-0000-4000-8000-00000000000c'),
-  'But not of a croft at a school that isn''t linked'
+  private.croft_topic_allowed('croft:c1000000-0000-4000-8000-00000000000c'),
+  'And of a croft at another school'
 );
 select ok(
   not private.croft_topic_allowed('lobby:anything'),
@@ -165,8 +168,14 @@ select ok(
 
 set local request.jwt.claims to '{"sub": "c1000000-0000-4000-8000-00000000000c", "role": "authenticated"}';
 select ok(
-  not private.croft_topic_allowed('croft:a1000000-0000-4000-8000-00000000000a'),
-  'A student at a school that isn''t linked can''t join A''s'
+  private.croft_topic_allowed('croft:a1000000-0000-4000-8000-00000000000a'),
+  'A student at another school can join A''s'
+);
+select public.block_student('a1000000-0000-4000-8000-00000000000a');
+select throws_ok(
+  $$select public.croft_view('a1000000-0000-4000-8000-00000000000a')$$,
+  'P0001', 'That croft isn’t open to you.',
+  'Blocking still closes crofts both ways'
 );
 
 reset role;

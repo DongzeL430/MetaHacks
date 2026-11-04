@@ -143,7 +143,7 @@ export function useCroft(ownerId: string | null, enabled = true) {
   return { croft, error, busy, act, refresh: load };
 }
 
-/** Your school's village and this week in the valley (public.croft_village, public.croft_valley) */
+/** The village and this week in the valley, across every school (public.croft_village, public.croft_valley) */
 export function useVillage(enabled: boolean) {
   const [crofts, setCrofts] = useState<VillageCroft[] | null>(null);
   const [valley, setValley] = useState<ValleyWeek | null>(null);

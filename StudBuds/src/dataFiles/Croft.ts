@@ -11,8 +11,8 @@
  *  - Decorations go on grass. Clearing one gives nothing back.
  *  - A visitor can help once a day: watering a dry seed starts it, and watering a growing crop
  *    takes a quarter of its growing time off. The owner sees who helped and can thank them.
- *  - The village lists the school's crofts (only students who've played), and the valley counts
- *    the week's harvests and help. "Here now" shows who's on a croft at the moment.
+ *  - The village lists crofts from every school (only students who've played), and the valley
+ *    counts the week's harvests and help. "Here now" shows who's on a croft at the moment.
  *  - Growth runs on the server's clock, so crops keep growing while the site is closed.
  */
 
@@ -92,7 +92,7 @@ export interface CroftThanks {
   at: string;
 }
 
-/** A croft in your school's village (only students who've played appear) */
+/** A croft in the village, from any school (only students who've played appear) */
 export interface VillageCroft {
   ownerId: string;
   ownerName: string;
@@ -107,7 +107,7 @@ export interface VillageCroft {
   connected: boolean;
 }
 
-/** This week in your school's valley (weeks start Monday) */
+/** This week in the valley, across every school (weeks start Monday) */
 export interface ValleyWeek {
   harvests: number;
   helps: number;
