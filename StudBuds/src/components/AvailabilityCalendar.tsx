@@ -30,6 +30,11 @@ export const PICKED_BUSY = 'bg-[repeating-linear-gradient(45deg,var(--color-busy
 
 export type CalendarMode = 'paint' | 'block';
 
+/** The calendar's default hours, used by the pre-survey. Other schedules read these so their time blocks line up. */
+export const DEFAULT_START_HOUR = 8;
+export const DEFAULT_END_HOUR = 23;
+export const DEFAULT_SLOT_MINUTES = 30;
+
 interface AvailabilityCalendarProps {
   /**
    * 'paint' (default): drag to mark any slots as free, for saving availability.
@@ -97,9 +102,9 @@ export default function AvailabilityCalendar({
   name = 'availability',
   days,
   weekStartsOn = 0,
-  startHour = 8,
-  endHour = 23,
-  slotMinutes = 30,
+  startHour = DEFAULT_START_HOUR,
+  endHour = DEFAULT_END_HOUR,
+  slotMinutes = DEFAULT_SLOT_MINUTES,
   defaultValue = [],
   onChange,
   allowIcsImport = true,

@@ -1,7 +1,12 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import AppWindow, { WINDOW_ACCENTS } from './AppWindow';
 import type { InitialSize } from './AppWindow';
-import AvailabilityCalendar, { PICKED_BUSY } from './AvailabilityCalendar';
+import AvailabilityCalendar, {
+  DEFAULT_END_HOUR,
+  DEFAULT_SLOT_MINUTES,
+  DEFAULT_START_HOUR,
+  PICKED_BUSY,
+} from './AvailabilityCalendar';
 import { DoodleCombobox, DoodleSelect } from './DoodleSelect';
 import {
   LOCATION_SUGGESTIONS,
@@ -18,7 +23,12 @@ export interface ScheduleGrid {
   slotMinutes: 15 | 30 | 60;
 }
 
-const DEFAULT_GRID: ScheduleGrid = { startHour: 8, endHour: 23, slotMinutes: 30 };
+// Taken from the calendar itself, so the host picker always shows the pre-survey's time blocks
+const DEFAULT_GRID: ScheduleGrid = {
+  startHour: DEFAULT_START_HOUR,
+  endHour: DEFAULT_END_HOUR,
+  slotMinutes: DEFAULT_SLOT_MINUTES,
+};
 
 export interface NewLobbyDetails {
   subject: string;
