@@ -9,8 +9,8 @@ sessions most likely to suit you at the top.
 
 **Live site:** [studbudstm.netlify.app](https://studbudstm.netlify.app)
 
-We built StudBuds for the Meta Global AI Developer Hackathon (https://cerebralvalley.ai/e/meta-ai-developer-hackathon). Everything in this repo was made during
-the hackathon.
+We built StudBuds for the [Meta Global AI Developer Hackathon](https://cerebralvalley.ai/e/meta-ai-developer-hackathon).
+Everything in this repo was made during the hackathon.
 
 ## What it does
 
@@ -47,16 +47,18 @@ After that you land on Home, which works like a small desktop:
   writes the color palette, Muse Image paints the background, and Muse composes a short music box tune
   for it, which loops quietly while you study. The theme picker and the music controls are in the
   gear menu at the right end of the nav bar.
-- **Croft**, under "Upcoming" in the same gear menu, is a tiny Celtic farm of your own. You plant
-  and harvest, visit other students' crofts (at any school) from their profile cards or the village
-  list, and water one crop a day for them. It's there to make the site feel like a place with people in it.
+- **Croft**, under "Upcoming" in the same gear menu, is a tiny Celtic farm of your own: a thatched
+  cottage, a barn and a fountain, with sheep wandering the meadow and bleating now and then (on the
+  music's volume). You grow six crops and place decorations, visit other students' crofts (at any
+  school) from their profile cards or the village list, and water one crop a day for them. It's
+  there to make the site feel like a place with people in it.
 - The **activity feed** at the bottom right pops up quiet messages as things happen: a new session
   that fits you, someone visiting or watering your croft.
 
 ## Try it
 
-1. Open [the site](https://studbudstm.netlify.app) and sign up with your `.edu` email. You'll get an 8-digit code by email (no links,
-   so school mail scanners can't use it up).
+1. Open [the site](https://studbudstm.netlify.app) and sign up with your `.edu` email. You'll get an
+   8-digit code by email (no links, so school mail scanners can't use it up).
 2. Go through the survey. Try the schedule screenshot on the calendar page and "Auto-fill courses" on
    the courses page if you want to see Muse at work.
 3. On Home, the welcome tour shows you around. Open Study Lobbies and host a session.
@@ -85,9 +87,6 @@ daily budget before it's made.
 | Session subjects | Muse Spark 1.3 | Links a free-form subject ("orgo midterm cram") to the course it's about, so it reaches the right people |
 | Themes | Muse Spark 1.3, Muse Image | Writes a readable color palette, paints and checks a background, composes a tune |
 
-The game art for Croft is drawn in code. We're using Muse Code, Meta's coding agent, to make the pixel
-sprites (see `docs/croft-muse-code.md`).
-
 ## Privacy and safety choices
 
 - Students only show up once they've finished the survey, so half-made accounts never appear.
@@ -112,8 +111,9 @@ sprites (see `docs/croft-muse-code.md`).
 React 19, TypeScript and Vite 8, styled with Tailwind 4 and doodle.css. Supabase handles auth (email
 codes, Cloudflare Turnstile), Postgres with row-level security, Realtime for chat and live updates,
 storage, and the Deno Edge Functions that call Muse. The music is synthesized in the browser with the
-Web Audio API from the score Muse writes. The database has nearly 400 pgTAP checks in
-`supabase/tests`.
+Web Audio API from the score Muse writes, and so are the croft's sheep bleats. The croft's pixel art
+(the farm, every crop at each stage of growth, the decorations) is drawn in code, with no image
+files. The database has nearly 400 pgTAP checks in `supabase/tests`.
 
 ## Running it yourself
 

@@ -7,7 +7,7 @@ import type { CroftTile } from '../../dataFiles/Croft';
  * wall around the field. Everything is drawn in code
  * on a pixel grid with one fixed, earthy palette, so it looks the same in every theme (the window
  * around it still follows the theme). Purely decorative, so screen readers skip it.
- * The crop and decoration sprites are Muse Code's part (docs/croft-muse-code.md).
+ * The crops and decorations on the field are in CroftSprites.tsx.
  */
 
 /** One fixed palette for the whole croft */

@@ -4,6 +4,7 @@ import PersonAvatar from '../PersonAvatar';
 import ViewTabs, { viewPanelId, viewTabId } from '../ViewTabs';
 import CroftField, { describeTile } from './CroftField';
 import CroftScene from './CroftScene';
+import { VillageStatusIcon } from './CroftSprites';
 import { CROPS, DECORATIONS, croftName, cropStage } from '../../dataFiles/Croft';
 import type { CropKey, DecorationKey, VillageCroft } from '../../dataFiles/Croft';
 import { useCroft, useCroftPresence, useNow, useVillage, useVisitCroft } from '../../lib/croft';
@@ -226,7 +227,10 @@ export default function CroftWindow({ id, open, onClose, ownerId }: CroftWindowP
               <PersonAvatar person={{ id: c.ownerId, name: c.ownerName, avatar: c.avatar }} className="w-9 h-9" />
               <span className="flex-1 min-w-0 flex flex-col">
                 <span className="truncate">{croftName(c.ownerName)}</span>
-                <span className="text-xs opacity-75 truncate">{villageStatus(c)}</span>
+                <span className="flex items-center gap-1 text-xs opacity-75 min-w-0">
+                  <VillageStatusIcon kind={c.drySeeds > 0 ? 'water' : c.ready > 0 ? 'ready' : c.growing > 0 ? 'growing' : 'empty'} />
+                  <span className="truncate">{villageStatus(c)}</span>
+                </span>
               </span>
               {c.connected && <span className="px-1.5 rounded bg-free/45 text-xs">Connected</span>}
               {c.helpedToday && <span className="px-1.5 rounded bg-sand text-xs">Helped today</span>}
