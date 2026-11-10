@@ -170,8 +170,10 @@ How it works (`supabase/migrations/20261110000000_demo_viewer.sql`):
   migration. `supabase/tests/demo_viewer.test.sql` fails if one is missing.
 - The demo login can't change its own password or email, and log out only signs out its own
   browser, so one visitor can't lock out the others.
-- Edge Functions refuse demo logins (no Muse calls). Muse's picks and study spots show only
-  what's already cached for the student.
+- Muse: the demo gets 10 uses a day in all, shared by everyone using it, instead of the
+  per-feature limits (`private.muse_settings.demo_daily_uses`; the shared daily budget still
+  applies). Uses count under the demo login's own id. Themes it makes go into its own library and
+  last for the visit. Avatar and nickname changes stay off, since they'd change the student's profile.
 - Realtime and Storage don't go through PostgREST, so a demo login gets no live updates; lists
   still load and refresh.
 

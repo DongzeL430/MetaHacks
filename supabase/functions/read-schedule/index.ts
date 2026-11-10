@@ -4,7 +4,7 @@
 
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 import { BUDGET_PAUSED, LIMIT_CHECK_FAILED, claimMuseUse, refundMuseUse, untilFree } from '../_shared/museBudget.ts';
-import { DEMO_READ_ONLY, demoOf } from '../_shared/demo.ts';
+import { demoLimitReached, demoOf } from '../_shared/demo.ts';
 
 // Base64 of a ~6 MB image. The page shrinks screenshots to well under this before sending.
 const MAX_IMAGE_CHARS = 8_000_000;
@@ -75,7 +75,7 @@ Deno.serve(async (req) => {
   const token = (req.headers.get('Authorization') ?? '').replace(/^Bearer /, '');
   const { data: auth } = await supabase.auth.getUser(token);
   if (!auth.user) return fail(401, 'Log in to read a schedule.');
-  if (demoOf(auth.user)) return fail(403, DEMO_READ_ONLY);
+  const demo = !!demoOf(auth.user);
   const userId = auth.user.id;
 
   let image: unknown;
@@ -92,7 +92,7 @@ Deno.serve(async (req) => {
   // Counted before calling Meta, so failed or abandoned reads still count toward the limit
   const claim = await claimMuseUse(supabase, userId, 'read_schedule');
   if (!claim.ok) {
-    if (claim.reason === 'student') return fail(429, `You've used today's screenshot reads. Mark your times by hand, or try again ${untilFree(claim.retry_at)}.`);
+    if (claim.reason === 'student') return fail(429, demo ? demoLimitReached(claim.retry_at) : `You've used today's screenshot reads. Mark your times by hand, or try again ${untilFree(claim.retry_at)}.`);
     return claim.reason === 'everyone' ? fail(503, BUDGET_PAUSED) : fail(500, LIMIT_CHECK_FAILED);
   }
 

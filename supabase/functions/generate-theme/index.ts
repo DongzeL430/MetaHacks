@@ -15,7 +15,7 @@
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 import type { SupabaseClient } from 'jsr:@supabase/supabase-js@2';
 import { BUDGET_PAUSED, LIMIT_CHECK_FAILED, claimMuseUse, refundMuseUse, untilFree } from '../_shared/museBudget.ts';
-import { DEMO_READ_ONLY, demoOf } from '../_shared/demo.ts';
+import { actingId, demoLimitReached, demoOf } from '../_shared/demo.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
@@ -543,7 +543,7 @@ function backgroundPrompt(idea: string): string {
  * theme music, or its music didn't come out right). Saved into the theme, and into the theme in use
  * if it's this one. Its own limit (theme_music), so it never uses one of the weekly themes.
  */
-async function composeForSavedTheme(admin: SupabaseClient, userId: string, themeId: unknown): Promise<Response> {
+async function composeForSavedTheme(admin: SupabaseClient, userId: string, themeId: unknown, demo: boolean): Promise<Response> {
   if (typeof themeId !== 'string' || !/^[0-9a-f-]{36}$/.test(themeId)) return json({ error: 'Pick a theme from your library.' }, 400);
   const { data: row } = await admin.from('saved_themes').select('theme').eq('id', themeId).eq('user_id', userId).maybeSingle();
   if (!row) return json({ error: 'That theme isn’t in your library.' }, 404);
@@ -553,7 +553,7 @@ async function composeForSavedTheme(admin: SupabaseClient, userId: string, theme
   const claim = await claimMuseUse(admin, userId, 'theme_music');
   if (!claim.ok) {
     if (claim.reason === 'student') {
-      return json({ error: `Muse has written today’s music for older themes. It can write more ${untilFree(claim.retry_at)}.` }, 429);
+      return json({ error: demo ? demoLimitReached(claim.retry_at) : `Muse has written today’s music for older themes. It can write more ${untilFree(claim.retry_at)}.` }, 429);
     }
     return json({ error: claim.reason === 'everyone' ? BUDGET_PAUSED : LIMIT_CHECK_FAILED }, claim.reason === 'everyone' ? 503 : 500);
   }
@@ -597,7 +597,8 @@ Deno.serve(async (req) => {
     data: { user },
   } = await admin.auth.getUser(token);
   if (!user) return json({ error: 'Sign in to make a theme.' }, 401);
-  if (demoOf(user)) return json({ error: DEMO_READ_ONLY }, 403);
+  // A demo login makes themes into its own library (under its own id), never the shown student's
+  const demo = !!demoOf(user);
   if (!META_API_KEY) return json({ error: 'Themes aren’t set up yet.' }, 503);
 
   let body: { prompt?: unknown; action?: unknown; themeId?: unknown } = {};
@@ -608,10 +609,10 @@ Deno.serve(async (req) => {
   }
 
   // Themes are a Home feature, so only students who finished the pre-survey can make them
-  const { data: account } = await admin.from('profiles').select('onboarding_status').eq('id', user.id).single();
+  const { data: account } = await admin.from('profiles').select('onboarding_status').eq('id', actingId(user)).single();
   if (account?.onboarding_status !== 'onboarded') return json({ error: 'Finish the pre-survey first.' }, 403);
 
-  if (body.action === 'compose') return composeForSavedTheme(admin, user.id, body.themeId);
+  if (body.action === 'compose') return composeForSavedTheme(admin, user.id, body.themeId, demo);
 
   const prompt = typeof body.prompt === 'string' ? body.prompt.trim() : '';
   if (prompt.length < MIN_PROMPT || prompt.length > MAX_PROMPT) {
@@ -622,7 +623,7 @@ Deno.serve(async (req) => {
   const claim = await claimMuseUse(admin, user.id, 'theme');
   if (!claim.ok) {
     if (claim.reason === 'student') {
-      return json({ error: `You’ve made this week’s 3 themes. You can make another ${untilFree(claim.retry_at)}.` }, 429);
+      return json({ error: demo ? demoLimitReached(claim.retry_at) : `You’ve made this week’s 3 themes. You can make another ${untilFree(claim.retry_at)}.` }, 429);
     }
     return json({ error: claim.reason === 'everyone' ? BUDGET_PAUSED : LIMIT_CHECK_FAILED }, claim.reason === 'everyone' ? 503 : 500);
   }

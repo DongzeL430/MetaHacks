@@ -93,6 +93,14 @@ function Home() {
   const study = useStudyData();
   const studySpots = useStudySpots();
   const demo = useIsDemo();
+  // On phones the demo note shows for a few seconds after Home loads
+  const [demoNoteShort, setDemoNoteShort] = useState(false);
+  const homeShown = me.ready && study.ready;
+  useEffect(() => {
+    if (!demo || !homeShown) return;
+    const timer = window.setTimeout(() => setDemoNoteShort(true), 5000);
+    return () => window.clearTimeout(timer);
+  }, [demo, homeShown]);
   const location = useLocation();
   const fromSurvey = (location.state as { fromSurvey?: boolean } | null)?.fromSurvey ?? false;
   // Just finished the survey: a short tour of Home, shown once per account
@@ -137,6 +145,7 @@ function Home() {
           ) : undefined
         }
         avatarUrl={me.avatarUrl}
+        taskbarTag={demo ? 'Demo' : undefined}
         taskbarRight={
           error ? (
             <p role="alert" className="m-0 max-w-[16rem] text-sm leading-tight">
@@ -170,9 +179,12 @@ function Home() {
         onDeleteAccount={deleteMyAccount}
       />
       {demo && (
+        // Wider screens keep it. On phones it fades after a few seconds, leaving "Demo" in the nav bar.
         <p
           role="note"
-          className="pointer-events-none fixed left-1/2 -translate-x-1/2 bottom-4 z-[70] m-0 w-max max-w-[calc(100vw-2rem)] px-3 py-1 rounded-full bg-nav text-nav-ink text-sm text-center leading-tight shadow-md"
+          className={`pointer-events-none fixed left-1/2 -translate-x-1/2 bottom-4 z-[70] m-0 w-max max-w-[calc(100vw-2rem)] px-3 py-1 rounded-full bg-nav text-nav-ink text-sm text-center leading-tight shadow-md motion-safe:transition-opacity motion-safe:duration-700 ${
+            demoNoteShort ? 'max-sm:opacity-0' : ''
+          }`}
         >
           {DEMO_NOTICE}
         </p>

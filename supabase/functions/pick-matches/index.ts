@@ -13,7 +13,7 @@
 
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 import { BUDGET_PAUSED, LIMIT_CHECK_FAILED, claimMuseUse, refundMuseUse, untilFree } from '../_shared/museBudget.ts';
-import { demoOf } from '../_shared/demo.ts';
+import { demoLimitReached, demoOf } from '../_shared/demo.ts';
 
 const TAKE = 8;
 const MAX_PICKS = 3;
@@ -185,11 +185,10 @@ Deno.serve(async (req) => {
   if (cached) {
     return reply(200, { picks: (cached.picks as Pick[]).filter((p) => byId.has(p.lobbyId)), cached: true });
   }
-  if (demo) return reply(200, { picks: [] });
 
-  const claim = await claimMuseUse(supabase, userId, 'match_picks');
+  const claim = await claimMuseUse(supabase, auth.user.id, 'match_picks');
   if (!claim.ok) {
-    if (claim.reason === 'student') return fail(429, `Muse’s picks are back ${untilFree(claim.retry_at)}.`);
+    if (claim.reason === 'student') return fail(429, demo ? demoLimitReached(claim.retry_at) : `Muse’s picks are back ${untilFree(claim.retry_at)}.`);
     return claim.reason === 'everyone' ? fail(503, BUDGET_PAUSED) : fail(500, LIMIT_CHECK_FAILED);
   }
 

@@ -69,6 +69,8 @@ interface HomePageProps {
   avatarUrl?: string;
   /** Optional content for the right side of the taskbar (step counter, clock, etc.) */
   taskbarRight?: ReactNode;
+  /** A short word beside the avatar in the taskbar on phones, e.g. "Demo" */
+  taskbarTag?: string;
   /** Other users who can appear in lobbies and connections */
   people?: Person[];
   /** The user's free slots from the pre-survey calendar ("mon|09:30"), shown when hosting and used by lobby filters */
@@ -113,6 +115,7 @@ export default function HomePage({
   avatar,
   avatarUrl,
   taskbarRight,
+  taskbarTag,
   people = [],
   myAvailability,
   mySubjects,
@@ -281,6 +284,7 @@ export default function HomePage({
         profile={{ open: profileOpen, onClick: () => setProfileOpen((o) => !o) }}
         avatar={avatar}
         right={taskbarRight}
+        tag={taskbarTag}
         apps={taskbarApps}
         gearApps={gearApps}
         music={{

@@ -11,7 +11,7 @@
 
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 import { BUDGET_PAUSED, LIMIT_CHECK_FAILED, claimMuseUse, refundMuseUse, untilFree } from '../_shared/museBudget.ts';
-import { DEMO_READ_ONLY, demoOf } from '../_shared/demo.ts';
+import { actingId, demoLimitReached, demoOf } from '../_shared/demo.ts';
 
 const MAX_NAMES = 25;
 const MAX_MAJORS = 3;
@@ -217,8 +217,9 @@ Deno.serve(async (req) => {
   const token = (req.headers.get('Authorization') ?? '').replace(/^Bearer /, '');
   const { data: auth } = await supabase.auth.getUser(token);
   if (!auth.user) return fail(401, 'Log in to check your courses.');
-  if (demoOf(auth.user)) return fail(403, DEMO_READ_ONLY);
-  const userId = auth.user.id;
+  // A demo login reads as the student it shows; its Muse uses count under its own id
+  const demo = !!demoOf(auth.user);
+  const userId = actingId(auth.user);
 
   // The school always comes from the student's own .edu email, never from the request.
   const { data: profile } = await supabase
@@ -297,9 +298,9 @@ Deno.serve(async (req) => {
   if (open.length === 0) return reply(200, { courses: [...results.values()] });
 
   // Everything left needs Muse, which counts toward the daily limit
-  const claim = await claimMuseUse(supabase, userId, 'format_courses');
+  const claim = await claimMuseUse(supabase, auth.user.id, 'format_courses');
   if (!claim.ok) {
-    if (claim.reason === 'student') return fail(429, `You've used today's course checks. Your courses can still be saved as you typed them, or try again ${untilFree(claim.retry_at)}.`);
+    if (claim.reason === 'student') return fail(429, demo ? demoLimitReached(claim.retry_at) : `You've used today's course checks. Your courses can still be saved as you typed them, or try again ${untilFree(claim.retry_at)}.`);
     return claim.reason === 'everyone' ? fail(503, BUDGET_PAUSED) : fail(500, LIMIT_CHECK_FAILED);
   }
 

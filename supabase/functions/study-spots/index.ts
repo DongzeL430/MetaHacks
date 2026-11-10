@@ -6,7 +6,7 @@
 
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 import { BUDGET_PAUSED, LIMIT_CHECK_FAILED, claimMuseUse, refundMuseUse, untilFree } from '../_shared/museBudget.ts';
-import { demoOf } from '../_shared/demo.ts';
+import { demoLimitReached, demoOf } from '../_shared/demo.ts';
 
 const CACHE_DAYS = 30;
 const MAX_SPOTS = 15;
@@ -195,12 +195,11 @@ Deno.serve(async (req) => {
   if (cached) {
     return reply(200, { spots: orderFor(cached.spots as Spot[], answer('noise'), answer('location')), cached: true });
   }
-  if (demo) return reply(200, { spots: [] });
 
-  const claim = await claimMuseUse(supabase, userId, 'study_spots');
+  const claim = await claimMuseUse(supabase, auth.user.id, 'study_spots');
   if (!claim.ok) {
     if (claim.reason === 'student') {
-      return fail(429, `Study spots can be looked up again ${untilFree(claim.retry_at)}. You can still type a place.`);
+      return fail(429, demo ? demoLimitReached(claim.retry_at) : `Study spots can be looked up again ${untilFree(claim.retry_at)}. You can still type a place.`);
     }
     return claim.reason === 'everyone' ? fail(503, BUDGET_PAUSED) : fail(500, LIMIT_CHECK_FAILED);
   }

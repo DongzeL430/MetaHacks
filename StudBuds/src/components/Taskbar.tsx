@@ -71,6 +71,8 @@ interface TaskbarProps {
   visibleApps?: string[];
   /** Optional extra content at the right end of the bar (step counter, clock, etc.) */
   right?: ReactNode;
+  /** A short word beside the avatar on phones, e.g. "Demo" for the view-only demo login */
+  tag?: string;
   /**
    * Apps that live in the gear menu at the very right of the bar instead of in the row of links,
    * e.g. the Upcoming drop-down. Each shows as its icon in the gear's capsule.
@@ -623,6 +625,7 @@ export default function Taskbar({
   apps = [],
   visibleApps,
   right,
+  tag,
   gearApps = [],
   theme,
   music,
@@ -670,6 +673,8 @@ export default function Taskbar({
               )}
               {/* Phones show only the avatar, leaving room for the links */}
               <span className="hidden sm:inline min-w-0 truncate text-base md:text-lg">{userName}</span>
+              {/* Phones only, where the name is hidden: e.g. "Demo" */}
+              {tag && <span className="sm:hidden shrink-0 pr-2 text-xs font-bold uppercase tracking-wide">{tag}</span>}
             </>
           );
           return profile ? (

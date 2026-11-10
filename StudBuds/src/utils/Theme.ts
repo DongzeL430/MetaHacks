@@ -116,8 +116,9 @@ export function contrastRatio(a: string, b: string): number {
  * Unknown names, bad values and unreadable color pairs are dropped (those fall back to the default),
  * and each one is listed in `problems`.
  * Pass the signed-in user's id so a generated background can only point at their own folder.
+ * The demo login passes two: the shown student's folder and its own (where its themes go).
  */
-export function sanitizeTheme(input: unknown, userId?: string): { theme: UserTheme; problems: string[] } | null {
+export function sanitizeTheme(input: unknown, userId?: string | string[]): { theme: UserTheme; problems: string[] } | null {
   if (!isObject(input) || input.version !== 1) return null;
   const problems: string[] = [];
 
@@ -156,7 +157,8 @@ export function sanitizeTheme(input: unknown, userId?: string): { theme: UserThe
     let image: ThemeBackground['image'] = { kind: 'default' };
     if (isObject(bg.image) && bg.image.kind === 'generated') {
       const path = bg.image.path;
-      const ownFolder = !userId || (typeof path === 'string' && path.startsWith(`${userId}/`));
+      const ownFolder =
+        !userId || (typeof path === 'string' && [userId].flat().some((id) => id && path.startsWith(`${id}/`)));
       if (typeof path === 'string' && GENERATED_PATH.test(path) && ownFolder) image = { kind: 'generated', path };
       else problems.push('Background image wasn’t usable, so the default picture is shown.');
     }

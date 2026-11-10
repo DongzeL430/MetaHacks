@@ -59,7 +59,8 @@ export default function InviteConnectionsPopup({
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
-        className="absolute inset-0 z-[70] p-3"
+        // Phones: over the desk. Wider screens: over the whole screen, nav bar included
+        className="absolute sm:fixed inset-0 z-[70] p-3"
         onPointerDown={(e) => {
           if (e.target === e.currentTarget) onClose();
         }}

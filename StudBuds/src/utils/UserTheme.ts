@@ -225,7 +225,10 @@ export function useUserTheme() {
         throw new Error(message);
       }
       if (typeof data?.themesLeft === 'number') setThemesLeft(data.themesLeft);
-      const checked = sanitizeTheme(data?.theme, userId ?? undefined);
+      // A demo login's themes are saved in its own folder, not the shown student's, and last for this visit
+      const { data: auth } = await supabase.auth.getSession();
+      const folders = [userId, auth.session?.user.id].filter((id): id is string => !!id);
+      const checked = sanitizeTheme(data?.theme, folders);
       if (!checked) throw new Error('That theme didn’t come out right. Try describing it a little differently.');
       // The theme function already saved it to the library and switched it on
       setSaved(checked.theme);
