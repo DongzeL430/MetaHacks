@@ -1,5 +1,5 @@
 import { Fragment, useMemo, useRef, useState } from 'react';
-import type { ChangeEvent, KeyboardEvent, PointerEvent } from 'react';
+import type { ChangeEvent, CSSProperties, KeyboardEvent, PointerEvent } from 'react';
 import { icsToAvailability } from '../utils/IcsAvailability';
 import { readScheduleScreenshot, scheduleToAvailability } from '../utils/ScheduleScreenshot';
 
@@ -467,8 +467,13 @@ export default function AvailabilityCalendar({
         </p>
       )}
 
+      <p className="sm:hidden m-0 text-xs opacity-70">
+        {isBlock ? 'Press a time and drag down to pick.' : 'Drag across the grid to mark times.'} Swipe on the times at the
+        left to scroll.
+      </p>
+
       <div className="overflow-x-auto">
-        <div className="min-w-max w-full rounded-md border-2 border-ink overflow-hidden">
+        <div className="w-full sm:min-w-max rounded-md border-2 border-ink overflow-hidden">
           <div
             ref={gridRef}
             role="group"
@@ -477,11 +482,10 @@ export default function AvailabilityCalendar({
                 ? 'Pick when the session meets: press a time, then drag (or Shift + arrow keys) to extend it'
                 : 'Select the times you’re free to study each week'
             }
-            className="grid select-none"
-            style={{
-              gridTemplateColumns: `4.5rem repeat(${columns.length}, minmax(3.5rem, 1fr))`,
-              touchAction: 'none', // lets touch drag select instead of scrolling
-            }}
+            // Phones: every day fits the width, so there's no sideways scrolling. Wider screens: roomier
+            // columns, scrolling sideways if they don't fit.
+            className="grid select-none grid-cols-[2.75rem_repeat(var(--days),minmax(0,1fr))] sm:grid-cols-[4.5rem_repeat(var(--days),minmax(3.5rem,1fr))]"
+            style={{ '--days': columns.length } as CSSProperties}
             onPointerDown={onPointerDown}
             onPointerMove={onPointerMove}
             onPointerUp={endDrag}
@@ -494,7 +498,7 @@ export default function AvailabilityCalendar({
               <div
                 key={d.key}
                 title={d.long}
-                className={`bg-sand py-2 text-center border-b-2 border-b-ink/70 ${
+                className={`bg-sand py-2 text-center text-sm sm:text-base border-b-2 border-b-ink/70 ${
                   c < lastCol ? `border-r ${LINE}` : ''
                 }`}
               >
@@ -506,7 +510,7 @@ export default function AvailabilityCalendar({
             {rows.map((mins, r) => (
               <Fragment key={mins}>
                 <div
-                  className={`h-7 px-2 pt-1 text-xs text-right leading-none bg-sand-soft border-r ${LINE} ${rowBottom(r, mins)}`}
+                  className={`h-7 px-1 sm:px-2 pt-1 text-[0.65rem] sm:text-xs text-right leading-none whitespace-nowrap bg-sand-soft border-r ${LINE} ${rowBottom(r, mins)}`}
                 >
                   {mins % 60 === 0 ? formatTime(mins) : ''}
                 </div>
@@ -539,7 +543,9 @@ export default function AvailabilityCalendar({
                       data-r={r}
                       data-c={c}
                       className={[
-                        'h-7 cursor-pointer transition-colors duration-100',
+                        // touch-none: a finger dragging over slots selects instead of scrolling. Only the
+                        // slots, so a swipe on the times or day names still scrolls the page on phones.
+                        'h-7 cursor-pointer touch-none transition-colors duration-100',
                         'outline-none focus-visible:outline-2 focus-visible:outline-dashed focus-visible:-outline-offset-4 focus-visible:outline-ink',
                         color,
                         c < lastCol ? `border-r ${LINE}` : '',

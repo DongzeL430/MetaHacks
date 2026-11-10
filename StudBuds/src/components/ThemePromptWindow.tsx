@@ -38,7 +38,8 @@ interface ThemePromptWindowProps {
 /**
  * Popup that explains custom themes and takes a description of the look the user wants.
  * Dims the page, floats above every window, and stays out of the tiling layout.
- * Closes with its X, Cancel, Escape, or a click on the dimmed area.
+ * Closes with its X, Escape, a click on the dimmed area, or Cancel (shown while Muse is making a
+ * theme; the theme still finishes on the server and switches on when it's ready).
  * Render it in the desk area (which needs `relative`), not inside a WindowLayer.
  */
 export default function ThemePromptWindow({
@@ -145,15 +146,18 @@ export default function ThemePromptWindow({
           minHeight={300}
           footer={
             <div className="flex flex-wrap items-center gap-3">
-              <p role="status" className={`m-0 flex-1 min-w-[10rem] text-sm ${error ? 'text-danger' : 'opacity-80'}`}>
-                {footerNote}
-              </p>
-              <button type="button" onClick={onClose} className="px-3 py-0.5 text-sm">
-                Cancel
-              </button>
               <button type="button" onClick={() => void generate()} disabled={!canGenerate} className="px-3 py-0.5 text-sm">
                 {working ? 'Making…' : 'Make my theme'}
               </button>
+              <p role="status" className={`m-0 flex-1 min-w-[10rem] text-sm ${error ? 'text-danger' : 'opacity-80'}`}>
+                {footerNote}
+              </p>
+              {/* Only while Muse is making the theme; otherwise the window's X closes it */}
+              {working && (
+                <button type="button" onClick={onClose} className="px-3 py-0.5 text-sm">
+                  Cancel
+                </button>
+              )}
             </div>
           }
         >

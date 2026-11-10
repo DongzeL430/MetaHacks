@@ -475,8 +475,8 @@ export default function CoursesSection({ value, onChange, missing, onOpenAutofil
                     <select
                       value={course.grade}
                       onChange={(e) => updateCourse(course.id, { grade: e.target.value })}
-                      // Room on the right for doodle.css's arrow, which px-2 would cover
-                      className="pl-2 pr-8 py-1"
+                      // Room on the right for doodle.css's arrow, which px-2 would cover. Smaller on phones.
+                      className="pl-2 pr-8 py-1 max-sm:pl-1.5 max-sm:pr-6 max-sm:py-0.5 max-sm:text-sm max-sm:max-w-[7.5rem]"
                     >
                       <option value="">No grade</option>
                       {GRADE_GROUPS.map((group) => (

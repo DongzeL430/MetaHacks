@@ -325,7 +325,7 @@ export default function ProfileEditorWindow({
                   ) : (
                     <PersonAvatar person={{ id: 'me', name: draft.nickname || '?' }} className="w-20 h-20" />
                   )}
-                  <div className="flex flex-col items-start gap-1.5">
+                  <div className="flex flex-col items-start gap-1.5 min-w-0">
                     <p className="m-0 text-sm opacity-70">This is how you appear in lobbies and in the nav bar.</p>
                     {onRedrawAvatar && (
                       <button
@@ -333,7 +333,8 @@ export default function ProfileEditorWindow({
                         onClick={() => void redraw()}
                         disabled={drawing || outOfChanges}
                         title="Muse draws a new avatar from your saved nickname"
-                        className="px-3 py-0.5 text-sm"
+                        // Phones: grows and shrinks with the screen, and wraps rather than overflowing
+                        className="px-3 py-0.5 text-sm max-sm:max-w-full max-sm:px-[clamp(0.5rem,3vw,0.75rem)] max-sm:text-[clamp(0.75rem,0.6rem+1vw,0.875rem)] max-sm:leading-tight max-sm:text-balance"
                       >
                         {drawing ? 'Drawing…' : 'Draw a new avatar'}
                       </button>
