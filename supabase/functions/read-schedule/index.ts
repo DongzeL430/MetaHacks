@@ -4,6 +4,7 @@
 
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 import { BUDGET_PAUSED, LIMIT_CHECK_FAILED, claimMuseUse, refundMuseUse, untilFree } from '../_shared/museBudget.ts';
+import { DEMO_READ_ONLY, demoOf } from '../_shared/demo.ts';
 
 // Base64 of a ~6 MB image. The page shrinks screenshots to well under this before sending.
 const MAX_IMAGE_CHARS = 8_000_000;
@@ -74,6 +75,7 @@ Deno.serve(async (req) => {
   const token = (req.headers.get('Authorization') ?? '').replace(/^Bearer /, '');
   const { data: auth } = await supabase.auth.getUser(token);
   if (!auth.user) return fail(401, 'Log in to read a schedule.');
+  if (demoOf(auth.user)) return fail(403, DEMO_READ_ONLY);
   const userId = auth.user.id;
 
   let image: unknown;

@@ -4,6 +4,7 @@ import type { Json } from '../../../supabase/database.types.ts';
 import { sanitizeMusic } from './Music';
 import { applyThemeColors, backgroundStyle, sanitizeTheme } from './Theme';
 import type { UserTheme } from './Theme';
+import { actingId } from '../lib/demo.ts';
 
 /** How long a signed link to a generated background lasts. It's renewed whenever the theme loads. */
 const SIGNED_URL_SECONDS = 60 * 60;
@@ -86,7 +87,7 @@ export function useUserTheme() {
     };
     // Supabase calls inside the auth callback can deadlock, so loading starts just after it
     const { data } = supabase.auth.onAuthStateChange((_event, session) => {
-      setTimeout(() => void load(session?.user.id ?? null), 0);
+      setTimeout(() => void load(actingId(session?.user)), 0);
     });
     return () => {
       cancelled = true;

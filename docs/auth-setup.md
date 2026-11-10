@@ -151,3 +151,39 @@ After sign-up, the student has to enter the emailed code before they can sign in
 - `config.toml` mirrors the hosted project's settings on purpose. The CLI's template defaults differ from a hosted project, so run `config diff` before every `config push`.
 - The hook is set in `config.toml`. If someone turns it off in the dashboard, the trigger still blocks bad sign-ups, but the user sees a generic "Database error saving new user" instead of the readable message.
 - `generate_nickname` checks for an existing nickname before using one. Two people signing up in the same instant with the same random draw would make one sign-up fail. At our scale that's unlikely; retrying works.
+
+## The view-only demo login
+
+For visitors without a school email (employers looking at the UI), the log-in page can show a
+"Try the demo" button. It signs in to a shared demo login that sees one real student's account
+(their Home, sessions, connections, croft and profile) and can't change anything.
+
+How it works (`supabase/migrations/20261110000000_demo_viewer.sql`):
+
+- The demo login is a normal auth user whose `app_metadata.demo_of` is the shown student's id.
+  Only the service key can set `app_metadata`.
+- Reads: PostgREST runs `public.demo_pre_request()` before every request. For a demo login it
+  swaps the token's `sub` for the student's id, so every policy and function answers as them.
+- Writes: a trigger on every table in `public` and `private` refuses changes during a demo
+  request ("This is a view-only demo account…"), even inside security definer functions.
+  **New tables need it too:** `select private.add_demo_guard('public.new_table');` in the
+  migration. `supabase/tests/demo_viewer.test.sql` fails if one is missing.
+- The demo login can't change its own password or email, and log out only signs out its own
+  browser, so one visitor can't lock out the others.
+- Edge Functions refuse demo logins (no Muse calls). Muse's picks and study spots show only
+  what's already cached for the student.
+- Realtime and Storage don't go through PostgREST, so a demo login gets no live updates; lists
+  still load and refresh.
+
+Set it up (or rotate its password), from the repo root:
+
+```sh
+npx supabase@2.122.0 db push --linked
+npx supabase@2.122.0 functions deploy
+node --env-file=.env scripts/demo-account.mjs <student email>
+```
+
+The script prints `VITE_DEMO_EMAIL` and `VITE_DEMO_PASSWORD`. Put both in `.env` and in the
+Netlify site's environment variables, then redeploy. The password ends up in the browser bundle;
+that's fine, since the login can only look. To turn the demo off, remove those two variables
+and delete the demo user in the dashboard.

@@ -3,6 +3,7 @@ import { CROPS } from '../dataFiles/Croft';
 import { ME } from '../dataFiles/StudyData';
 import type { Lobby, Person } from '../dataFiles/StudyData';
 import { listenerTopic, supabase } from './supabase.ts';
+import { actingId } from './demo.ts';
 
 /*
  * The live activity feed at the bottom right of Home, like a game's world chat. Lines appear when:
@@ -93,7 +94,7 @@ export function useWorldChat(lobbies: Lobby[], people: Map<string, Person>) {
 
   useEffect(() => {
     void supabase.auth.getUser().then(({ data }) => {
-      const id = data.user?.id ?? null;
+      const id = actingId(data.user);
       me.current = id;
       // Lines that came in while the account was loading stay after the saved ones
       if (id) {
@@ -149,7 +150,7 @@ export function useWorldChat(lobbies: Lobby[], people: Map<string, Person>) {
     let cancelled = false;
     const thanked = new Set<number>();
     void supabase.auth.getUser().then(({ data }) => {
-      const me = data.user?.id;
+      const me = actingId(data.user);
       if (cancelled || !me) return;
       channel = supabase
         .channel(listenerTopic('world-chat'))

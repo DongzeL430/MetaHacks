@@ -15,6 +15,7 @@
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 import type { SupabaseClient } from 'jsr:@supabase/supabase-js@2';
 import { BUDGET_PAUSED, LIMIT_CHECK_FAILED, claimMuseUse, refundMuseUse, untilFree } from '../_shared/museBudget.ts';
+import { DEMO_READ_ONLY, demoOf } from '../_shared/demo.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
@@ -596,6 +597,7 @@ Deno.serve(async (req) => {
     data: { user },
   } = await admin.auth.getUser(token);
   if (!user) return json({ error: 'Sign in to make a theme.' }, 401);
+  if (demoOf(user)) return json({ error: DEMO_READ_ONLY }, 403);
   if (!META_API_KEY) return json({ error: 'Themes aren’t set up yet.' }, 503);
 
   let body: { prompt?: unknown; action?: unknown; themeId?: unknown } = {};

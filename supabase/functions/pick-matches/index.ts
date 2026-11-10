@@ -13,6 +13,7 @@
 
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 import { BUDGET_PAUSED, LIMIT_CHECK_FAILED, claimMuseUse, refundMuseUse, untilFree } from '../_shared/museBudget.ts';
+import { demoOf } from '../_shared/demo.ts';
 
 const TAKE = 8;
 const MAX_PICKS = 3;
@@ -149,7 +150,9 @@ Deno.serve(async (req) => {
   const token = (req.headers.get('Authorization') ?? '').replace(/^Bearer /, '');
   const { data: auth } = await supabase.auth.getUser(token);
   if (!auth.user) return fail(401, 'Log in to see Muse’s picks.');
-  const userId = auth.user.id;
+  // A demo login sees the picks of the student it shows, but only ones already made
+  const demo = demoOf(auth.user);
+  const userId = demo ?? auth.user.id;
 
   let mySchoolOnly = true;
   try {
@@ -182,6 +185,7 @@ Deno.serve(async (req) => {
   if (cached) {
     return reply(200, { picks: (cached.picks as Pick[]).filter((p) => byId.has(p.lobbyId)), cached: true });
   }
+  if (demo) return reply(200, { picks: [] });
 
   const claim = await claimMuseUse(supabase, userId, 'match_picks');
   if (!claim.ok) {

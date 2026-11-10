@@ -8,6 +8,7 @@ import type {
   CourseSearchResult,
   CourseSuggestionQuery,
 } from '../components/CoursesSection';
+import { actingId } from './demo.ts';
 
 type Grade = Database['public']['Enums']['letter_grade'];
 
@@ -57,7 +58,7 @@ export async function matchCourses(query: CourseMatchQuery): Promise<CourseMatch
 /** Saves the student's majors (with tracks) and minors, replacing what was saved before. */
 export async function savePrograms(academics: AcademicProfile): Promise<void> {
   const { data } = await supabase.auth.getSession();
-  const userId = data.session?.user.id;
+  const userId = actingId(data.session?.user);
   if (!userId) throw new Error('Not signed in');
 
   const rows = [

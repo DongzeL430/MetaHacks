@@ -6,6 +6,7 @@
 
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 import { BUDGET_PAUSED, LIMIT_CHECK_FAILED, claimMuseUse, refundMuseUse, untilFree } from '../_shared/museBudget.ts';
+import { demoOf } from '../_shared/demo.ts';
 
 const CACHE_DAYS = 30;
 const MAX_SPOTS = 15;
@@ -161,7 +162,9 @@ Deno.serve(async (req) => {
   const token = (req.headers.get('Authorization') ?? '').replace(/^Bearer /, '');
   const { data: auth } = await supabase.auth.getUser(token);
   if (!auth.user) return fail(401, 'Log in to see study spots.');
-  const userId = auth.user.id;
+  // A demo login sees the spots of the student it shows, but only ones already found
+  const demo = demoOf(auth.user);
+  const userId = demo ?? auth.user.id;
 
   // The school always comes from the student's own .edu email, never from the request
   const { data: profile } = await supabase
@@ -192,6 +195,7 @@ Deno.serve(async (req) => {
   if (cached) {
     return reply(200, { spots: orderFor(cached.spots as Spot[], answer('noise'), answer('location')), cached: true });
   }
+  if (demo) return reply(200, { spots: [] });
 
   const claim = await claimMuseUse(supabase, userId, 'study_spots');
   if (!claim.ok) {

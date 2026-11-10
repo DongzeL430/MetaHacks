@@ -6,6 +6,7 @@ import { listenerTopic, supabase } from './supabase.ts';
 import { ME } from '../dataFiles/StudyData';
 import type { ConnectionStatus, Lobby, Person } from '../dataFiles/StudyData';
 import type { StudyAction, StudyState } from '../utils/StudyState';
+import { actingId } from './demo.ts';
 
 /** After a burst of changes (a request, then an accept), reload once */
 const RELOAD_DELAY_MS = 250;
@@ -149,7 +150,7 @@ export function useStudyData() {
     void supabase.auth.getSession().then(({ data }) => {
       const user = data.session?.user;
       if (cancelled || !user) return;
-      myId.current = user.id;
+      myId.current = actingId(user);
       void load();
       // Any change to a lobby or its members reloads the lists (each student only gets changes
       // they're allowed to see). A fresh topic each time, so a quick close and reopen can't land

@@ -5,6 +5,7 @@ import type { AuthError, Session } from '@supabase/supabase-js';
 import { prefetchStudySpots } from './lib/spots.ts';
 import { supabase } from './lib/supabase.ts';
 import Turnstile from './Turnstile.tsx';
+import { DEMO_LOGIN, DEMO_NOTICE, demoOf, logOut } from './lib/demo.ts';
 // This session's default background picture, shared with Home
 import { defaultBackground as defaultbg } from './utils/DefaultBackground.ts';
 import BearLogo from './components/BearLogo';
@@ -180,6 +181,25 @@ export default function AuthPage() {
     }
   };
 
+  // The view-only demo login, for visitors without a school email (employers trying the UI)
+  const onTryDemo = async (): Promise<void> => {
+    if (!DEMO_LOGIN) return;
+    if (!captchaToken) {
+      setError('The bot check is still loading. Try again in a moment.');
+      return;
+    }
+    setError('');
+    setSending(true);
+    const { error: authError } = await supabase.auth.signInWithPassword({
+      ...DEMO_LOGIN,
+      options: { captchaToken },
+    });
+    setSending(false);
+    setCaptchaReset((n) => n + 1);
+    if (authError) setError(describeError(authError));
+    else goIn();
+  };
+
   const onVerify = async (e: FormEvent<HTMLFormElement>): Promise<void> => {
     e.preventDefault();
     const token = code.replace(/\s/g, '');
@@ -296,7 +316,7 @@ export default function AuthPage() {
   const onLogOut = async (): Promise<void> => {
     setNotice('');
     setConfirmingDelete(false);
-    await supabase.auth.signOut();
+    await logOut();
   };
 
   const onDeleteAccount = async (): Promise<void> => {
@@ -361,7 +381,7 @@ export default function AuthPage() {
 
             {session === undefined ? null : session && resetStep === 'none' ? (
               <div className="flex flex-col gap-4">
-                <p>You are signed in as {session.user.email}.</p>
+                <p>{demoOf(session.user) ? DEMO_NOTICE : `You are signed in as ${session.user.email}.`}</p>
                 {notice && <p>{notice}</p>}
                 <button type="button" onClick={goIn} className={`self-center ${PRIMARY_BUTTON}`}>
                   Continue
@@ -370,7 +390,7 @@ export default function AuthPage() {
                   Log out
                 </button>
 
-                {confirmingDelete ? (
+                {demoOf(session.user) ? null : confirmingDelete ? (
                   <div className="flex flex-col gap-3 mt-4">
                     <p>This deletes your account and everything tied to you. It can&rsquo;t be undone.</p>
                     <label className="flex flex-col gap-1">
@@ -642,6 +662,15 @@ export default function AuthPage() {
                 <button type="button" onClick={openForgotPassword} className={`self-center ${SECONDARY_BUTTON}`}>
                   Forgot password?
                 </button>
+              )}
+
+              {!signup && DEMO_LOGIN && (
+                <div className="mt-2 flex flex-col items-center gap-1 text-center">
+                  <p className="m-0 text-sm">No school email? Look around a real student’s account, view only.</p>
+                  <button type="button" onClick={() => void onTryDemo()} disabled={sending} className={SECONDARY_BUTTON}>
+                    Try the demo
+                  </button>
+                </div>
               )}
             </form>
             )}

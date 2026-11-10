@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { PostgrestError } from '@supabase/supabase-js';
 import { listenerTopic, supabase } from '../lib/supabase';
+import { actingId } from '../lib/demo.ts';
 
 /**
  * Chat limits. The database enforces these (supabase/migrations/…_lobby_chat.sql);
@@ -72,8 +73,8 @@ export function useLobbyChat(lobbyId: string | null) {
 
   // Who's signed in, so the window can tell your messages apart
   useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => setMyId(data.user?.id ?? null));
-    const { data } = supabase.auth.onAuthStateChange((_event, session) => setMyId(session?.user.id ?? null));
+    supabase.auth.getUser().then(({ data }) => setMyId(actingId(data.user)));
+    const { data } = supabase.auth.onAuthStateChange((_event, session) => setMyId(actingId(session?.user)));
     return () => data.subscription.unsubscribe();
   }, []);
 

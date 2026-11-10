@@ -9,6 +9,7 @@
 
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 import { BUDGET_PAUSED, LIMIT_CHECK_FAILED, claimMuseUse, refundMuseUse, untilFree } from '../_shared/museBudget.ts';
+import { DEMO_READ_ONLY, demoOf } from '../_shared/demo.ts';
 
 const NICK_MIN = 2;
 const NICK_MAX = 24;
@@ -175,6 +176,7 @@ Deno.serve(async (req) => {
   const token = (req.headers.get('Authorization') ?? '').replace(/^Bearer /, '');
   const { data: auth } = await supabase.auth.getUser(token);
   if (!auth.user) return fail(401, 'Log in to change your avatar.');
+  if (demoOf(auth.user)) return fail(403, DEMO_READ_ONLY);
   const userId = auth.user.id;
 
   let body: { action?: unknown; nickname?: unknown };

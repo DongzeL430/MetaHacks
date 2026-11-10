@@ -7,6 +7,7 @@
 
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 import { BUDGET_PAUSED, LIMIT_CHECK_FAILED, claimMuseUse, refundMuseUse, untilFree } from '../_shared/museBudget.ts';
+import { DEMO_READ_ONLY, demoOf } from '../_shared/demo.ts';
 
 const MAX_CANDIDATES = 150;
 const UUID = /^[0-9a-f-]{36}$/;
@@ -81,6 +82,7 @@ Deno.serve(async (req) => {
   const token = (req.headers.get('Authorization') ?? '').replace(/^Bearer /, '');
   const { data: auth } = await supabase.auth.getUser(token);
   if (!auth.user) return fail(401, 'Log in to host a session.');
+  if (demoOf(auth.user)) return fail(403, DEMO_READ_ONLY);
   const userId = auth.user.id;
 
   let lobbyId: unknown;

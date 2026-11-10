@@ -1,5 +1,6 @@
 import { supabase } from './supabase.ts';
 import type { SurveySection } from '../dataFiles/SurveySections.ts';
+import { actingId } from './demo.ts';
 
 // Calendar day keys to the database's weekday numbers (ISO: 1 = Monday, 7 = Sunday)
 const WEEKDAY: Record<string, number> = { mon: 1, tue: 2, wed: 3, thu: 4, fri: 5, sat: 6, sun: 7 };
@@ -15,7 +16,7 @@ const toTime = (mins: number) => `${pad(Math.floor(mins / 60))}:${pad(mins % 60)
  */
 export async function saveAvailability(slots: string[]): Promise<void> {
   const { data } = await supabase.auth.getSession();
-  const userId = data.session?.user.id;
+  const userId = actingId(data.session?.user);
   if (!userId) throw new Error('Not signed in');
 
   const startsByDay = new Map<number, number[]>();

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { Session } from '@supabase/supabase-js';
 import { supabase } from './supabase.ts';
+import { actingId } from './demo.ts';
 
 /** loading: not known yet. new: signed in, pre-survey not finished. onboarded: in the match pool. */
 export type AccountStatus = 'loading' | 'signed-out' | 'new' | 'onboarded';
@@ -24,7 +25,7 @@ export function useAccount() {
       const { data, error } = await supabase
         .from('profiles')
         .select('onboarding_status')
-        .eq('id', next.user.id)
+        .eq('id', actingId(next.user)!)
         .maybeSingle();
       if (cancelled) return;
       if (error) {

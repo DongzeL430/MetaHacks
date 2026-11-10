@@ -13,6 +13,7 @@ import type {
 } from '../dataFiles/Croft';
 import { avatarUrlOf } from './profile.ts';
 import { listenerTopic, supabase } from './supabase.ts';
+import { actingId } from './demo.ts';
 
 /** How often crops visibly grow on screen; the database's clock decides when they're ready */
 const TICK_MS = 15_000;
@@ -105,7 +106,7 @@ export function useCroft(ownerId: string | null, enabled = true) {
         .channel(listenerTopic('croft-help'))
         .on(
           'postgres_changes',
-          { event: 'INSERT', schema: 'public', table: 'croft_help', filter: `owner_id=eq.${data.user.id}` },
+          { event: 'INSERT', schema: 'public', table: 'croft_help', filter: `owner_id=eq.${actingId(data.user)}` },
           () => void load(),
         )
         .subscribe();
@@ -188,7 +189,7 @@ export function useCroftPresence(ownerId: string | null, enabled: boolean): stri
     let cancelled = false;
     void (async () => {
       const { data } = await supabase.auth.getUser();
-      const me = data.user?.id;
+      const me = actingId(data.user);
       if (cancelled || !me) return;
       // Private channels are checked against the student's own session
       await supabase.realtime.setAuth();

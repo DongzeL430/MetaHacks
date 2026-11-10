@@ -7,7 +7,7 @@ import RequireAuth from './RequireAuth.tsx';
 import BearLogo from './components/BearLogo';
 import Tour, { useFirstTimeTour } from './components/Tour.tsx';
 import type { TourStep } from './components/Tour.tsx';
-import { supabase } from './lib/supabase.ts';
+import { DEMO_NOTICE, logOut, useIsDemo } from './lib/demo.ts';
 import { finishOnboarding, saveAnswers, saveAvailability } from './lib/onboarding.ts';
 import { findCourses, matchCourses, saveAcademics } from './lib/courses.ts';
 import { deleteMyAccount, loadSurveyProgress, useMyProfile } from './lib/profile.ts';
@@ -92,6 +92,7 @@ function Home() {
   const me = useMyProfile();
   const study = useStudyData();
   const studySpots = useStudySpots();
+  const demo = useIsDemo();
   const location = useLocation();
   const fromSurvey = (location.state as { fromSurvey?: boolean } | null)?.fromSurvey ?? false;
   // Just finished the survey: a short tour of Home, shown once per account
@@ -165,9 +166,17 @@ function Home() {
         onSaveProfile={me.save}
         onRedrawAvatar={me.redrawAvatar}
         identityChangesLeft={me.changesLeft}
-        onLogOut={() => void supabase.auth.signOut()}
+        onLogOut={() => void logOut()}
         onDeleteAccount={deleteMyAccount}
       />
+      {demo && (
+        <p
+          role="note"
+          className="pointer-events-none fixed left-1/2 -translate-x-1/2 bottom-4 z-[70] m-0 w-max max-w-[calc(100vw-2rem)] px-3 py-1 rounded-full bg-nav text-nav-ink text-sm text-center leading-tight shadow-md"
+        >
+          {DEMO_NOTICE}
+        </p>
+      )}
       {error && (
         // On phones the nav bar has no room for it, so the same message shows as a note over the page
         <p

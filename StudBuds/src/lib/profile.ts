@@ -8,6 +8,7 @@ import { callFunction } from './edgeFunctions.ts';
 import { saveAnswers, saveAvailability } from './onboarding.ts';
 import { rangesToSlots } from './slots.ts';
 import { supabase } from './supabase.ts';
+import { actingId } from './demo.ts';
 
 /** Public link to an avatar Muse drew (the avatars bucket is public; file names are random) */
 export const avatarUrlOf = (path: string | null | undefined) =>
@@ -111,7 +112,7 @@ export interface SurveyProgress {
  */
 export async function loadSurveyProgress(): Promise<SurveyProgress> {
   const { data: session } = await supabase.auth.getSession();
-  const id = session.session?.user.id;
+  const id = actingId(session.session?.user);
   if (!id) throw new Error('Not signed in');
   const [pub, slots, saved, picks, programs] = await Promise.all([
     supabase.from('public_profiles').select('nickname, avatar_path').eq('id', id).single(),
@@ -176,7 +177,7 @@ export function useMyProfile() {
     const loadProfile = async () => {
       // The saved session says who's signed in without a network call (RequireAuth checked it)
       const { data: session } = await supabase.auth.getSession();
-      const id = session.session?.user.id;
+      const id = actingId(session.session?.user);
       if (!id) return;
       const [pub, priv, slots, left, saved, picks, programs] = await Promise.all([
         supabase.from('public_profiles').select('nickname, avatar_path').eq('id', id).single(),
@@ -256,7 +257,7 @@ export function useMyProfile() {
       if (JSON.stringify(next.contact) !== JSON.stringify(contact)) {
         const { data: auth } = await supabase.auth.getUser();
         const clean = cleanContact(next.contact);
-        const { error } = await supabase.from('profiles').update(clean).eq('id', auth.user!.id);
+        const { error } = await supabase.from('profiles').update(clean).eq('id', actingId(auth.user)!);
         if (error) throw new Error('Your contact details didn’t save. Check them and try again.');
         result.contact = { instagram: clean.instagram ?? '', discord: clean.discord ?? '', phone: clean.phone ?? '' };
         setContact(result.contact);
@@ -310,7 +311,7 @@ export function useMyProfile() {
 /** The student's avatar and every theme background they generated */
 async function removeMyFiles(): Promise<void> {
   const { data: session } = await supabase.auth.getSession();
-  const id = session.session?.user.id;
+  const id = actingId(session.session?.user);
   if (!id) return;
   const { data: pub } = await supabase.from('public_profiles').select('avatar_path').eq('id', id).single();
   if (pub?.avatar_path) await supabase.storage.from('avatars').remove([pub.avatar_path]);
